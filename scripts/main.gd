@@ -10,9 +10,16 @@ var _screen: Node = null
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	if "--demo" in args or "--demo-frappe" in args:
+	if "--demo" in args or "--demo-frappe" in args or "--demo-competences" in args:
 		get_node("/root/Game").start_demo()
 		show_game()
+		if "--demo-competences" in args:
+			await get_tree().process_frame
+			var profile: Dictionary = get_node("/root/Game").profile
+			profile["skills_xp"]["physique"] = 130.0
+			profile["skills_xp"]["charisme"] = 45.0
+			profile["skills_xp"]["organisation"] = 260.0
+			_screen._open_skills()
 		if "--demo-frappe" in args:
 			await get_tree().process_frame
 			var f = _screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]

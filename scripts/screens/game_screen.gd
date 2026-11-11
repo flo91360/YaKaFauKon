@@ -11,6 +11,7 @@ const Studio = preload("res://scripts/world/studio.gd")
 const Character = preload("res://scripts/world/character.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 const TypingPanel = preload("res://scripts/ui/typing_panel.gd")
+const SkillsPanel = preload("res://scripts/ui/skills_panel.gd")
 
 const SLEEP_TIME_FACTOR := 24.0 # pendant le sommeil, le temps passe 24 fois plus vite
 const SLEEP_OTHER_NEEDS := 0.25 # les autres besoins baissent moins vite en dormant
@@ -29,6 +30,7 @@ var _action_done_minutes := 0.0
 var _last_typing_chars := 0
 var _menu: Control = null
 var _pause_menu: Control = null
+var _overlay: Control = null # panneau compétences / travail (le jeu est en pause)
 var _hovered = null
 var _was_red := {}
 
@@ -111,12 +113,14 @@ func _status_text() -> String:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		if _menu != null:
+		if _overlay != null:
+			_close_overlay()
+		elif _menu != null:
 			_close_menu()
 		elif not typing.is_open():
 			_toggle_pause()
 		return
-	if paused or typing.is_open() or _menu != null:
+	if paused or typing.is_open() or _menu != null or _overlay != null:
 		return
 	if event is InputEventMouseMotion:
 		var hit: Dictionary = studio.pick(event.position)
@@ -310,8 +314,26 @@ func _toggle_pause() -> void:
 
 # --- Étapes suivantes (compétences, carrières, missions) ---------------------------------
 
+func _open_overlay(panel: Control) -> void:
+	_close_overlay()
+	_close_menu()
+	_overlay = panel
+	paused = true
+	ui.add_child(panel)
+	panel.closed.connect(_close_overlay)
+
+
+func _close_overlay() -> void:
+	if _overlay != null:
+		_overlay.queue_free()
+		_overlay = null
+		paused = _pause_menu != null
+
+
 func _open_skills() -> void:
-	hud.toast("Les compétences arrivent bientôt.")
+	if typing.is_open():
+		return
+	_open_overlay(SkillsPanel.new())
 
 
 func _open_career() -> void:
