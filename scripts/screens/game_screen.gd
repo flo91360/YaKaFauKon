@@ -12,6 +12,8 @@ const Character = preload("res://scripts/world/character.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 const TypingPanel = preload("res://scripts/ui/typing_panel.gd")
 const SkillsPanel = preload("res://scripts/ui/skills_panel.gd")
+const CareerPanel = preload("res://scripts/ui/career_panel.gd")
+const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 
 const SLEEP_TIME_FACTOR := 24.0 # pendant le sommeil, le temps passe 24 fois plus vite
 const SLEEP_OTHER_NEEDS := 0.25 # les autres besoins baissent moins vite en dormant
@@ -31,6 +33,10 @@ var _last_typing_chars := 0
 var _menu: Control = null
 var _pause_menu: Control = null
 var _overlay: Control = null # panneau compétences / travail (le jeu est en pause)
+var _mission_state: Dictionary = {} # mission proposée ou en cours
+var _mission_panel: Control = null
+var _typing_mode := "action" # action / mission
+var _last_mission_id := ""
 var _hovered = null
 var _was_red := {}
 
@@ -209,6 +215,10 @@ func _start_typing(f, action_id: String) -> void:
 func _on_typing_finished(result: Dictionary) -> void:
 	var game = _game()
 	var profile: Dictionary = game.profile
+	if _typing_mode == "mission":
+		_typing_mode = "action"
+		_on_mission_item_typed(result)
+		return
 	match result["status"]:
 		"ok":
 			Progression.record_success(profile, result["cps"], typing.timed)
@@ -281,6 +291,9 @@ func _interrupt_action() -> void:
 
 func _on_skill_level_up(skill: String, level: int) -> void:
 	hud.toast("Bravo ! %s passe au niveau %d !" % [Data.SKILLS[skill]["label"], level], Color(0.65, 0.5, 0.85), 4.5)
+	# Les missions étaient faites mais il manquait une compétence : promotion maintenant.
+	if Progression.try_promotion(_game().profile):
+		_announce_promotion()
 
 
 # --- Pause ------------------------------------------------------------------------------
@@ -337,12 +350,133 @@ func _open_skills() -> void:
 
 
 func _open_career() -> void:
-	hud.toast("Le travail arrive bientôt.")
+	if typing.is_open():
+		return
+	var panel := CareerPanel.new()
+	panel.mission_available = not _mission_state.is_empty()
+	panel.career_chosen.connect(_on_career_chosen)
+	panel.mission_requested.connect(func():
+		_close_overlay()
+		_open_mission())
+	_open_overlay(panel)
+
+
+func _on_career_chosen(career: String) -> void:
+	var profile: Dictionary = _game().profile
+	if Progression.choose_career(profile, career):
+		_close_overlay()
+		_drop_mission()
+		profile["mission_timer"] = 3.0 # première mission très vite
+		hud.toast("Ton nouveau travail : %s !" % Data.CAREERS[career]["label"], UiTheme.COL_GOOD, 4.0)
+
+
+# --- Missions ---------------------------------------------------------------------------
+
+func _update_missions(profile: Dictionary, delta: float) -> void:
+	if profile["career"]["current"] == "" or not _mission_state.is_empty():
+		return
+	profile["mission_timer"] -= delta
+	if profile["mission_timer"] > 0.0:
+		return
+	var pool := Data.missions_for(profile["career"]["current"], Progression.current_tier(profile))
+	pool = pool.filter(func(m): return m["id"] != _last_mission_id) if pool.size() > 1 else pool
+	if pool.is_empty():
+		return
+	var mission: Dictionary = pool[randi() % pool.size()]
+	_last_mission_id = mission["id"]
+	_mission_state = {"data": mission, "step": "intro", "q": 0, "item": 0}
+	hud.set_mission_available(true)
+	hud.toast("Nouvelle mission : %s !" % mission["title"], Color(0.95, 0.5, 0.45), 5.0)
 
 
 func _open_mission() -> void:
-	pass
+	if _mission_state.is_empty() or _mission_panel != null or typing.is_open() or _overlay != null:
+		return
+	_close_menu()
+	var panel := MissionPanel.new()
+	panel.state = _mission_state
+	_mission_panel = panel
+	ui.add_child(panel)
+	ui.move_child(typing, -1)
+	panel.closed.connect(_close_mission_panel)
+	panel.abandoned.connect(_on_mission_abandoned)
+	panel.typing_requested.connect(_on_mission_typing_requested)
+	panel.completed.connect(_on_mission_completed)
 
 
-func _update_missions(_profile: Dictionary, _delta: float) -> void:
-	pass
+func _close_mission_panel() -> void:
+	if _mission_panel != null:
+		_mission_panel.queue_free()
+		_mission_panel = null
+
+
+func _drop_mission() -> void:
+	_close_mission_panel()
+	_mission_state = {}
+	hud.set_mission_available(false)
+	_game().profile["mission_timer"] = float(Progression.setting(_game().profile, "missions_minutes")) * 60.0
+
+
+func _on_mission_typing_requested(text: String, title: String) -> void:
+	var profile: Dictionary = _game().profile
+	var timed := Progression.next_is_timed(profile)
+	_typing_mode = "mission"
+	typing.open(text, title, timed, Progression.time_limit(profile, text) if timed else 0.0)
+
+
+func _on_mission_item_typed(result: Dictionary) -> void:
+	var game = _game()
+	var profile: Dictionary = game.profile
+	var ok: bool = result["status"] == "ok"
+	if ok:
+		Progression.record_success(profile, result["cps"], typing.timed)
+		if typing.timed:
+			game.session["chronos_reussis"] += 1
+	elif result["status"] == "timeout":
+		Progression.record_timeout(profile)
+		game.session["chronos_rates"] += 1
+	if _mission_panel != null:
+		_mission_panel.item_typed(ok)
+
+
+func _on_mission_abandoned() -> void:
+	var session: Dictionary = _game().session
+	session["missions_abandonnees"] += 1
+	session["taches_abandonnees"] += 1
+	_drop_mission()
+	hud.toast("Mission abandonnée. Une autre arrivera bientôt.", Color(0.6, 0.62, 0.68))
+
+
+func _on_mission_completed() -> void:
+	var game = _game()
+	var profile: Dictionary = game.profile
+	var career: String = profile["career"]["current"]
+	var pay := Progression.salary(profile)
+	game.add_money(pay)
+	var gained := []
+	var skills: Dictionary = Data.CAREERS[career]["mission_skills"]
+	game.session["missions_reussies"] += 1
+	game.session["taches_finies"] += 1
+	var promoted := Progression.complete_mission(profile)
+	for s in skills:
+		game.add_skill_xp(s, skills[s])
+		gained.append(Data.SKILLS[s]["label"])
+	_drop_mission()
+	hud.toast("Mission réussie ! + %d pièces" % pay, UiTheme.COL_GOOD, 5.0)
+	hud.toast("+ " + ", ".join(gained), UiTheme.COL_GOOD, 4.0)
+	if promoted:
+		_announce_promotion()
+	elif profile["career"]["missions"].get(career, 0) >= Data.MISSIONS_PER_TIER:
+		var missing := Progression.missing_for_next_tier(profile)
+		var parts := []
+		for s in missing:
+			parts.append("%s %d" % [Data.SKILLS[s]["label"], missing[s]])
+		if not parts.is_empty():
+			hud.toast("Pour monter de palier, il te faut : " + ", ".join(parts), UiTheme.COL_ACCENT, 6.0)
+
+
+func _announce_promotion() -> void:
+	var profile: Dictionary = _game().profile
+	var c: String = profile["career"]["current"]
+	var tier := Progression.current_tier(profile)
+	hud.toast("Promotion ! Tu deviens %s (palier %d)." % [Data.CAREERS[c]["tiers"][tier - 1]["title"], tier], Color(0.65, 0.5, 0.85), 7.0)

@@ -103,6 +103,44 @@ func _run() -> void:
 	print("Jauges dans le rouge")
 	check(game.session["rouge_sec"]["toilettes"] > 0.0, "temps dans le rouge mesuré")
 
+	print("Carrière et mission")
+	screen._open_career()
+	check(screen._overlay != null and screen.paused, "le panneau travail s'ouvre (jeu en pause)")
+	screen._on_career_chosen("artisan")
+	check(profile["career"]["current"] == "artisan" and screen._overlay == null, "carrière artisan choisie")
+	await _wait(4.5)
+	check(not screen._mission_state.is_empty(), "une mission est proposée")
+	screen._open_mission()
+	var panel = screen._mission_panel
+	check(panel != null, "le panneau de mission s'ouvre")
+	var mission: Dictionary = screen._mission_state["data"]
+	panel.state["step"] = "question"
+	panel.refresh()
+	for qi in mission["questions"].size():
+		var q: Dictionary = mission["questions"][qi]
+		var wrong: int = (q["good"] + 1) % q["choices"].size()
+		panel._answer(q, wrong, Button.new(), [true])
+		check(panel.state["q"] == qi, "mauvais choix : explication, on reste sur la question")
+		await panel._answer(q, q["good"], Button.new(), [false])
+	check(panel.state["step"] == "items", "après les choix : la liste à taper")
+	var money_before: int = profile["money"]
+	profile["typing"]["since_timed"] = 0
+	profile["settings"]["chrono"] = "jamais"
+	for i in mission["items"].size():
+		var text := Progression.text_for(mission["items"][i], profile)
+		screen._on_mission_typing_requested(text, "test")
+		screen.typing._input.text = text
+		screen.typing._submit()
+		await _wait(1.0)
+	await _wait(0.5)
+	check(screen._mission_state.is_empty(), "mission terminée")
+	check(profile["money"] == money_before + 20, "salaire versé (20 pièces au palier 1)")
+	check(profile["career"]["missions"]["artisan"] == 1, "mission comptée pour la carrière")
+	check(game.session["missions_reussies"] == 1, "mission réussie comptée pour l'ergo")
+	check(game.session["choix_total"] == mission["questions"].size(), "choix comptés")
+	screen._on_career_chosen("organisateur")
+	check(profile["career"]["current"] == "artisan", "changement refusé au palier 1")
+
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)

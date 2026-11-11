@@ -9,8 +9,8 @@ var _screen: Node = null
 
 
 func _ready() -> void:
-	var args := OS.get_cmdline_user_args()
-	if "--demo" in args or "--demo-frappe" in args or "--demo-competences" in args:
+	var args := Array(OS.get_cmdline_user_args())
+	if args.any(func(a): return a.begins_with("--demo")):
 		get_node("/root/Game").start_demo()
 		show_game()
 		if "--demo-competences" in args:
@@ -20,6 +20,18 @@ func _ready() -> void:
 			profile["skills_xp"]["charisme"] = 45.0
 			profile["skills_xp"]["organisation"] = 260.0
 			_screen._open_skills()
+		if "--demo-travail" in args:
+			await get_tree().process_frame
+			_screen._open_career()
+		if "--demo-mission" in args:
+			await get_tree().process_frame
+			var game = get_node("/root/Game")
+			_screen._on_career_chosen("organisateur")
+			game.profile["mission_timer"] = 0.0
+			await get_tree().create_timer(0.3).timeout
+			_screen._open_mission()
+			_screen._mission_panel.state["step"] = "question"
+			_screen._mission_panel.refresh()
 		if "--demo-frappe" in args:
 			await get_tree().process_frame
 			var f = _screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]
