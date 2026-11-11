@@ -78,6 +78,8 @@ func _game():
 func _process(delta: float) -> void:
 	var game = _game()
 	var profile: Dictionary = game.profile
+	if profile.is_empty(): # joueur en train de changer : l'écran va disparaître
+		return
 	if not paused:
 		var sleeping: bool = _state == "acting" and Data.ACTIONS[_action_id].get("sleep", false)
 		var factor := SLEEP_TIME_FACTOR if sleeping else 1.0
@@ -92,6 +94,7 @@ func _process(delta: float) -> void:
 
 func _update_needs(profile: Dictionary, hours: float, sleeping: bool, real_delta: float) -> void:
 	var speed: float = Progression.NEEDS_SPEED.get(Progression.setting(profile, "vitesse_besoins"), 1.0)
+	var any_red := false
 	for n in Data.NEED_ORDER:
 		var rate: float = Data.NEEDS[n]["decay"] * speed
 		if sleeping:
@@ -99,10 +102,13 @@ func _update_needs(profile: Dictionary, hours: float, sleeping: bool, real_delta
 		profile["needs"][n] = clampf(profile["needs"][n] - rate * hours, 0.0, 100.0)
 		var red: bool = profile["needs"][n] < Data.RED_THRESHOLD
 		if red:
+			any_red = true
 			_game().session["rouge_sec"][n] = _game().session["rouge_sec"].get(n, 0.0) + real_delta
 		if red and not _was_red[n]:
 			hud.toast("%s %s %s" % [profile["name"], Data.NEEDS[n]["alerte"], Data.NEEDS[n]["conseil"]], UiTheme.COL_BAD, 6.0)
 		_was_red[n] = red
+	if any_red:
+		_game().session["rouge_au_moins_une_sec"] = _game().session.get("rouge_au_moins_une_sec", 0.0) + real_delta
 
 
 func _status_text() -> String:

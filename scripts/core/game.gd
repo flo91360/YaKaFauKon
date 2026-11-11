@@ -186,6 +186,7 @@ func start_session() -> void:
 		"missions_reussies": 0, "missions_abandonnees": 0,
 		"choix_justes_du_premier_coup": 0, "choix_total": 0,
 		"rouge_sec": red,
+		"rouge_au_moins_une_sec": 0.0,
 		"competences_debut": Progression.skill_levels(profile),
 		"competences_fin": Progression.skill_levels(profile),
 		"argent_gagne": 0,
