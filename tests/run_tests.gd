@@ -5,6 +5,7 @@ extends SceneTree
 const TypingCheck = preload("res://scripts/core/typing_check.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Data = preload("res://scripts/core/data.gd")
+const Objectives = preload("res://scripts/core/objectives.gd")
 
 var _fails := 0
 var _count := 0
@@ -17,6 +18,9 @@ func _init() -> void:
 	_test_skills()
 	_test_careers()
 	_test_data()
+	_test_lexique()
+	_test_appearance()
+	_test_objectives()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -95,10 +99,12 @@ func _test_text_levels() -> void:
 	var p := _profile()
 	var texts: Array = Data.ACTIONS["toilettes"]["texts"]
 	check(Progression.text_for(texts, p) == "toilettes", "niveau 1 : mot-clé")
-	for i in 10:
+	for i in Progression.LEVEL_UP_SUCCESSES[1] - 1:
 		Progression.record_success(p, 1.0, false)
+	check(Progression.text_for(texts, p) == "toilettes", "encore niveau 1 juste avant le seuil")
+	Progression.record_success(p, 1.0, false)
 	check(Progression.text_for(texts, p) == "les toilettes", "niveau 2 : article + mot")
-	for i in 15:
+	for i in Progression.LEVEL_UP_SUCCESSES[2]:
 		Progression.record_success(p, 1.0, false)
 	check(Progression.text_for(texts, p) == "aller aux toilettes", "niveau 3 : petite phrase")
 	p["settings"]["niveau_texte"] = "1"
@@ -149,3 +155,126 @@ func _test_data() -> void:
 	for c in Data.CAREERS:
 		check(Data.CAREERS[c]["tiers"].size() == 5, "carrière %s : 5 paliers" % c)
 		check(Data.missions_for(c, 1).size() >= 2, "carrière %s : missions disponibles" % c)
+
+
+func _test_lexique() -> void:
+	print("Champs lexicaux")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	for id in Data.ACTIONS:
+		var has_skills: bool = not Data.ACTIONS[id]["skills"].is_empty()
+		check(Data.is_series(id) == has_skills, "action %s : série de mots si et seulement si elle entraîne une compétence" % id)
+		check(Data.ACTIONS[id].has("anim"), "action %s : animation définie" % id)
+	for id in Data.LEXIQUE:
+		var lists: Array = Data.LEXIQUE[id]
+		var total := 0
+		var clean := true
+		var all_words := []
+		for list in lists:
+			total += list.size()
+			for w in list:
+				clean = clean and not w.contains("œ") and not w.contains("'") and w == w.strip_edges() and w.length() >= 2
+				all_words.append(w)
+		check(lists.size() == 3 and total >= 25, "%s : 3 niveaux et au moins 25 mots (%d)" % [id, total])
+		check(clean, "%s : mots faciles à trouver sur le clavier" % id)
+		var unique := {}
+		for w in all_words:
+			unique[w] = true
+		check(unique.size() == all_words.size(), "%s : pas de mot en double" % id)
+		var easy := Data.series_words(id, 1, Data.WORDS_PER_SERIES, rng)
+		var only_easy := true
+		for w in easy:
+			only_easy = only_easy and w in lists[0]
+		check(easy.size() == Data.WORDS_PER_SERIES and only_easy, "%s : niveau 1 = mots courts, sans doublon dans la série" % id)
+		var hard := Data.series_words(id, 3, Data.WORDS_PER_SERIES, rng)
+		var no_easy := true
+		for w in hard:
+			no_easy = no_easy and not w in lists[0]
+		check(no_easy, "%s : niveau 3 = mots moyens et longs" % id)
+	check(Data.word_xp("endurance") > Data.word_xp("saut"), "un mot long rapporte plus qu'un mot court")
+	check(Data.main_skill("cuisiner") == "organisation" and Data.skill_weights("cuisiner")["creativite"] < 1.0, "compétence principale et secondaire")
+
+
+func _test_appearance() -> void:
+	print("Apparence")
+	var old := Data.complete_appearance({"skin": 3, "hair": 4, "hair_style": 2, "outfit": 1})
+	check(old["skin"] == 3 and old["hair"] == 4 and old["hair_style"] == 2 and old["outfit"] == 1, "apparence de la version 1 conservée")
+	check(old.size() == Data.APPEARANCE_COUNTS.size() and old["body"] == 0 and old["height"] == 2, "nouvelles options complétées")
+	var bad := Data.complete_appearance({"skin": 99, "height": -4, "glasses": 2.0})
+	check(bad["skin"] == Data.SKIN_COLORS.size() - 1 and bad["height"] == 0 and typeof(bad["glasses"]) == TYPE_INT, "valeurs hors limites corrigées")
+	var sizes_ok: bool = Data.SKIN_COLORS.size() == Data.APPEARANCE_COUNTS["skin"] and Data.HAIR_COLORS.size() == Data.APPEARANCE_COUNTS["hair"] \
+		and Data.HAIR_STYLES.size() == Data.APPEARANCE_COUNTS["hair_style"] and Data.OUTFIT_COLORS.size() == Data.APPEARANCE_COUNTS["outfit"] \
+		and Data.EYE_COLORS.size() == Data.APPEARANCE_COUNTS["eye_color"] and Data.HEIGHT_SCALES.size() == Data.APPEARANCE_COUNTS["height"] \
+		and Data.BUILD_FACTORS.size() == Data.APPEARANCE_COUNTS["build"] and Data.BODIES.size() == 2
+	check(sizes_ok, "listes d'options cohérentes")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var valid := true
+	for i in 50:
+		var a := Data.random_appearance(rng)
+		valid = valid and a == Data.complete_appearance(a)
+	check(valid, "personnages au hasard toujours valides")
+
+
+func _test_objectives() -> void:
+	print("Objectifs")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var p := _profile()
+	p["objectif"] = {}
+	p["objectifs_finis"] = 0
+	p["objectifs_choisis"] = 0
+	p["etoiles"] = 0
+	var first := Objectives.offers(p, rng)
+	var types := first.map(func(o): return o["type"])
+	check(first.size() == 3 and types == ["competence", "mots", "soins"], "premier choix guidé : compétence, mots, soins")
+	check(not "metier" in Objectives.candidates(p).map(func(o): return o["type"]), "pas d'objectif métier avant le premier objectif réussi")
+	# Objectif « taper des mots »
+	Objectives.choose(p, {"type": "mots", "action": "sport", "target": 2, "label": "x", "pieces": 10})
+	check(not Objectives.notify(p, "mot", {"action": "peindre"}), "un mot d'une autre activité ne compte pas")
+	check(not Objectives.notify(p, "mot", {"action": "sport"}) and is_equal_approx(Objectives.fraction(p), 0.5), "avancement à la moitié")
+	check(Objectives.notify(p, "mot", {"action": "sport"}) and Objectives.is_done(p), "objectif atteint au 2e mot")
+	var reward := Objectives.claim(p)
+	check(reward["pieces"] == 10 and p["etoiles"] == 1 and p["objectifs_finis"] == 1 and not Objectives.has_current(p), "récompense : pièces et étoile")
+	check(Objectives.claim(p).is_empty(), "pas de récompense sans objectif")
+	# Compétence
+	Objectives.choose(p, {"type": "competence", "skill": "physique", "target": 1, "label": "x", "pieces": 20})
+	p["skills_xp"]["physique"] = 10.0
+	check(is_equal_approx(Objectives.fraction(p), 0.5) and not Objectives.is_done(p), "compétence : barre à la moitié")
+	p["skills_xp"]["physique"] = 20.0
+	check(Objectives.is_done(p), "compétence : niveau atteint")
+	Objectives.claim(p)
+	# Jauges hors du rouge
+	Objectives.choose(p, {"type": "vert", "target": 10, "label": "x", "pieces": 5})
+	Objectives.notify(p, "temps", {"sec": 6.0, "rouge": false})
+	Objectives.notify(p, "temps", {"sec": 1.0, "rouge": true})
+	check(Objectives.current(p)["count"] == 0.0, "une jauge dans le rouge remet le compteur à zéro")
+	Objectives.notify(p, "temps", {"sec": 10.0, "rouge": false})
+	check(Objectives.is_done(p), "jauges hors du rouge assez longtemps")
+	Objectives.claim(p)
+	# Soins et séries
+	Objectives.choose(p, {"type": "soins", "target": 1, "label": "x", "pieces": 5})
+	check(not Objectives.notify(p, "action", {"action": "sport"}) and Objectives.notify(p, "action", {"action": "douche"}), "seules les actions de soin comptent")
+	Objectives.claim(p)
+	# Travail
+	var with_job := Objectives.candidates(p).map(func(o): return o["type"])
+	check("metier" in with_job and not "missions" in with_job, "sans métier : on propose d'en choisir un")
+	check("metier" in Objectives.offers(p, rng).map(func(o): return o["type"]), "le choix d'un métier est proposé en priorité")
+	Objectives.choose(p, {"type": "metier", "target": 1, "label": "x", "pieces": 20})
+	Progression.choose_career(p, "artisan")
+	check(Objectives.is_done(p), "objectif métier atteint")
+	Objectives.claim(p)
+	var job_types := Objectives.candidates(p).map(func(o): return o["type"])
+	check("missions" in job_types and "palier" in job_types and "argent" in job_types and not "metier" in job_types, "avec un métier : missions, palier, argent")
+	Objectives.choose(p, {"type": "argent", "target": 30, "label": "x", "pieces": 5})
+	check(not Objectives.notify(p, "argent", {"amount": 20}) and Objectives.notify(p, "argent", {"amount": 20}), "argent gagné compté")
+	Objectives.abandon(p)
+	check(not Objectives.has_current(p) and Objectives.fraction(p) == 0.0, "abandon : plus d'objectif")
+	var varied := true
+	for i in 30:
+		var offers := Objectives.offers(p, rng)
+		var seen := {}
+		for o in offers:
+			seen[o["type"]] = true
+		varied = varied and offers.size() == 3 and seen.size() == 3
+	check(varied, "toujours 3 propositions de types différents")

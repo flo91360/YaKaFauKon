@@ -1,9 +1,10 @@
 extends Node
 ## Autoload « Game » : profil en cours, sauvegarde locale, statistiques de séance,
-## lecture vocale et thème visuel.
+## réglages de l'ordinateur (son, graphismes), sons, lecture vocale et thème visuel.
 
 signal skill_level_up(skill: String, level: int)
 signal money_changed(amount: int)
+signal settings_changed
 
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
@@ -11,12 +12,20 @@ const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
 const AUTOSAVE_SEC := 20.0
+const SETTINGS_PATH := "user://reglages.json"
+## Réglages de l'ordinateur (communs à tous les joueurs).
+const DEFAULT_LOCAL_SETTINGS := {"volume": 70, "musique": 35, "qualite": 1, "plein_ecran": false}
+const QUALITY_LABELS := ["Léger", "Normal", "Beau"]
 
 var profile: Dictionary = {}
 var session: Dictionary = {}
 var demo_mode := false # profil de démonstration, jamais sauvegardé
 var _autosave_timer := 0.0
 var _tts_voice := ""
+var local_settings: Dictionary = DEFAULT_LOCAL_SETTINGS.duplicate()
+var _sounds := {}
+var _players: Array = []
+var _music: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -30,6 +39,9 @@ func _ready() -> void:
 	default_theme.default_font_size = theme.default_font_size
 	get_tree().root.theme = theme
 	get_tree().set_auto_accept_quit(false)
+	_load_local_settings()
+	_setup_audio()
+	apply_local_settings()
 
 
 func _notification(what: int) -> void:
@@ -58,10 +70,10 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 	for s in Data.SKILLS:
 		skills[s] = 0.0
 	return {
-		"version": 1,
+		"version": 2,
 		"id": "%d_%d" % [Time.get_unix_time_from_system(), randi() % 10000],
 		"name": child_name,
-		"appearance": appearance,
+		"appearance": Data.complete_appearance(appearance),
 		"created": Time.get_datetime_string_from_system(false, true),
 		"needs": needs,
 		"skills_xp": skills,
@@ -72,6 +84,12 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"typing": Progression.new_typing_state(),
 		"settings": Progression.DEFAULT_SETTINGS.duplicate(),
 		"sessions": [],
+		"objectif": {},
+		"objectifs_choisis": 0,
+		"objectifs_finis": 0,
+		"etoiles": 0,
+		"tuto_fait": false,
+		"mots_tapes": {},
 	}
 
 
@@ -103,7 +121,8 @@ func load_profile(data: Dictionary) -> void:
 
 
 func start_demo() -> void:
-	profile = new_profile_data("Camille", {"skin": 1, "hair": 1, "hair_style": 1, "outfit": 0})
+	profile = new_profile_data("Camille", {"skin": 1, "hair": 1, "hair_style": 4, "outfit": 3, "outfit_style": 1, "eye_color": 2, "blush": 1, "mouth": 1})
+	profile["tuto_fait"] = true
 	demo_mode = true
 	start_session()
 
@@ -161,8 +180,15 @@ func _sanitize(data: Dictionary) -> Dictionary:
 	data["typing"]["level_successes"] = int(data["typing"]["level_successes"])
 	data["typing"]["since_timed"] = int(data["typing"]["since_timed"])
 	data["settings"]["missions_minutes"] = int(data["settings"]["missions_minutes"])
-	for k in data["appearance"]:
-		data["appearance"][k] = int(data["appearance"][k])
+	data["appearance"] = Data.complete_appearance(data["appearance"])
+	data["version"] = 2
+	for key in ["objectifs_choisis", "objectifs_finis", "etoiles"]:
+		data[key] = int(data[key])
+	if not data["objectif"] is Dictionary:
+		data["objectif"] = {}
+	data["tuto_fait"] = bool(data["tuto_fait"])
+	for a in data["mots_tapes"]:
+		data["mots_tapes"][a] = int(data["mots_tapes"][a])
 	for c in data["career"]["tiers"]:
 		data["career"]["tiers"][c] = int(data["career"]["tiers"][c])
 	for c in data["career"]["missions"]:
@@ -190,6 +216,9 @@ func start_session() -> void:
 		"competences_debut": Progression.skill_levels(profile),
 		"competences_fin": Progression.skill_levels(profile),
 		"argent_gagne": 0,
+		"mots_ok": 0, "mots_par_activite": {},
+		"series_finies": 0, "series_interrompues": 0,
+		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0,
 	}
 	profile["sessions"].append(session)
 	_autosave_timer = 0.0
@@ -231,6 +260,96 @@ func add_money(amount: int) -> void:
 	profile["money"] += amount
 	session["argent_gagne"] = session.get("argent_gagne", 0) + amount
 	money_changed.emit(profile["money"])
+
+
+# --- Réglages de l'ordinateur, sons et musique ---------------------------------------
+
+func _load_local_settings() -> void:
+	var data := _read_json(SETTINGS_PATH) if FileAccess.file_exists(SETTINGS_PATH) else {}
+	for key in DEFAULT_LOCAL_SETTINGS:
+		if data.has(key):
+			var v = data[key]
+			local_settings[key] = bool(v) if DEFAULT_LOCAL_SETTINGS[key] is bool else int(v)
+	local_settings["volume"] = clampi(local_settings["volume"], 0, 100)
+	local_settings["musique"] = clampi(local_settings["musique"], 0, 100)
+	local_settings["qualite"] = clampi(local_settings["qualite"], 0, 2)
+
+
+func set_local_setting(key: String, value) -> void:
+	local_settings[key] = value
+	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(local_settings, "\t"))
+	apply_local_settings()
+	settings_changed.emit()
+
+
+func apply_local_settings() -> void:
+	var sfx := AudioServer.get_bus_index("Sons")
+	var music := AudioServer.get_bus_index("Musique")
+	if sfx >= 0:
+		AudioServer.set_bus_mute(sfx, local_settings["volume"] <= 0)
+		AudioServer.set_bus_volume_db(sfx, linear_to_db(maxf(local_settings["volume"], 1) / 100.0))
+	if music >= 0:
+		AudioServer.set_bus_mute(music, local_settings["musique"] <= 0)
+		AudioServer.set_bus_volume_db(music, linear_to_db(maxf(local_settings["musique"], 1) / 100.0) - 8.0)
+	if DisplayServer.get_name() != "headless":
+		var mode := DisplayServer.window_get_mode()
+		if local_settings["plein_ecran"] and mode != DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		elif not local_settings["plein_ecran"] and mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+
+
+func _setup_audio() -> void:
+	for bus_name in ["Sons", "Musique"]:
+		if AudioServer.get_bus_index(bus_name) < 0:
+			AudioServer.add_bus()
+			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus_name)
+	for i in 6:
+		var player := AudioStreamPlayer.new()
+		player.bus = "Sons"
+		add_child(player)
+		_players.append(player)
+	_music = AudioStreamPlayer.new()
+	_music.bus = "Musique"
+	add_child(_music)
+
+
+## Joue un petit son (res://sons/<nom>.wav). Sans effet si le fichier n'existe pas.
+func play_sound(sound_name: String, pitch := 1.0) -> void:
+	if not _sounds.has(sound_name):
+		var path := "res://sons/%s.wav" % sound_name
+		_sounds[sound_name] = load(path) if ResourceLoader.exists(path) else null
+	var stream = _sounds[sound_name]
+	if stream == null:
+		return
+	for player in _players:
+		if not player.playing:
+			player.stream = stream
+			player.pitch_scale = pitch
+			player.play()
+			return
+	_players[0].stream = stream
+	_players[0].pitch_scale = pitch
+	_players[0].play()
+
+
+func start_music() -> void:
+	if _music.playing:
+		return
+	var path := "res://sons/musique.ogg"
+	if not ResourceLoader.exists(path):
+		return
+	var stream = load(path)
+	if stream is AudioStreamOggVorbis:
+		stream.loop = true
+	_music.stream = stream
+	_music.play()
+
+
+func stop_music() -> void:
+	_music.stop()
 
 
 # --- Lecture vocale ------------------------------------------------------------

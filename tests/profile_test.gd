@@ -5,6 +5,7 @@ extends SceneTree
 
 const Recap = preload("res://scripts/core/recap.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Data = preload("res://scripts/core/data.gd")
 
 var _fails := 0
 var _count := 0
@@ -69,6 +70,48 @@ func _run() -> void:
 
 	game.delete_profile(id)
 	check(game.list_profiles().size() == before, "profil de test supprimé")
+
+	print("Sauvegarde de la version 1")
+	var v1 := {
+		"version": 1, "id": "test_v1_ancien", "name": "Ancien", "created": "2026-11-10 10:00:00",
+		"appearance": {"skin": 2.0, "hair": 3.0, "hair_style": 1.0, "outfit": 4.0},
+		"needs": {"faim": 40.0, "sommeil": 60.0, "toilettes": 70.0, "hygiene": 50.0, "social": 30.0},
+		"skills_xp": {"physique": 75.0, "creativite": 20.0, "charisme": 0.0, "organisation": 5.0},
+		"money": 40.0, "game_minutes": 2000.0,
+		"career": {"current": "artisan", "tiers": {"artisan": 2.0}, "missions": {"artisan": 1.0}},
+		"mission_timer": 30.0,
+		"typing": {"level": 2.0, "level_successes": 4.0, "samples": [], "baseline_cps": 1.2, "ema_cps": 1.4, "since_timed": 1.0},
+		"settings": {"chrono": "parfois", "exigence": "normale", "tolerance": "large", "niveau_texte": "auto", "vitesse_besoins": "normale", "missions_minutes": 2.0},
+		"sessions": [{"date": "2026-11-10 10:00:00", "duree_sec": 400.0, "frappes_ok": 12, "frappes_ratees": 2, "chronos_reussis": 1, "chronos_rates": 1,
+			"caracteres": 90, "temps_frappe_sec": 80.0, "erreurs": {"substitution": 2, "oubli": 1, "ajout": 0, "inversion": 0, "accents": 3, "majuscules": 0},
+			"taches_finies": 8, "taches_abandonnees": 1, "missions_reussies": 1, "missions_abandonnees": 0,
+			"choix_justes_du_premier_coup": 2, "choix_total": 2, "rouge_sec": {"faim": 10.0}, "rouge_au_moins_une_sec": 10.0,
+			"competences_debut": {"physique": 0}, "competences_fin": {"physique": 2}, "argent_gagne": 40}],
+	}
+	game.save_any(v1)
+	var old: Dictionary = {}
+	for q in game.list_profiles():
+		if q["id"] == "test_v1_ancien":
+			old = q
+	check(not old.is_empty(), "ancienne sauvegarde relue")
+	game.load_profile(old)
+	var o: Dictionary = game.profile
+	check(o["appearance"]["skin"] == 2 and o["appearance"]["hair"] == 3 and o["appearance"]["hair_style"] == 1 and o["appearance"]["outfit"] == 4, "apparence de la version 1 conservée")
+	check(o["appearance"].size() == Data.APPEARANCE_COUNTS.size(), "nouvelles options d'apparence ajoutées")
+	check(Progression.skill_level(o, "physique") == 2 and o["money"] == 40 and Progression.current_tier(o) == 2, "progression de la version 1 conservée")
+	check(Progression.setting(o, "tolerance") == "large" and Progression.setting(o, "aide_couleur") == "oui", "réglages conservés et complétés")
+	check(o["tuto_fait"] == false and o["etoiles"] == 0 and o["objectif"].is_empty(), "nouveautés prêtes : tutoriel à voir, pas d'objectif")
+	check(Recap.session_lines(o["sessions"][0]).size() >= 8 and Recap.keywords(o).size() > 0, "récapitulatif des anciennes séances lisible")
+	check(game.session.has("series_finies") and Recap.session_lines(game.session).size() >= 11, "nouvelles statistiques dans la séance en cours")
+	var screen = load("res://scripts/screens/game_screen.gd").new()
+	root.add_child(screen)
+	await process_frame
+	await process_frame
+	check(screen.character != null and screen.tutorial != null, "le jeu s'ouvre avec l'ancien profil et propose le tutoriel")
+	screen.queue_free()
+	await process_frame
+	game.close_profile()
+	game.delete_profile("test_v1_ancien")
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)

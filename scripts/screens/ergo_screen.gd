@@ -133,6 +133,11 @@ func _show_recap(p: Dictionary) -> void:
 	if o["choix"] > 0:
 		_line("Compréhension des consignes : %d choix justes du premier coup sur %d" % [o["choix_ok"], o["choix"]])
 	_line("Missions réussies : %d" % o["missions"])
+	var series: int = o["series_finies"] + o["series_interrompues"]
+	if series > 0 or o["mots"] > 0:
+		_line("Champs lexicaux : %d mots réussis — séries de 5 mots : %d terminées, %d arrêtées avant la fin" % [o["mots"], o["series_finies"], o["series_interrompues"]])
+	if o["objectifs_choisis"] > 0:
+		_line("Objectifs : %d choisis, %d atteints, %d changés en cours de route" % [o["objectifs_choisis"], o["objectifs_finis"], o["objectifs_abandonnes"]])
 	_line("Compétences : " + " ; ".join(Recap.skills_progress(p)))
 	var career: String = p["career"]["current"]
 	if career != "":

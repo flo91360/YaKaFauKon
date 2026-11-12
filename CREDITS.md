@@ -6,9 +6,11 @@
   Licence complète : `fonts/OFL-Lexend.txt`.
   Choisie car conçue pour améliorer la fluidité de lecture (utile pour les lecteurs dyslexiques).
 
-## Modèles 3D
-- Aucun modèle externe dans la V1 : le studio, les meubles et le personnage sont construits
-  dans Godot à partir de formes simples (boîtes, cylindres, sphères, capsules).
+## Graphismes, pictogrammes, sons et musique
+- Aucun fichier extérieur : tout est fabriqué pour ce jeu.
+  - Le studio, le jardin, les meubles et le personnage sont construits par le code (`scripts/world/`).
+  - Les textures (`textures/`), les pictogrammes (`icons/`), l'icône, les sons et la musique (`sons/`)
+    sont calculés par les scripts de `tools/` (Python, numpy, Pillow).
 
 ## Moteur
 - Godot Engine 4.7.2 — licence MIT (https://godotengine.org/license).

@@ -46,6 +46,15 @@ static func session_lines(s: Dictionary) -> Array:
 	if total_choices > 0:
 		lines.append("Choix justes du premier coup : %d sur %d" % [s.get("choix_justes_du_premier_coup", 0), total_choices])
 	lines.append("Tâches terminées : %d — abandonnées : %d" % [s.get("taches_finies", 0), s.get("taches_abandonnees", 0)])
+	if s.has("series_finies"): # séances de la version 2
+		var by_activity := []
+		var words: Dictionary = s.get("mots_par_activite", {})
+		for a in words:
+			if Data.ACTIONS.has(a):
+				by_activity.append("%s : %d" % [Data.ACTIONS[a]["label"].to_lower(), int(words[a])])
+		lines.append("Mots de champ lexical réussis : %d%s" % [int(s.get("mots_ok", 0)), " (" + ", ".join(by_activity) + ")" if not by_activity.is_empty() else ""])
+		lines.append("Séries de 5 mots terminées : %d — arrêtées avant la fin : %d" % [int(s.get("series_finies", 0)), int(s.get("series_interrompues", 0))])
+		lines.append("Objectifs choisis : %d — atteints : %d — changés en cours : %d" % [int(s.get("objectifs_choisis", 0)), int(s.get("objectifs_finis", 0)), int(s.get("objectifs_abandonnes", 0))])
 	lines.append("Temps avec au moins une jauge dans le rouge : %s" % format_duration(red_any_sec(s)))
 	return lines
 
@@ -62,7 +71,8 @@ static func overview(profile: Dictionary) -> Dictionary:
 	var sessions: Array = profile.get("sessions", [])
 	var o := {"seances": sessions.size(), "duree": 0.0, "finies": 0, "abandons": 0, "rouge": 0.0,
 		"missions": 0, "choix_ok": 0, "choix": 0, "caracteres": 0, "erreurs": 0, "rouge_par_besoin": {},
-		"erreurs_par_type": {}}
+		"erreurs_par_type": {}, "mots": 0, "series_finies": 0, "series_interrompues": 0,
+		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0}
 	for s in sessions:
 		o["duree"] += s.get("duree_sec", 0.0)
 		o["finies"] += int(s.get("taches_finies", 0))
@@ -73,6 +83,9 @@ static func overview(profile: Dictionary) -> Dictionary:
 		o["choix"] += int(s.get("choix_total", 0))
 		o["caracteres"] += int(s.get("caracteres", 0))
 		o["erreurs"] += error_count(s)
+		for key in ["series_finies", "series_interrompues", "objectifs_choisis", "objectifs_finis", "objectifs_abandonnes"]:
+			o[key] += int(s.get(key, 0))
+		o["mots"] += int(s.get("mots_ok", 0))
 		for n in s.get("rouge_sec", {}):
 			o["rouge_par_besoin"][n] = o["rouge_par_besoin"].get(n, 0.0) + s["rouge_sec"][n]
 		for k in COUNTED_ERRORS:
@@ -133,6 +146,11 @@ static func keywords(profile: Dictionary) -> Array:
 		words.append("Consignes bien comprises" if float(o["choix_ok"]) / o["choix"] >= 0.8 else "Relire les consignes")
 	if o["missions"] > 0:
 		words.append("%d mission(s) réussie(s)" % o["missions"])
+	var series: int = o["series_finies"] + o["series_interrompues"]
+	if series >= 3:
+		words.append("Va au bout des séries de mots" if float(o["series_finies"]) / series >= 0.8 else "Arrête souvent les séries de mots")
+	if o["objectifs_finis"] > 0:
+		words.append("%d objectif(s) atteint(s)" % o["objectifs_finis"])
 	return words
 
 

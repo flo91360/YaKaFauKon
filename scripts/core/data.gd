@@ -59,35 +59,141 @@ static func active_skills() -> Array:
 # --- Objets et actions ------------------------------------------------------
 # texts = [niveau 1 : mot-clé, niveau 2 : article + mot, niveau 3 : petite phrase]
 # minutes = durée en minutes de jeu ; needs = effet total sur les besoins ;
-# skills = XP gagnée ; sleep = le temps passe plus vite pendant l'action.
+# skills = XP gagnée ; sleep = le temps passe plus vite pendant l'action ;
+# anim = animation du personnage pendant l'action.
+# Les actions qui donnent de la compétence se jouent en « série de mots » : après le
+# mot de départ, l'enfant tape WORDS_PER_SERIES mots du champ lexical (voir LEXIQUE).
 const ACTIONS := {
-	"dormir": {"label": "Dormir", "texts": ["lit", "le lit", "aller au lit"], "minutes": 480,
+	"dormir": {"anim": "sleep", "label": "Dormir", "texts": ["lit", "le lit", "aller au lit"], "minutes": 480,
 		"needs": {"sommeil": 100.0}, "skills": {}, "sleep": true, "verbe": "dort"},
-	"manger": {"label": "Manger", "texts": ["repas", "un repas", "manger un repas"], "minutes": 30,
+	"manger": {"anim": "eat", "label": "Manger", "texts": ["repas", "un repas", "manger un repas"], "minutes": 30,
 		"needs": {"faim": 70.0}, "skills": {}, "verbe": "mange"},
-	"cuisiner": {"label": "Faire la cuisine", "texts": ["cuisine", "la cuisine", "faire la cuisine"], "minutes": 60,
+	"cuisiner": {"anim": "cook", "label": "Faire la cuisine", "texts": ["cuisine", "la cuisine", "faire la cuisine"], "minutes": 60,
 		"needs": {"faim": 45.0, "hygiene": -5.0}, "skills": {"organisation": 10.0, "creativite": 6.0}, "verbe": "cuisine"},
-	"toilettes": {"label": "Aller aux toilettes", "texts": ["toilettes", "les toilettes", "aller aux toilettes"], "minutes": 10,
+	"toilettes": {"anim": "sit_read", "label": "Aller aux toilettes", "texts": ["toilettes", "les toilettes", "aller aux toilettes"], "minutes": 10,
 		"needs": {"toilettes": 100.0}, "skills": {}, "verbe": "est aux toilettes"},
-	"douche": {"label": "Prendre une douche", "texts": ["douche", "la douche", "prendre une douche"], "minutes": 20,
+	"douche": {"anim": "shower", "label": "Prendre une douche", "texts": ["douche", "la douche", "prendre une douche"], "minutes": 20,
 		"needs": {"hygiene": 75.0}, "skills": {}, "verbe": "se douche"},
-	"dents": {"label": "Se brosser les dents", "texts": ["dents", "les dents", "se brosser les dents"], "minutes": 5,
+	"dents": {"anim": "brush", "label": "Se brosser les dents", "texts": ["dents", "les dents", "se brosser les dents"], "minutes": 5,
 		"needs": {"hygiene": 30.0}, "skills": {}, "verbe": "se brosse les dents"},
-	"appeler": {"label": "Appeler un ami", "texts": ["ami", "un ami", "appeler un ami"], "minutes": 30,
+	"appeler": {"anim": "sit_phone", "label": "Appeler un ami", "texts": ["ami", "un ami", "appeler un ami"], "minutes": 30,
 		"needs": {"social": 45.0}, "skills": {"charisme": 4.0}, "verbe": "téléphone"},
-	"inviter": {"label": "Inviter des amis", "texts": ["amis", "des amis", "inviter des amis"], "minutes": 90,
+	"inviter": {"anim": "sit_chat", "label": "Inviter des amis", "texts": ["amis", "des amis", "inviter des amis"], "minutes": 90,
 		"needs": {"social": 80.0, "faim": -10.0}, "skills": {"charisme": 8.0}, "verbe": "reçoit des amis"},
-	"sport": {"label": "Faire du sport", "texts": ["sport", "le sport", "faire du sport"], "minutes": 45,
+	"sport": {"anim": "run", "label": "Faire du sport", "texts": ["sport", "le sport", "faire du sport"], "minutes": 45,
 		"needs": {"hygiene": -20.0, "sommeil": -10.0}, "skills": {"physique": 12.0}, "verbe": "fait du sport"},
-	"peindre": {"label": "Peindre", "texts": ["peinture", "la peinture", "faire de la peinture"], "minutes": 45,
+	"peindre": {"anim": "paint", "label": "Peindre", "texts": ["peinture", "la peinture", "faire de la peinture"], "minutes": 45,
 		"needs": {}, "skills": {"creativite": 12.0}, "verbe": "peint"},
-	"miroir": {"label": "Parler devant le miroir", "texts": ["miroir", "le miroir", "parler au miroir"], "minutes": 30,
+	"miroir": {"anim": "talk", "label": "Parler devant le miroir", "texts": ["miroir", "le miroir", "parler au miroir"], "minutes": 30,
 		"needs": {}, "skills": {"charisme": 12.0}, "verbe": "parle au miroir"},
-	"bois": {"label": "Travailler le bois", "texts": ["bois", "le bois", "travailler le bois"], "minutes": 60,
+	"bois": {"anim": "hammer", "label": "Travailler le bois", "texts": ["bois", "le bois", "travailler le bois"], "minutes": 60,
 		"needs": {"hygiene": -10.0}, "skills": {"physique": 6.0, "creativite": 6.0}, "verbe": "travaille le bois"},
-	"planning": {"label": "Faire mon planning", "texts": ["planning", "le planning", "faire mon planning"], "minutes": 30,
+	"planning": {"anim": "sit_write", "label": "Faire mon planning", "texts": ["planning", "le planning", "faire mon planning"], "minutes": 30,
 		"needs": {}, "skills": {"organisation": 12.0}, "verbe": "fait son planning"},
 }
+
+const WORDS_PER_SERIES := 5
+
+# --- Champs lexicaux ---------------------------------------------------------
+# Pour chaque activité : 3 listes de mots, de plus en plus longs ou difficiles.
+# (Pas de « œ » ni d'apostrophe : trop difficiles à trouver sur le clavier.)
+const LEXIQUE := {
+	"sport": [
+		["saut", "course", "ballon", "vélo", "force", "jambe", "bras", "match", "but", "corde"],
+		["muscle", "courir", "sauter", "baskets", "vitesse", "équipe", "énergie", "nager", "effort", "tapis"],
+		["endurance", "étirement", "entraînement", "échauffement", "respiration", "champion", "gymnastique", "équilibre", "athlète"],
+	],
+	"peindre": [
+		["bleu", "rouge", "vert", "jaune", "toile", "trait", "rose", "noir", "pot", "art"],
+		["pinceau", "couleur", "dessin", "tableau", "peinture", "palette", "crayon", "tache", "modèle", "orange"],
+		["aquarelle", "chevalet", "portrait", "paysage", "mélange", "artiste", "lumière", "imagination", "exposition"],
+	],
+	"miroir": [
+		["voix", "mot", "regard", "salut", "joie", "oui", "merci", "geste", "calme", "idée"],
+		["sourire", "parler", "bonjour", "discours", "écouter", "phrase", "courage", "public", "confiant", "humour"],
+		["confiance", "présenter", "expliquer", "convaincre", "articuler", "politesse", "expression", "compliment", "applaudir"],
+	],
+	"bois": [
+		["bois", "clou", "scie", "vis", "lime", "colle", "règle", "banc", "trou", "outil"],
+		["marteau", "planche", "mesure", "poncer", "vernis", "atelier", "bûche", "étagère", "tabouret", "copeau"],
+		["tournevis", "perceuse", "assembler", "menuisier", "établi", "découper", "fabriquer", "équerre", "construction"],
+	],
+	"planning": [
+		["jour", "heure", "liste", "lundi", "mardi", "date", "soir", "matin", "midi", "note"],
+		["agenda", "semaine", "horaire", "devoirs", "cartable", "montre", "minute", "prévoir", "ranger", "jeudi"],
+		["calendrier", "organiser", "planifier", "priorité", "rendez-vous", "préparer", "mercredi", "vendredi", "anticiper"],
+	],
+	"cuisiner": [
+		["sel", "lait", "riz", "pain", "plat", "bol", "four", "pâte", "miel", "soupe"],
+		["farine", "beurre", "sucre", "recette", "couper", "mélanger", "légumes", "tomate", "carotte", "fromage"],
+		["casserole", "ingrédient", "éplucher", "assiette", "fourchette", "délicieux", "saladier", "spatule", "cuisinier"],
+	],
+	"appeler": [
+		["allô", "ami", "appel", "salut", "rire", "copain", "bisou", "bien", "voix", "merci"],
+		["message", "bonjour", "raconter", "écouter", "nouvelle", "bavarder", "répondre", "sonnerie", "copine", "discuter"],
+		["téléphone", "conversation", "au revoir", "à bientôt", "rappeler", "messagerie", "bonne journée", "décrocher", "numéro"],
+	],
+	"inviter": [
+		["jeu", "fête", "ami", "rire", "jus", "carte", "dés", "bravo", "goûter", "joie"],
+		["inviter", "partage", "gâteau", "musique", "accueil", "danser", "blague", "cadeau", "ensemble", "bienvenue"],
+		["invitation", "anniversaire", "amusement", "discussion", "chaleureux", "convivial", "partager", "surprise", "jeu de société"],
+	],
+}
+
+
+static func is_series(action_id: String) -> bool:
+	return LEXIQUE.has(action_id)
+
+
+## Mots à taper pour une série : `level` = niveau de texte de l'enfant (1 à 3).
+## Niveau 1 : mots courts. Niveau 2 : surtout des mots moyens. Niveau 3 : moyens et longs.
+static func series_words(action_id: String, level: int, count: int, rng: RandomNumberGenerator = null) -> Array:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var lists: Array = LEXIQUE[action_id]
+	var result := []
+	var guard := 0
+	while result.size() < count and guard < 200:
+		guard += 1
+		var tier := 0
+		match clampi(level, 1, 3):
+			2:
+				tier = 1 if rng.randf() < 0.7 else 0
+			3:
+				tier = 2 if rng.randf() < 0.6 else 1
+		var words: Array = lists[tier]
+		var w: String = words[rng.randi() % words.size()]
+		if not w in result:
+			result.append(w)
+	return result
+
+
+## XP gagnée pour un mot réussi (les mots longs rapportent plus).
+static func word_xp(word: String) -> float:
+	return 4.0 + 0.5 * word.length()
+
+
+## Part de chaque compétence pour une activité (la compétence principale vaut 1).
+static func skill_weights(action_id: String) -> Dictionary:
+	var skills: Dictionary = ACTIONS[action_id]["skills"]
+	var best := 0.0
+	for s in skills:
+		best = maxf(best, skills[s])
+	var result := {}
+	for s in skills:
+		result[s] = skills[s] / best
+	return result
+
+
+static func main_skill(action_id: String) -> String:
+	var skills: Dictionary = ACTIONS[action_id]["skills"]
+	var best := ""
+	for s in skills:
+		if best == "" or skills[s] > skills[best]:
+			best = s
+	return best
+
 
 # --- Carrières -----------------------------------------------------------------
 const CAREERS := {
@@ -256,7 +362,73 @@ static func missions_for(career: String, tier: int) -> Array:
 
 
 # --- Apparence ---------------------------------------------------------------
-const SKIN_COLORS := [Color(1.0, 0.86, 0.74), Color(0.93, 0.74, 0.58), Color(0.76, 0.55, 0.38), Color(0.5, 0.34, 0.24)]
-const HAIR_COLORS := [Color(0.15, 0.1, 0.08), Color(0.45, 0.28, 0.15), Color(0.9, 0.75, 0.4), Color(0.75, 0.3, 0.15), Color(0.35, 0.45, 0.85)]
-const OUTFIT_COLORS := [Color(0.35, 0.55, 0.9), Color(0.95, 0.5, 0.45), Color(0.45, 0.75, 0.5), Color(0.95, 0.75, 0.3), Color(0.65, 0.5, 0.85)]
-const HAIR_STYLES := ["Courts", "Longs", "Chignon"]
+# Les 4 premières couleurs de peau, les 5 premières de cheveux et de tenue et les
+# 3 premières coiffures gardent leur numéro de la version 1 (anciennes sauvegardes).
+const SKIN_COLORS := [Color(1.0, 0.86, 0.74), Color(0.93, 0.74, 0.58), Color(0.76, 0.55, 0.38), Color(0.5, 0.34, 0.24),
+	Color(0.98, 0.8, 0.66), Color(0.36, 0.24, 0.18)]
+const HAIR_COLORS := [Color(0.15, 0.1, 0.08), Color(0.45, 0.28, 0.15), Color(0.9, 0.75, 0.4), Color(0.75, 0.3, 0.15), Color(0.35, 0.45, 0.85),
+	Color(0.62, 0.42, 0.24), Color(0.8, 0.8, 0.82), Color(0.9, 0.5, 0.65)]
+const OUTFIT_COLORS := [Color(0.35, 0.55, 0.9), Color(0.95, 0.5, 0.45), Color(0.45, 0.75, 0.5), Color(0.95, 0.75, 0.3), Color(0.65, 0.5, 0.85),
+	Color(0.96, 0.96, 0.94), Color(0.25, 0.3, 0.42), Color(0.3, 0.7, 0.72)]
+const BOTTOM_COLORS := [Color(0.27, 0.36, 0.58), Color(0.2, 0.22, 0.28), Color(0.72, 0.62, 0.48), Color(0.5, 0.33, 0.25), Color(0.4, 0.6, 0.45), Color(0.85, 0.45, 0.5)]
+const SHOE_COLORS := [Color(0.95, 0.95, 0.93), Color(0.22, 0.23, 0.28), Color(0.9, 0.4, 0.36), Color(0.38, 0.55, 0.85), Color(0.55, 0.38, 0.26)]
+const EYE_COLORS := [Color(0.36, 0.22, 0.12), Color(0.58, 0.4, 0.2), Color(0.3, 0.58, 0.38), Color(0.28, 0.52, 0.85), Color(0.5, 0.56, 0.62), Color(0.1, 0.09, 0.09)]
+const HAIR_STYLES := ["Courts", "Longs", "Chignon", "Carré", "Queue de cheval", "Couettes", "Bouclés", "Très courts", "Mèche"]
+const BODIES := ["Femme", "Homme"]
+const HEIGHTS := ["Très petite", "Petite", "Moyenne", "Grande", "Très grande"]
+const HEIGHT_SCALES := [0.88, 0.94, 1.0, 1.06, 1.12]
+const BUILDS := ["Très fine", "Fine", "Moyenne", "Ronde", "Très ronde"]
+const BUILD_FACTORS := [0.86, 0.93, 1.0, 1.1, 1.22]
+const FACES := ["Rond", "Ovale", "Carré"]
+const CHEEKS := ["Fines", "Normales", "Rondes"]
+const BLUSHES := ["Sans", "Un peu roses", "Très roses"]
+const EYE_SHAPES := ["Ronds", "En amande", "Grands", "Petits"]
+const BROWS := ["Fins", "Épais", "Arqués"]
+const NOSES := ["Petit", "Moyen", "Grand"]
+const MOUTHS := ["Sourire", "Grand sourire", "Petite bouche"]
+const FRECKLES := ["Sans", "Avec"]
+const GLASSES := ["Sans", "Rondes", "Carrées"]
+const BEARDS := ["Sans", "Barbe", "Moustache"]
+const OUTFIT_STYLES := ["T-shirt", "Pull", "Chemise et short", "Robe", "Salopette"]
+
+## Toutes les options d'apparence : clé → nombre de choix.
+const APPEARANCE_COUNTS := {
+	"body": 2, "height": 5, "build": 5, "skin": 6, "face": 3, "cheeks": 3, "blush": 3,
+	"eye_color": 6, "eye_shape": 4, "brows": 3, "nose": 3, "mouth": 3, "freckles": 2, "glasses": 3,
+	"hair_style": 9, "hair": 8, "beard": 3, "outfit_style": 5, "outfit": 8, "bottom": 6, "shoes": 5,
+}
+const APPEARANCE_DEFAULTS := {
+	"body": 0, "height": 2, "build": 2, "skin": 0, "face": 0, "cheeks": 1, "blush": 1,
+	"eye_color": 0, "eye_shape": 0, "brows": 0, "nose": 0, "mouth": 0, "freckles": 0, "glasses": 0,
+	"hair_style": 0, "hair": 1, "beard": 0, "outfit_style": 0, "outfit": 0, "bottom": 0, "shoes": 0,
+}
+
+
+## Apparence complète et valide (les sauvegardes de la version 1 n'ont que 4 clés).
+static func complete_appearance(appearance: Dictionary) -> Dictionary:
+	var result := {}
+	for key in APPEARANCE_DEFAULTS:
+		var v: int = int(appearance.get(key, APPEARANCE_DEFAULTS[key]))
+		result[key] = clampi(v, 0, APPEARANCE_COUNTS[key] - 1)
+	return result
+
+
+static func random_appearance(rng: RandomNumberGenerator = null) -> Dictionary:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var result := {}
+	for key in APPEARANCE_COUNTS:
+		result[key] = rng.randi() % APPEARANCE_COUNTS[key]
+	# Rien d'extrême par hasard : taille et corpulence proches de la moyenne, barbe rare.
+	result["height"] = 1 + rng.randi() % 3
+	result["build"] = 1 + rng.randi() % 3
+	if result["body"] == 0 or rng.randf() < 0.6:
+		result["beard"] = 0
+	if rng.randf() < 0.6:
+		result["glasses"] = 0
+	if rng.randf() < 0.7:
+		result["freckles"] = 0
+	if result["hair"] >= 6 and rng.randf() < 0.7:
+		result["hair"] = rng.randi() % 6
+	return result

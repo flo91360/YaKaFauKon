@@ -26,8 +26,14 @@ func _ready() -> void:
 			_capture_later(a.substr(10))
 	if args.any(func(a): return a.begins_with("--demo")):
 		await _start_demo(args)
+	elif args.any(func(a): return a.begins_with("--galerie")):
+		_show_gallery(args)
 	elif "--ecran=creation" in args:
 		show_create()
+		for a in args:
+			if a.begins_with("--onglet="):
+				_screen.appearance = load("res://scripts/core/data.gd").random_appearance()
+				_screen._show_tab(int(a.substr(9)))
 	elif "--ecran=ergo-demo" in args:
 		show_ergo(_demo_profiles(), false)
 	else:
@@ -90,6 +96,9 @@ func _set_screen(screen: Node) -> void:
 
 func _start_demo(args: Array) -> void:
 	_game().start_demo()
+	for a in args:
+		if a.begins_with("--heure="):
+			_game().profile["game_minutes"] = float(a.substr(8)) * 60.0
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
@@ -108,6 +117,39 @@ func _start_demo(args: Array) -> void:
 		screen._open_mission()
 		screen._mission_panel.state["step"] = "question"
 		screen._mission_panel.refresh()
+	if "--demo-serie" in args: # série de mots sur le tapis de course (2 mots déjà réussis)
+		var tapis = screen.studio.get_object("tapis")
+		screen._start_typing(tapis, "sport")
+		screen.typing.force_close()
+		screen._state = "walking"
+		screen.character.position = tapis.use_point
+		screen._on_arrived()
+		for i in 2:
+			screen._on_series_word_ok({"cps": 2.0})
+			screen._series["index"] += 1
+		screen._open_series_word()
+		screen.typing._input.text = "cou"
+		screen.typing._refresh_model()
+	if "--demo-objectifs" in args:
+		screen._open_objectives()
+	if "--demo-guide" in args:
+		screen._open_guide()
+	if "--demo-pause" in args:
+		screen._toggle_pause()
+	if "--demo-look" in args:
+		screen._open_look()
+	if "--demo-tuto" in args:
+		screen.start_tutorial()
+	for a in args:
+		if a.begins_with("--demo-action="): # ex. --demo-action=cuisine:cuisiner
+			var parts: PackedStringArray = a.substr(14).split(":")
+			var f = screen.studio.get_object(parts[0])
+			screen._object = f
+			screen._action_id = parts[1]
+			screen._state = "walking"
+			screen.character.position = f.use_point
+			screen._on_arrived()
+			screen.typing.force_close()
 	if "--demo-frappe" in args:
 		var f = screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]
 		screen._start_typing(f, "toilettes")
@@ -140,6 +182,66 @@ func _demo_profiles() -> Array:
 		p["sessions"].append(s)
 	var q: Dictionary = _game().new_profile_data("Inès", {"skin": 0, "hair": 3, "hair_style": 1, "outfit": 4})
 	return [p, q]
+
+
+## Galerie de contrôle : plusieurs personnages et animations côte à côte.
+## --galerie=anim1,anim2… (une animation par personnage), --graine=N, --zoom
+func _show_gallery(args: Array) -> void:
+	var Character = load("res://scripts/world/character.gd")
+	var Data = load("res://scripts/core/data.gd")
+	var anims := ["idle", "walk", "run", "talk", "paint", "celebrate"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var zoom := "--zoom" in args
+	for a in args:
+		if a.begins_with("--galerie="):
+			anims = Array(a.substr(10).split(","))
+		if a.begins_with("--graine="):
+			rng.seed = int(a.substr(9))
+	var root := Node3D.new()
+	add_child(root)
+	_screen = root
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.8, 0.87, 0.94)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(1, 0.97, 0.92)
+	env.environment.ambient_light_energy = 0.55
+	env.environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	root.add_child(env)
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-40, 35, 0)
+	light.shadow_enabled = true
+	root.add_child(light)
+	var ground := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(30, 30)
+	ground.mesh = plane
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.86, 0.84, 0.8)
+	ground.material_override = gm
+	root.add_child(ground)
+	var cam := Camera3D.new()
+	var n := anims.size()
+	cam.fov = 30
+	cam.position = Vector3(0, 1.5, 3.4) if zoom else Vector3(0, 1.7, 2.6 + n * 1.25)
+	root.add_child(cam)
+	cam.look_at(Vector3(0, 1.25 if zoom else 0.9, 0))
+	for i in n:
+		var c = Character.new()
+		root.add_child(c)
+		c.build(Data.random_appearance(rng))
+		c.position = Vector3((i - (n - 1) / 2.0) * (0.75 if zoom else 1.25), 0, 0)
+		c.rotation_degrees.y = 180.0 - 18.0 * signf(c.position.x) * minf(absf(c.position.x), 1.0)
+		var anim: String = anims[i]
+		if anim.begins_with("sit"):
+			c.position.y = 0.5
+			c.set_pose("assis")
+		elif anim == "sleep":
+			c.position.y = 0.3
+			c.set_pose("allonge")
+		c.play(anim)
 
 
 func _capture_later(path: String) -> void:

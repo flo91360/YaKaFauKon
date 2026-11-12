@@ -7,7 +7,9 @@ const Data = preload("res://scripts/core/data.gd")
 const CALIBRATION_COUNT := 6 # frappes réussies avant le premier chronomètre
 const READ_MARGIN_SEC := 3.0 # temps laissé pour lire le modèle avant de taper
 const SPEED_CAP_FACTOR := 2.0 # l'exigence se stabilise à 2 x la vitesse de départ
-const LEVEL_UP_SUCCESSES := [0, 10, 15] # frappes réussies pour passer au niveau suivant
+## Frappes réussies pour passer au niveau de texte suivant (les mots des séries
+## comptent aussi : une série = 5 frappes).
+const LEVEL_UP_SUCCESSES := [0, 20, 40]
 
 const DEFAULT_SETTINGS := {
 	"chrono": "parfois", # jamais / parfois / souvent / toujours
@@ -16,6 +18,7 @@ const DEFAULT_SETTINGS := {
 	"niveau_texte": "auto", # auto / 1 / 2 / 3
 	"vitesse_besoins": "normale", # lente / normale / rapide
 	"missions_minutes": 2, # minutes réelles entre deux missions
+	"aide_couleur": "oui", # lettres du modèle en vert / rouge pendant la frappe
 }
 const SETTING_CHOICES := {
 	"chrono": ["jamais", "parfois", "souvent", "toujours"],
@@ -24,6 +27,7 @@ const SETTING_CHOICES := {
 	"niveau_texte": ["auto", "1", "2", "3"],
 	"vitesse_besoins": ["lente", "normale", "rapide"],
 	"missions_minutes": [1, 2, 3, 5],
+	"aide_couleur": ["oui", "non"],
 }
 const SETTING_LABELS := {
 	"chrono": "Fréquence du chronomètre",
@@ -32,6 +36,7 @@ const SETTING_LABELS := {
 	"niveau_texte": "Niveau des textes",
 	"vitesse_besoins": "Vitesse des besoins",
 	"missions_minutes": "Minutes entre deux missions",
+	"aide_couleur": "Lettres en couleur pendant la frappe",
 }
 const EXIGENCE_FACTOR := {"facile": 0.6, "normale": 0.75, "difficile": 0.9}
 const TOLERANCE_OFFSET := {"stricte": -1, "normale": 0, "large": 1}

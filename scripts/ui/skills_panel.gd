@@ -1,5 +1,6 @@
 extends Control
-## Panneau des compétences : niveau sur 10 et conseils pour progresser.
+## Panneau des compétences : niveau sur 10, barre d'avancement vers le niveau
+## suivant, et conseils pour progresser.
 
 signal closed
 
@@ -10,70 +11,75 @@ const Progression = preload("res://scripts/core/progression.gd")
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var shade := ColorRect.new()
-	shade.color = Color(0.1, 0.12, 0.2, 0.4)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(shade)
+	UiTheme.shade(self)
 	var profile: Dictionary = get_node("/root/Game").profile
-	var box := UiTheme.centered_panel(self, 900)
-
-	var header := HBoxContainer.new()
-	box.add_child(header)
-	var title := UiTheme.label("Mes compétences", 34)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var close := UiTheme.button("Fermer", Color(0.6, 0.62, 0.68), 22)
-	close.pressed.connect(func(): closed.emit())
-	header.add_child(close)
+	var box := UiTheme.centered_panel(self, 960)
+	box.add_theme_constant_override("separation", 10)
+	UiTheme.header(box, "Mes compétences", func(): closed.emit(), "etoile", UiTheme.COL_PURPLE)
 
 	for s in Data.active_skills():
 		var xp: float = profile["skills_xp"].get(s, 0.0)
 		var level := Data.skill_level(xp)
-		var card := PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = UiTheme.COL_SOFT
-		style.set_corner_radius_all(16)
-		style.content_margin_left = 16
-		style.content_margin_right = 16
-		style.content_margin_top = 8
-		style.content_margin_bottom = 8
-		card.add_theme_stylebox_override("panel", style)
+		var color: Color = UiTheme.SKILL_COLORS.get(s, UiTheme.COL_PURPLE)
+		var card := UiTheme.card(UiTheme.COL_SOFT, 16)
 		box.add_child(card)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		card.add_child(row)
+		row.add_child(UiTheme.badge(s, color, 54))
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
-		card.add_child(v)
-		var row := HBoxContainer.new()
-		v.add_child(row)
-		var name_label := UiTheme.label(Data.SKILLS[s]["label"], 26)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(v)
+		var top := HBoxContainer.new()
+		v.add_child(top)
+		var name_label := UiTheme.label(Data.SKILLS[s]["label"], 25)
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		name_label.custom_minimum_size = Vector2(190, 0)
-		row.add_child(name_label)
-		row.add_child(_stars(level))
-		var lvl := UiTheme.label("%d / 10" % level, 24)
+		name_label.custom_minimum_size = Vector2(170, 0)
+		top.add_child(name_label)
+		top.add_child(_dots(level, color))
+		var lvl := UiTheme.label("%d / 10" % level, 23)
 		lvl.autowrap_mode = TextServer.AUTOWRAP_OFF
 		lvl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lvl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(lvl)
+		top.add_child(lvl)
+		# Barre vers le niveau suivant
+		var bar_row := HBoxContainer.new()
+		v.add_child(bar_row)
+		var bar := UiTheme.bar(color, 16.0)
+		bar_row.add_child(bar)
+		var next := UiTheme.label("", 17, UiTheme.COL_TEXT.lightened(0.25))
+		next.autowrap_mode = TextServer.AUTOWRAP_OFF
+		bar_row.add_child(next)
+		if level >= Data.SKILL_MAX:
+			bar.value = 1.0
+			next.text = "niveau maximum !"
+		else:
+			var from := float(Data.xp_for_level(level))
+			var to := float(Data.xp_for_level(level + 1))
+			bar.value = clampf((xp - from) / (to - from), 0.0, 1.0)
+			next.text = "encore %d points pour le niveau %d" % [ceili(to - xp), level + 1]
 		var help_row := HBoxContainer.new()
 		v.add_child(help_row)
 		var help_text: String = Data.SKILLS[s]["aide"]
-		var help := UiTheme.label(help_text, 20, UiTheme.COL_TEXT.lightened(0.2))
+		var help := UiTheme.label(help_text, 18, UiTheme.COL_TEXT.lightened(0.2))
 		help.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		help_row.add_child(help)
 		help_row.add_child(UiTheme.speak_button(func(): return Data.SKILLS[s]["label"] + ". " + help_text))
 
 
 ## Dix pastilles : pleines jusqu'au niveau atteint.
-func _stars(level: int) -> HBoxContainer:
+func _dots(level: int, color: Color) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for i in Data.SKILL_MAX:
 		var dot := Panel.new()
-		dot.custom_minimum_size = Vector2(22, 22)
+		dot.custom_minimum_size = Vector2(20, 20)
 		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(11)
-		style.bg_color = Color(0.65, 0.5, 0.85) if i < level else Color(0.85, 0.86, 0.9)
+		style.set_corner_radius_all(10)
+		style.anti_aliasing = true
+		style.bg_color = color if i < level else Color(0.84, 0.86, 0.9)
 		dot.add_theme_stylebox_override("panel", style)
 		row.add_child(dot)
 	return row
