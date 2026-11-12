@@ -1,0 +1,247 @@
+name: Construire le jeu
+
+on:
+  # Sur main (et sur un tag « v0.1.0 ») : construction, tests et, si un nouveau
+  # numéro de version (config/version dans project.godot) arrive, publication
+  # d'une version (Release GitHub avec le jeu). Les autres branches sont
+  # construites par leur pull request, une seule fois.
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  # Bouton « Run workflow » de l'onglet Actions : cocher « publier » sur la
+  # branche main crée le tag v<version du projet> et la Release.
+  workflow_dispatch:
+    inputs:
+      publier:
+        description: "Publier la version (tag + Release) à partir de main"
+        type: boolean
+        default: false
+
+concurrency:
+  group: validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Par défaut, lecture seule : seul le job « release » peut écrire dans le dépôt.
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  # Construction et tests : ne peut rien modifier dans le dépôt.
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    steps:
+      # Actions épinglées par SHA (commentaire : version correspondante).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Version à publier
+        id: version
+        run: |
+          version=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          tag=""
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+              echo "::error::Le tag ${GITHUB_REF_NAME} ne correspond pas à la version du jeu (v$version, dans project.godot)."
+              exit 1
+            fi
+            tag="${GITHUB_REF_NAME}"
+          elif [ "${{ inputs.publier }}" = "true" ]; then
+            if [ "${GITHUB_REF_NAME}" != "main" ]; then
+              echo "::error::Une version se publie depuis la branche main."
+              exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+              echo "::error::La version v$version est déjà publiée : augmenter config/version dans project.godot."
+              exit 1
+            fi
+            tag="v$version"
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_NAME}" = "main" ]; then
+            # Publication automatique : un nouveau numéro de version arrive sur main.
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+              echo "Version v$version déjà publiée : rien à publier."
+            else
+              echo "Nouvelle version v$version : elle sera publiée."
+              tag="v$version"
+            fi
+          fi
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Vérifier le changelog
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+              echo "::error::La version v$version publiée n'a pas de section dans CHANGELOG.md."
+              exit 1
+            fi
+            # Les cartes PlaniFiKateur augmentent la version sans écrire le
+            # changelog : la publication rédigera alors la section elle-même.
+            echo "::warning file=CHANGELOG.md::Pas de section « ## [$version] » dans CHANGELOG.md : elle sera rédigée à partir des commits lors de la publication."
+          fi
+
+      - name: Installer Godot et les modèles d'export
+        run: |
+          base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
+          editor=Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          templates=Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          wget -q $base/$editor $base/$templates $base/SHA512-SUMS.txt
+          # Fichiers vérifiés avec les sommes de contrôle publiées par Godot.
+          grep -E "  ($editor|$templates)\$" SHA512-SUMS.txt > sommes.txt
+          [ "$(wc -l < sommes.txt)" -eq 2 ] || { echo "::error::Sommes de contrôle de Godot introuvables."; exit 1; }
+          sha512sum -c sommes.txt
+          unzip -q $editor
+          sudo mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q $templates
+          mv templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          rm -f *.zip *.tpz SHA512-SUMS.txt sommes.txt
+
+      - name: Importer le projet
+        run: godot --headless --import
+
+      - name: Tests de la logique du jeu
+        run: godot --headless --path . --script res://tests/run_tests.gd
+
+      - name: Test de jeu automatique
+        run: godot --headless --path . --script res://tests/gameplay_test.gd
+
+      - name: Test des profils et des sauvegardes
+        run: godot --headless --path . --script res://tests/profile_test.gd
+
+      - name: Parcours des écrans
+        run: godot --headless --path . --script res://tests/flow_test.gd
+
+      - name: Installer rcedit (icône et version de l'exe Windows)
+        # Godot modifie les ressources de l'exe (icône, version) avec rcedit,
+        # un outil Windows lancé ici avec Wine.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends wine wine64 > /dev/null
+          wine_bin=$(command -v wine64 || command -v wine64-stable || command -v wine || true)
+          [ -n "$wine_bin" ] || { echo "::error::Wine introuvable."; exit 1; }
+          wget -q -O /tmp/rcedit-x64.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
+          echo "3e7801db1a5edbec91b49a24a094aad776cb4515488ea5a4ca2289c400eade2a  /tmp/rcedit-x64.exe" | sha256sum -c -
+          # Réglages de l'éditeur Godot : chemins de Wine et de rcedit.
+          mkdir -p ~/.config/godot
+          for f in ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.7.tres; do
+            [ -f "$f" ] || printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\n' > "$f"
+            echo "export/windows/wine = \"$wine_bin\"" >> "$f"
+            echo 'export/windows/rcedit = "/tmp/rcedit-x64.exe"' >> "$f"
+          done
+          # Premier lancement de Wine (création de son dossier) avant l'export.
+          WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml=" "$wine_bin" /tmp/rcedit-x64.exe --help > /dev/null 2>&1 || true
+          echo "Wine : $wine_bin ($("$wine_bin" --version 2>/dev/null))"
+
+      - name: Exporter pour Windows
+        env:
+          WINEDEBUG: -all
+          # Pas d'installation de Mono ni de Gecko par Wine (inutiles à rcedit).
+          WINEDLLOVERRIDES: "mscoree,mshtml="
+        run: |
+          mkdir -p build/windows
+          godot --headless --export-release "Windows" build/windows/YaKaFauKon.exe
+          test -s build/windows/YaKaFauKon.exe
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: YaKaFauKon-Windows
+          path: build/windows/YaKaFauKon.exe
+
+  # Publication d'une version : seulement après des tests réussis, et seul job
+  # autorisé à écrire (changelog, tag, Release).
+  release:
+    needs: export
+    if: needs.export.outputs.release_tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.export.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Historique et tags complets : le changelog d'une version liste les
+          # commits depuis le tag précédent.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: YaKaFauKon-Windows
+          path: build/windows
+
+      - name: Préparer les fichiers de la version
+        run: |
+          cd build/windows && zip -9 ../YaKaFauKon-${RELEASE_TAG}-Windows.zip YaKaFauKon.exe
+
+      - name: Préparer le changelog de la version
+        id: changelog
+        run: |
+          version="${RELEASE_TAG#v}"
+          etat=$(.github/scripts/changelog.sh "$version" build/changelog-version.md)
+          echo "genere=$([ "$etat" = genere ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          {
+            echo "**Pour jouer sous Windows** : télécharger \`YaKaFauKon-${RELEASE_TAG}-Windows.zip\`, le dézipper, puis double-cliquer sur \`YaKaFauKon.exe\`."
+            echo "Si Windows affiche « Windows a protégé votre ordinateur » : « Informations complémentaires » puis « Exécuter quand même »."
+            echo
+            echo "## Nouveautés de la version ${version}"
+            echo
+            cat build/changelog-version.md
+            echo
+            echo "Historique complet : [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/CHANGELOG.md)"
+          } > build/release-notes.md
+          cat build/release-notes.md
+
+      - name: Enregistrer le changelog sur main
+        # Seulement si la section a été rédigée automatiquement.
+        if: steps.changelog.outputs.genere == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "Changelog de la version ${RELEASE_TAG}"
+          if ! git push origin HEAD:refs/heads/main; then
+            # Pas de tag ni de Release sans le changelog sur main : sinon la
+            # vérification du changelog échouerait ensuite sur toutes les
+            # pull requests. La prochaine construction de main réessaiera.
+            echo "::error::CHANGELOG.md n'a pas pu être enregistré sur main (main a changé ou est protégée) : version ${RELEASE_TAG} non publiée. Elle le sera à la prochaine construction de main, ou ajouter la section à la main."
+            exit 1
+          fi
+
+      - name: Créer le tag de la version
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "Le tag ${RELEASE_TAG} existe déjà."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          # Tag annoté portant le changelog de la version ; il désigne le
+          # commit (avec CHANGELOG.md à jour s'il vient d'être enregistré).
+          git tag -a "${RELEASE_TAG}" -F build/changelog-version.md HEAD
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+      - name: Publier la version sur GitHub
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: YaKaFauKon ${{ env.RELEASE_TAG }}
+          body_path: build/release-notes.md
+          # YaKaFauKon.exe seul est aussi joint : PlaniFiKateur l'archive dans Google Drive.
+          # CHANGELOG.md donne l'historique de toutes les versions.
+          files: |
+            build/YaKaFauKon-${{ env.RELEASE_TAG }}-Windows.zip
+            build/windows/YaKaFauKon.exe
+            CHANGELOG.md

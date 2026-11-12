@@ -12,7 +12,8 @@ après avoir lu une consigne, et progresse dans une carrière.
 
 Double-cliquer sur **`YaKaFauKon.exe`**. Rien à installer : le jeu tient dans ce seul fichier
 (Windows 10 ou 11, 64 bits). Le fichier n'est pas rangé dans le dépôt (il pèse 106 Mo) : il se fabrique
-avec la commande ci-dessous, et peut être déposé dans une « Release » GitHub pour le partager.
+avec la commande ci-dessous. Chaque nouvelle version est publiée automatiquement dans les
+[Releases](https://github.com/flo91360/YaKaFauKon/releases) du dépôt, avec `YaKaFauKon.exe`.
 
 - Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur » car le fichier
   n'est pas signé : cliquer sur **Informations complémentaires** puis **Exécuter quand même**.
@@ -89,6 +90,10 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/g
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/profile_test.gd
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/flow_test.gd
 ```
+
+La CI GitHub (`.github/workflows/build.yml`, « Construire le jeu ») rejoue ces tests sous Linux,
+fabrique `YaKaFauKon.exe` et, quand `config/version` de `project.godot` change sur `main`, publie la
+Release avec la section correspondante de `CHANGELOG.md`.
 
 ## Organisation du code
 
