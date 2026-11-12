@@ -39,7 +39,7 @@ func _ready() -> void:
 	_panel.anchor_right = 0.5
 	_panel.offset_left = -300
 	_panel.offset_right = 300
-	_panel.offset_top = 96
+	_panel.offset_top = 124
 	var style: StyleBoxFlat = get_theme_stylebox("panel", "PanelContainer").duplicate()
 	style.bg_color = Color(1.0, 0.98, 0.9)
 	style.border_color = UiTheme.COL_GOLD

@@ -16,10 +16,7 @@ var _box: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var shade := ColorRect.new()
-	shade.color = Color(0.1, 0.12, 0.2, 0.4)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(shade)
+	UiTheme.shade(self)
 	_box = UiTheme.centered_panel(self, 900)
 	var profile: Dictionary = get_node("/root/Game").profile
 	if profile["career"]["current"] == "":
@@ -34,14 +31,7 @@ func _clear() -> void:
 
 
 func _header(text: String) -> void:
-	var header := HBoxContainer.new()
-	_box.add_child(header)
-	var title := UiTheme.label(text, 32)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var close := UiTheme.button("Fermer", Color(0.6, 0.62, 0.68), 22)
-	close.pressed.connect(func(): closed.emit())
-	header.add_child(close)
+	UiTheme.header(_box, text, func(): closed.emit(), "travail", UiTheme.COL_ORANGE)
 
 
 func _card() -> VBoxContainer:
@@ -104,6 +94,9 @@ func _show_status(profile: Dictionary) -> void:
 	if tier < 5:
 		var done: int = profile["career"]["missions"].get(c, 0)
 		v.add_child(UiTheme.label("Missions réussies à ce palier : %d sur %d" % [mini(done, Data.MISSIONS_PER_TIER), Data.MISSIONS_PER_TIER], 22))
+		var missions_bar := UiTheme.bar(UiTheme.COL_ORANGE, 20.0, Data.MISSIONS_PER_TIER)
+		missions_bar.value = mini(done, Data.MISSIONS_PER_TIER)
+		v.add_child(missions_bar)
 		var next: Dictionary = info["tiers"][tier]
 		var req: Dictionary = next["req"]
 		var nv := _card()
@@ -114,7 +107,16 @@ func _show_status(profile: Dictionary) -> void:
 			var ok: bool = have >= req[s]
 			var line := "%s %d sur 10 (tu as %d)" % [Data.SKILLS[s]["label"], req[s], have]
 			lines.append(line)
-			nv.add_child(UiTheme.label(("✔ " if ok else "• ") + line, 22, UiTheme.COL_GOOD.darkened(0.2) if ok else UiTheme.COL_TEXT))
+			var req_row := HBoxContainer.new()
+			nv.add_child(req_row)
+			req_row.add_child(UiTheme.badge("coche" if ok else s, UiTheme.COL_GOOD if ok else UiTheme.SKILL_COLORS.get(s, UiTheme.COL_PURPLE), 30))
+			var req_label := UiTheme.label(line, 21, UiTheme.COL_GOOD.darkened(0.2) if ok else UiTheme.COL_TEXT)
+			req_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+			req_label.custom_minimum_size = Vector2(330, 0)
+			req_row.add_child(req_label)
+			var req_bar := UiTheme.bar(UiTheme.COL_GOOD if ok else UiTheme.SKILL_COLORS.get(s, UiTheme.COL_PURPLE), 18.0, float(req[s]))
+			req_bar.value = minf(have, req[s])
+			req_row.add_child(req_bar)
 		nv.add_child(UiTheme.speak_button(func(): return "Pour devenir " + next["title"] + ", il faut : " + ", ".join(lines)))
 	else:
 		v.add_child(UiTheme.label("Tu es au plus haut palier. Bravo !", 22, UiTheme.COL_GOOD))
@@ -123,7 +125,7 @@ func _show_status(profile: Dictionary) -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(buttons)
 	if mission_available:
-		var go := UiTheme.button("Faire la mission", Color(0.95, 0.5, 0.45))
+		var go := UiTheme.icon_button("drapeau", "Faire la mission", UiTheme.COL_CORAL)
 		go.pressed.connect(func(): mission_requested.emit())
 		buttons.add_child(go)
 	var change := UiTheme.button("Changer de travail", Color(0.6, 0.62, 0.68))

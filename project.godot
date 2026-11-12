@@ -13,6 +13,8 @@ config_version=5
 config/name="YaKaFauKon"
 config/description="Jeu de simulation de vie pour apprendre la frappe au clavier en ergothérapie."
 run/main_scene="res://main.tscn"
+config/icon="res://icon.png"
+config/version="2.0"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [audio]

@@ -249,6 +249,7 @@ func update_display(profile: Dictionary, status_text: String, action_fraction :=
 	_status_panel.visible = status_text != ""
 	_status.text = status_text
 	_action_bar.visible = action_fraction >= 0.0
+	_status_panel.offset_top = -86.0 if action_fraction >= 0.0 else -62.0
 	_action_bar.value = clampf(action_fraction, 0.0, 1.0)
 	_update_objective(profile)
 	if _mission_button.visible:
