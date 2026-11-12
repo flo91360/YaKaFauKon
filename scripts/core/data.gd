@@ -8,7 +8,7 @@ extends RefCounted
 const NEEDS := {
 	"faim": {"label": "Faim", "decay": 14.0, "alerte": "a très faim !", "conseil": "Va à la cuisine pour manger."},
 	"sommeil": {"label": "Sommeil", "decay": 7.0, "alerte": "est très fatigué !", "conseil": "Va dormir dans le lit."},
-	"toilettes": {"anim": "sit_read", "label": "Toilettes", "decay": 16.0, "alerte": "doit aller aux toilettes !", "conseil": "Va aux toilettes."},
+	"toilettes": {"label": "Toilettes", "decay": 16.0, "alerte": "doit aller aux toilettes !", "conseil": "Va aux toilettes."},
 	"hygiene": {"label": "Hygiène", "decay": 9.0, "alerte": "a besoin de se laver !", "conseil": "Prends une douche ou brosse-toi les dents."},
 	"social": {"label": "Vie sociale", "decay": 8.0, "alerte": "se sent seul !", "conseil": "Appelle un ami ou invite des amis."},
 }
@@ -70,7 +70,7 @@ const ACTIONS := {
 		"needs": {"faim": 70.0}, "skills": {}, "verbe": "mange"},
 	"cuisiner": {"anim": "cook", "label": "Faire la cuisine", "texts": ["cuisine", "la cuisine", "faire la cuisine"], "minutes": 60,
 		"needs": {"faim": 45.0, "hygiene": -5.0}, "skills": {"organisation": 10.0, "creativite": 6.0}, "verbe": "cuisine"},
-	"toilettes": {"label": "Aller aux toilettes", "texts": ["toilettes", "les toilettes", "aller aux toilettes"], "minutes": 10,
+	"toilettes": {"anim": "sit_read", "label": "Aller aux toilettes", "texts": ["toilettes", "les toilettes", "aller aux toilettes"], "minutes": 10,
 		"needs": {"toilettes": 100.0}, "skills": {}, "verbe": "est aux toilettes"},
 	"douche": {"anim": "shower", "label": "Prendre une douche", "texts": ["douche", "la douche", "prendre une douche"], "minutes": 20,
 		"needs": {"hygiene": 75.0}, "skills": {}, "verbe": "se douche"},

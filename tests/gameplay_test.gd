@@ -5,6 +5,8 @@ extends SceneTree
 
 const GameScreen = preload("res://scripts/screens/game_screen.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Objectives = preload("res://scripts/core/objectives.gd")
+const Data = preload("res://scripts/core/data.gd")
 
 var _fails := 0
 var _count := 0
@@ -67,14 +69,87 @@ func _run() -> void:
 	check(game.session["taches_finies"] == 1, "tâche terminée comptée")
 	check(game.session["frappes_ok"] == 1 and game.session["frappes_ratees"] == 1, "frappes réussies / ratées comptées")
 
-	print("Activité et compétence (miroir)")
+	print("Activité en série de mots (miroir)")
 	var xp_before: float = profile["skills_xp"]["charisme"]
+	Objectives.choose(profile, {"type": "mots", "action": "miroir", "target": 3, "label": "test", "pieces": 12})
 	screen._start_typing(_object(screen, "miroir"), "miroir")
 	screen.typing._input.text = "miroir"
 	screen.typing._submit()
-	check(await _wait_state(screen, "acting", 10.0), "le personnage va au miroir")
-	check(await _wait_state(screen, "idle", 40.0), "l'activité se termine")
-	check(profile["skills_xp"]["charisme"] > xp_before + 10.0, "le charisme progresse")
+	check(await _wait_state(screen, "series", 10.0), "le personnage va au miroir et la série commence")
+	check(screen.typing.is_open() and screen.typing.series, "le panneau de série est ouvert")
+	check(screen._series["words"].size() == Data.WORDS_PER_SERIES, "la série contient %d mots" % Data.WORDS_PER_SERIES)
+	check(screen.character.anim == "talk", "le personnage est animé pendant l'activité")
+	var all_in_field := true
+	for w in screen._series["words"]:
+		var found := false
+		for list in Data.LEXIQUE["miroir"]:
+			if w in list:
+				found = true
+		all_in_field = all_in_field and found
+	check(all_in_field, "les mots viennent du champ lexical de l'activité")
+	var xp_word: float = profile["skills_xp"]["charisme"]
+	var first_word: String = screen.typing.model_text
+	screen.typing._input.text = first_word
+	screen.typing._submit()
+	check(profile["skills_xp"]["charisme"] > xp_word, "un mot réussi fait monter la compétence tout de suite")
+	check(Objectives.current(profile)["count"] == 1, "le mot compte pour l'objectif en cours")
+	await _wait(1.3)
+	check(screen._series["index"] == 1 and screen.typing.model_text != first_word, "le mot suivant s'affiche")
+	for i in range(1, Data.WORDS_PER_SERIES):
+		screen.typing._input.text = screen.typing.model_text
+		screen.typing._submit()
+		await _wait(1.3)
+	check(await _wait_state(screen, "idle", 5.0), "la série se termine")
+	check(profile["skills_xp"]["charisme"] > xp_before + 30.0, "le charisme progresse (%.0f XP)" % (profile["skills_xp"]["charisme"] - xp_before))
+	check(game.session["series_finies"] == 1 and game.session["mots_ok"] == Data.WORDS_PER_SERIES, "série et mots comptés pour l'ergo")
+	check(Objectives.is_done(profile), "objectif « taper 3 mots » atteint")
+	var money_obj: int = profile["money"]
+	screen._open_objectives()
+	check(profile["money"] == money_obj + 12 and profile["etoiles"] == 1, "récompense de l'objectif : pièces et étoile")
+	check(screen._overlay != null and screen._overlay.offers.size() == 3, "3 nouveaux objectifs proposés")
+	screen._on_objective_chosen(screen._overlay.offers[0])
+	check(Objectives.has_current(profile) and screen._overlay == null, "nouvel objectif choisi")
+
+	print("Série arrêtée en cours")
+	screen._start_typing(_object(screen, "tapis"), "sport")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	check(await _wait_state(screen, "series", 12.0), "série de sport commencée")
+	check(screen.character.pose == "course" and screen.character.anim == "run", "le personnage court sur le tapis")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	await _wait(1.3)
+	var physique: float = profile["skills_xp"]["physique"]
+	screen.typing._close({"status": "cancel"})
+	check(screen._state == "idle" and not screen.typing.is_open(), "bouton Arrêter : la série s'arrête")
+	check(game.session["series_interrompues"] == 1, "série interrompue comptée pour l'ergo")
+	check(profile["skills_xp"]["physique"] == physique and physique > 0.0, "les points déjà gagnés sont gardés")
+	game.session["taches_abandonnees"] = 0
+
+	print("Tutoriel")
+	screen.start_tutorial()
+	check(screen.tutorial != null and screen.tutorial.current_id() == "bienvenue", "le tutoriel démarre")
+	screen.tutorial.advance()
+	check(screen.tutorial.current_id() == "bouger", "étape : se déplacer")
+	screen._state = "walking"
+	screen._object = null
+	screen._on_arrived()
+	check(screen.tutorial.current_id() == "jauges", "se déplacer fait avancer le tutoriel")
+	screen.tutorial.advance()
+	check(screen.tutorial.current_id() == "objet" and screen.studio.get_object("lavabo")._marker.visible, "la flèche montre le lavabo")
+	screen.tutorial._finish(true)
+	check(screen.tutorial == null and profile["tuto_fait"], "le tutoriel peut être passé")
+	screen._close_overlay()
+
+	print("Guide et changement de look")
+	screen._open_guide()
+	check(screen._overlay != null and screen._overlay.objects.size() == screen.studio.furniture.size(), "le guide présente tous les objets")
+	screen._close_overlay()
+	screen._open_look()
+	check(screen._overlay != null and screen._overlay.edit_mode, "le miroir ouvre le changement de look")
+	screen._overlay.appearance["hair_style"] = 6
+	screen._overlay._validate()
+	check(profile["appearance"]["hair_style"] == 6 and screen._overlay == null, "nouveau look enregistré")
 
 	print("Annulation et chronomètre")
 	screen._start_typing(_object(screen, "lavabo"), "dents")
