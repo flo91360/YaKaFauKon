@@ -10,6 +10,14 @@ const ROOM_MIN := Vector2(-5.0, -4.0) # (x, z)
 const ROOM_MAX := Vector2(5.0, 4.0)
 const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4), Vector2(-2.4, 1.6), Vector2(2.6, 1.8), Vector2(0.4, 1.6)]
 const GROUND_Y := -0.3
+## Calques de lumière : la pièce (calque 1, par défaut pour tout ce qui est ajouté,
+## personnage compris) n'est éclairée que par `inside_light` et les lampes ;
+## le jardin (calque 2) par le soleil. Ainsi aucune ombre de soleil ne bouge dans la maison.
+const LAYER_ROOM := 1
+const LAYER_GARDEN := 2
+## Directions fixes : des ombres immobiles, quelle que soit l'heure.
+const SUN_DIR := Vector3(0.5, 0.78, 0.62)
+const INSIDE_DIR := Vector3(0.32, 0.9, 0.45)
 
 # Palette douce et chaleureuse
 const CAM_HOME := Vector3(8.0, 9.4, 10.6)
@@ -36,6 +44,7 @@ var furniture: Array = []
 var camera: Camera3D
 var floor_body: StaticBody3D
 var sun: DirectionalLight3D
+var inside_light: DirectionalLight3D # lumière de la pièce (le soleil n'éclaire que le jardin)
 var env: Environment
 var quality := 1 # 0 léger, 1 normal, 2 beau
 
@@ -67,7 +76,10 @@ func _ready() -> void:
 	_steel = M.mat(C_STEEL, 0.28, 0.35)
 	_build_environment()
 	_build_room()
+	var first_garden := get_child_count()
 	_build_garden()
+	for i in range(first_garden, get_child_count()):
+		_set_layers(get_child(i), LAYER_GARDEN)
 	_build_furniture()
 	_build_decor()
 	set_time(_minutes, false, true)
@@ -124,7 +136,24 @@ func _build_environment() -> void:
 	sun.shadow_normal_bias = 1.2
 	sun.shadow_blur = 1.2
 	sun.light_angular_distance = 1.2
+	sun.light_cull_mask = LAYER_GARDEN
 	add_child(sun)
+	sun.position = SUN_DIR.normalized() * 30.0
+	sun.look_at(Vector3.ZERO, Vector3.UP)
+
+	inside_light = DirectionalLight3D.new()
+	inside_light.shadow_enabled = true
+	inside_light.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	inside_light.directional_shadow_max_distance = 30.0
+	inside_light.shadow_bias = 0.04
+	inside_light.shadow_normal_bias = 1.2
+	inside_light.shadow_opacity = 0.7
+	inside_light.light_angular_distance = 2.5
+	inside_light.light_cull_mask = LAYER_ROOM
+	inside_light.shadow_caster_mask = LAYER_ROOM
+	add_child(inside_light)
+	inside_light.position = INSIDE_DIR.normalized() * 30.0
+	inside_light.look_at(Vector3.ZERO, Vector3.UP)
 
 	camera = Camera3D.new()
 	camera.fov = 36.0
@@ -151,6 +180,7 @@ func apply_quality(level: int) -> void:
 	env.glow_bloom = 0.04
 	env.glow_hdr_threshold = 1.05
 	sun.shadow_blur = [0.8, 1.2, 1.6][level]
+	inside_light.shadow_blur = [1.2, 1.8, 2.4][level]
 	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM, RenderingServer.SHADOW_QUALITY_SOFT_HIGH][level])
 	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 8192][level], true)
 	if is_inside_tree():
@@ -158,6 +188,13 @@ func apply_quality(level: int) -> void:
 		get_viewport().screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if level == 0 else Viewport.SCREEN_SPACE_AA_DISABLED
 	for l in _lamps:
 		l["light"].shadow_enabled = level >= 2 and l["shadow"]
+
+
+func _set_layers(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		node.layers = layer
+	for c in node.get_children():
+		_set_layers(c, layer)
 
 
 func _lamps_wanted() -> bool:
@@ -178,18 +215,17 @@ func set_time(minutes: float, sleeping := false, instant := false) -> void:
 	var day := _daylight(minutes)
 	var arc := clampf((hour - 6.0) / 14.5, 0.0, 1.0) # 6 h → 20 h 30
 	var height := sin(arc * PI) # 0 à l'horizon, 1 au plus haut
-	var el := deg_to_rad(11.0 + 49.0 * height)
-	var az := deg_to_rad(lerpf(-72.0, 72.0, arc))
-	var sun_dir := Vector3(sin(az) * cos(el), sin(el), cos(az) * cos(el))
-	var moon_dir := Vector3(-0.35, 0.8, 0.5).normalized()
-	var dir := moon_dir.lerp(sun_dir, smoothstep(0.0, 0.25, day)).normalized()
-	sun.position = dir * 30.0
-	sun.look_at(Vector3.ZERO, Vector3.UP)
+	# Le soleil ne tourne pas (ses ombres resteraient en mouvement) : seules
+	# sa couleur et sa force suivent l'heure.
 	var warm := smoothstep(0.05, 0.85, height)
 	var sun_col := Color(1.0, 0.56, 0.3).lerp(Color(1.0, 0.95, 0.86), warm)
 	var moon_col := Color(0.55, 0.66, 1.0)
 	sun.light_color = moon_col.lerp(sun_col, day)
 	sun.light_energy = lerpf(0.32, lerpf(1.05, 1.4, warm), day)
+	# Lumière intérieure : jour qui entre doucement par la fenêtre, faible la nuit
+	# (les lampes prennent le relais).
+	inside_light.light_color = Color(0.6, 0.68, 0.95).lerp(Color(1.0, 0.94, 0.86).lerp(Color(1.0, 0.86, 0.72), 1.0 - warm), day)
+	inside_light.light_energy = lerpf(0.12, 0.95, day)
 	var amb_day := Color(1.0, 0.8, 0.74).lerp(Color(0.84, 0.9, 1.0), warm)
 	env.ambient_light_color = Color(0.38, 0.45, 0.78).lerp(amb_day, day)
 	env.ambient_light_energy = lerpf(0.5, 0.52, day)

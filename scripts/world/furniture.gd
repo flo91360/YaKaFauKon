@@ -91,6 +91,13 @@ func set_marker(on: bool) -> void:
 	_update_processing()
 
 
+## Points (en 3D) de la flèche dorée et du nom, pour que l'interface ne les cache pas.
+func marker_points() -> Array:
+	if _marker == null or not _marker.visible:
+		return []
+	return [to_global(Vector3(0, height + 0.3, 0)), to_global(Vector3(0, height + 1.35, 0))]
+
+
 func _update_processing() -> void:
 	set_process(_highlight or (_marker != null and _marker.visible))
 

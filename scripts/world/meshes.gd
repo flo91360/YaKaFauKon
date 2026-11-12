@@ -275,6 +275,50 @@ static func _array_mesh(verts: PackedVector3Array, normals: PackedVector3Array, 
 	return mesh
 
 
+## Crâne d'une seule pièce : une sphère déformée, sans bosse ajoutée par-dessus.
+## `square` (0 à 1) élargit le bas du visage en carré arrondi et aplatit le menton ;
+## `cheeks` (0 à 1) gonfle doucement les joues. Le devant du visage est vers -z.
+static func head(radius: float, square := 0.0, cheeks := 0.0, rings := 20) -> Mesh:
+	if square <= 0.0 and cheeks <= 0.0:
+		return sphere(radius, rings)
+	var key := "hd%.3f/%.2f/%.2f/%d" % [radius, square, cheeks, rings]
+	if _meshes.has(key):
+		return _meshes[key]
+	var src := sphere(radius, rings).get_mesh_arrays()
+	var verts: PackedVector3Array = src[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
+	for i in verts.size():
+		var d := verts[i].normalized()
+		verts[i] = _head_point(d, radius, square, cheeks)
+		# Normale recalculée sur la surface déformée (petits pas autour du point)
+		var t1 := d.cross(Vector3.UP if absf(d.y) < 0.95 else Vector3.RIGHT).normalized()
+		var t2 := d.cross(t1)
+		var e := 0.01
+		var du := _head_point((d + t1 * e).normalized(), radius, square, cheeks) - _head_point((d - t1 * e).normalized(), radius, square, cheeks)
+		var dv := _head_point((d + t2 * e).normalized(), radius, square, cheeks) - _head_point((d - t2 * e).normalized(), radius, square, cheeks)
+		var n := du.cross(dv).normalized()
+		normals[i] = n if n.dot(d) > 0.0 else -n
+	var mesh := _array_mesh(verts, normals, src[Mesh.ARRAY_TEX_UV], src[Mesh.ARRAY_INDEX])
+	_meshes[key] = mesh
+	return mesh
+
+
+static func _head_point(d: Vector3, radius: float, square: float, cheeks: float) -> Vector3:
+	var v := d * radius
+	if square > 0.0:
+		var w := smoothstep(0.15, -0.75, d.y) * square # 0 en haut, 1 au menton
+		var ang := atan2(d.z, d.x)
+		var sq := pow(pow(absf(cos(ang)), 4.0) + pow(absf(sin(ang)), 4.0), -0.25) # carré arrondi
+		var sxz := lerpf(1.0, sq * 1.02, w * 0.75)
+		v = Vector3(v.x * sxz, v.y * lerpf(1.0, 0.9, w), v.z * sxz)
+	if cheeks > 0.0:
+		for sx in [-1.0, 1.0]:
+			var c := Vector3(sx * 0.6, -0.52, -0.6).normalized()
+			var a := d.angle_to(c)
+			v += d * radius * cheeks * 0.13 * exp(-pow(a / 0.36, 2.0))
+	return v
+
+
 # --- Formes simples (mises en cache) ------------------------------------------------------
 
 static func sphere(radius: float, rings := 16) -> SphereMesh:

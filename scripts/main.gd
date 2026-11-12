@@ -34,6 +34,14 @@ func _ready() -> void:
 			if a.begins_with("--onglet="):
 				_screen.appearance = load("res://scripts/core/data.gd").random_appearance()
 				_screen._show_tab(int(a.substr(9)))
+		for a in args: # ex. --visage=2 : forme du visage imposée
+			if a.begins_with("--visage="):
+				_screen.appearance = load("res://scripts/core/data.gd").APPEARANCE_DEFAULTS.duplicate()
+				_screen.appearance["face"] = int(a.substr(9))
+			if a.begins_with("--joues="):
+				_screen.appearance["cheeks"] = int(a.substr(8))
+				_screen._show_tab(1)
+				_screen._show_tab(1)
 	elif "--ecran=ergo-demo" in args:
 		show_ergo(_demo_profiles(), false)
 	else:
@@ -138,8 +146,11 @@ func _start_demo(args: Array) -> void:
 		screen._toggle_pause()
 	if "--demo-look" in args:
 		screen._open_look()
-	if "--demo-tuto" in args:
-		screen.start_tutorial()
+	for a in args:
+		if a == "--demo-tuto" or a.begins_with("--demo-tuto="): # ex. --demo-tuto=4 (étape)
+			screen.start_tutorial()
+			if a.contains("="):
+				screen.tutorial._show(int(a.get_slice("=", 1)) - 1)
 	for a in args:
 		if a.begins_with("--demo-action="): # ex. --demo-action=cuisine:cuisiner
 			var parts: PackedStringArray = a.substr(14).split(":")
