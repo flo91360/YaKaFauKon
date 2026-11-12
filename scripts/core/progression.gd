@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS := {
 	"niveau_texte": "auto", # auto / 1 / 2 / 3
 	"vitesse_besoins": "normale", # lente / normale / rapide
 	"missions_minutes": 2, # minutes réelles entre deux missions
+	"aide_couleur": "oui", # lettres du modèle en vert / rouge pendant la frappe
 }
 const SETTING_CHOICES := {
 	"chrono": ["jamais", "parfois", "souvent", "toujours"],
@@ -24,6 +25,7 @@ const SETTING_CHOICES := {
 	"niveau_texte": ["auto", "1", "2", "3"],
 	"vitesse_besoins": ["lente", "normale", "rapide"],
 	"missions_minutes": [1, 2, 3, 5],
+	"aide_couleur": ["oui", "non"],
 }
 const SETTING_LABELS := {
 	"chrono": "Fréquence du chronomètre",
@@ -32,6 +34,7 @@ const SETTING_LABELS := {
 	"niveau_texte": "Niveau des textes",
 	"vitesse_besoins": "Vitesse des besoins",
 	"missions_minutes": "Minutes entre deux missions",
+	"aide_couleur": "Lettres en couleur pendant la frappe",
 }
 const EXIGENCE_FACTOR := {"facile": 0.6, "normale": 0.75, "difficile": 0.9}
 const TOLERANCE_OFFSET := {"stricte": -1, "normale": 0, "large": 1}
