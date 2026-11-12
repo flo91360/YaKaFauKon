@@ -16,11 +16,23 @@ var profiles: Array = []
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color(0.86, 0.92, 0.98)
+	var bg := TextureRect.new()
+	var gradient := GradientTexture2D.new()
+	gradient.gradient = Gradient.new()
+	gradient.gradient.set_color(0, Color(0.72, 0.85, 0.98))
+	gradient.gradient.set_color(1, Color(0.99, 0.92, 0.82))
+	gradient.fill_to = Vector2(0, 1)
+	bg.texture = gradient
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var box := UiTheme.centered_panel(self, 760)
+	var logo := TextureRect.new()
+	logo.texture = load("res://icon.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size = Vector2(110, 110)
+	box.add_child(logo)
 	var title := UiTheme.label("YaKaFauKon", 52, UiTheme.COL_ACCENT.darkened(0.15))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
@@ -38,7 +50,8 @@ func _ready() -> void:
 	box.add_child(scroll)
 	scroll.add_child(grid)
 	for p in profiles:
-		var b := UiTheme.button(str(p.get("name", "?")), Data.OUTFIT_COLORS[clampi(int(p.get("appearance", {}).get("outfit", 0)), 0, Data.OUTFIT_COLORS.size() - 1)].darkened(0.1), 30)
+		var stars := int(p.get("etoiles", 0))
+		var b := UiTheme.icon_button("perso", str(p.get("name", "?")) + ("  ·  %d étoile%s" % [stars, "" if stars == 1 else "s"] if stars > 0 else ""), Data.OUTFIT_COLORS[clampi(int(p.get("appearance", {}).get("outfit", 0)), 0, Data.OUTFIT_COLORS.size() - 1)].darkened(0.1), 30)
 		b.custom_minimum_size = Vector2(340, 70)
 		b.pressed.connect(func(): profile_selected.emit(p))
 		grid.add_child(b)
@@ -48,8 +61,20 @@ func _ready() -> void:
 		box.add_child(hint)
 
 	var new_button := UiTheme.button("+ Nouveau joueur", UiTheme.COL_GOOD, 28)
+	new_button.custom_minimum_size = Vector2(0, 64)
 	new_button.pressed.connect(func(): new_profile_requested.emit())
 	box.add_child(new_button)
+
+	var quit := UiTheme.icon_button("croix", "Quitter", UiTheme.COL_GREY, 18)
+	quit.anchor_top = 1.0
+	quit.anchor_bottom = 1.0
+	quit.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	quit.offset_left = 16
+	quit.offset_top = -16
+	quit.offset_bottom = -16
+	quit.focus_mode = Control.FOCUS_NONE
+	quit.pressed.connect(func(): get_tree().quit())
+	add_child(quit)
 
 	# Espace ergothérapeute : petit bouton en bas à droite + mot à taper.
 	var ergo := UiTheme.button("Espace ergothérapeute", Color(0.6, 0.62, 0.68), 18)

@@ -92,6 +92,8 @@ func event(event_name: String) -> void:
 		_show(7) # l'enfant est allé plus vite que le tutoriel
 	elif event_name == "series_end" and current_id() == "activite":
 		_show(8)
+	elif event_name == "moved" and current_id() == "action":
+		_show(3) # l'action a été interrompue : on remontre le lavabo
 
 
 func advance() -> void:

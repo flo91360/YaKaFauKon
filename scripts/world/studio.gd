@@ -54,6 +54,7 @@ var _fabric_n := "tissu_n"
 var _fx: Array = [] # effets de l'activité en cours (particules, invités…)
 var _belt_on := false
 var _cam_focus = null # point regardé de près pendant une activité (Vector3) ou null
+var _cam_lift := 0.85 # décalage du sujet vers le haut de l'écran (place pour le panneau de frappe)
 var _cam_pos := CAM_HOME
 var _cam_look := CAM_LOOK
 
@@ -99,7 +100,8 @@ func _build_environment() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
+	# Le rendu de secours (OpenGL) est plus clair : on baisse un peu l'exposition.
+	env.tonemap_exposure = 1.0 if RenderingServer.get_current_rendering_method() == "forward_plus" else 0.8
 	env.tonemap_white = 1.6
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.12
@@ -941,8 +943,9 @@ func pick(screen_pos: Vector2) -> Dictionary:
 
 ## Rapproche la caméra d'un point pendant une activité. Le point est cadré dans
 ## la moitié haute de l'écran, au-dessus du panneau de frappe.
-func focus_on(point: Vector3) -> void:
+func focus_on(point: Vector3, lift := 0.85) -> void:
 	_cam_focus = point
+	_cam_lift = lift
 
 
 func unfocus() -> void:
@@ -956,7 +959,7 @@ func _move_camera(delta: float) -> void:
 		var dir := (CAM_HOME - CAM_LOOK).normalized()
 		var up := dir.cross(Vector3.UP).cross(dir).normalized()
 		var focus: Vector3 = _cam_focus
-		want_look = focus + Vector3(0, 0.9, 0) - up * 1.25
+		want_look = focus + Vector3(0, 0.9, 0) - up * _cam_lift
 		want_pos = want_look + dir * CAM_FOCUS_DISTANCE
 	if _cam_pos.distance_to(want_pos) < 0.002 and _cam_look.distance_to(want_look) < 0.002:
 		return

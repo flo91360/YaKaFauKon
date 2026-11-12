@@ -99,10 +99,12 @@ func _test_text_levels() -> void:
 	var p := _profile()
 	var texts: Array = Data.ACTIONS["toilettes"]["texts"]
 	check(Progression.text_for(texts, p) == "toilettes", "niveau 1 : mot-clé")
-	for i in 10:
+	for i in Progression.LEVEL_UP_SUCCESSES[1] - 1:
 		Progression.record_success(p, 1.0, false)
+	check(Progression.text_for(texts, p) == "toilettes", "encore niveau 1 juste avant le seuil")
+	Progression.record_success(p, 1.0, false)
 	check(Progression.text_for(texts, p) == "les toilettes", "niveau 2 : article + mot")
-	for i in 15:
+	for i in Progression.LEVEL_UP_SUCCESSES[2]:
 		Progression.record_success(p, 1.0, false)
 	check(Progression.text_for(texts, p) == "aller aux toilettes", "niveau 3 : petite phrase")
 	p["settings"]["niveau_texte"] = "1"

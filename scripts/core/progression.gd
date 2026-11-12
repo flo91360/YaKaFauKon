@@ -7,7 +7,9 @@ const Data = preload("res://scripts/core/data.gd")
 const CALIBRATION_COUNT := 6 # frappes réussies avant le premier chronomètre
 const READ_MARGIN_SEC := 3.0 # temps laissé pour lire le modèle avant de taper
 const SPEED_CAP_FACTOR := 2.0 # l'exigence se stabilise à 2 x la vitesse de départ
-const LEVEL_UP_SUCCESSES := [0, 10, 15] # frappes réussies pour passer au niveau suivant
+## Frappes réussies pour passer au niveau de texte suivant (les mots des séries
+## comptent aussi : une série = 5 frappes).
+const LEVEL_UP_SUCCESSES := [0, 20, 40]
 
 const DEFAULT_SETTINGS := {
 	"chrono": "parfois", # jamais / parfois / souvent / toujours

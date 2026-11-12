@@ -294,10 +294,11 @@ func apply_local_settings() -> void:
 		AudioServer.set_bus_mute(music, local_settings["musique"] <= 0)
 		AudioServer.set_bus_volume_db(music, linear_to_db(maxf(local_settings["musique"], 1) / 100.0) - 8.0)
 	if DisplayServer.get_name() != "headless":
-		var want := DisplayServer.WINDOW_MODE_FULLSCREEN if local_settings["plein_ecran"] else DisplayServer.WINDOW_MODE_MAXIMIZED
-		if DisplayServer.window_get_mode() != want and not OS.has_feature("editor_hint"):
-			if local_settings["plein_ecran"] or DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
-				DisplayServer.window_set_mode(want)
+		var mode := DisplayServer.window_get_mode()
+		if local_settings["plein_ecran"] and mode != DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		elif not local_settings["plein_ecran"] and mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 
 
 func _setup_audio() -> void:

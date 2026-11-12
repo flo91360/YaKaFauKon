@@ -358,7 +358,7 @@ func _on_arrived() -> void:
 	_action_done_minutes = 0.0
 	character.start_acting(_object.pose, _object.pose_point, _object.face_point, Data.ACTIONS[_action_id]["anim"])
 	studio.start_activity(_object, _action_id)
-	studio.focus_on(character.position * Vector3(1, 0, 1))
+	studio.focus_on(character.position * Vector3(1, 0, 1), 0.15)
 
 
 func _progress_action(profile: Dictionary, minutes: float) -> void:
