@@ -89,6 +89,7 @@ func _process(delta: float) -> void:
 		if _state == "acting":
 			_progress_action(profile, minutes)
 		_update_missions(profile, delta)
+		studio.set_time(profile["game_minutes"], sleeping)
 	hud.update_display(profile, _status_text())
 
 

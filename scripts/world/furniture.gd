@@ -1,7 +1,10 @@
 extends StaticBody3D
 ## Un objet du studio : il propose une ou plusieurs actions.
 ## Le personnage se place à `use_point`, regarde `face_point`,
-## et peut prendre une pose (debout, assis, allongé) à `pose_point`.
+## et peut s'installer à `pose_point` (lit, chaise, canapé…).
+## Sans appel à setup(), ce nœud sert de simple support pour le décor.
+
+const M = preload("res://scripts/world/meshes.gd")
 
 var object_id := ""
 var display_name := ""
@@ -11,8 +14,14 @@ var face_point := Vector3.ZERO
 var pose := "debout" # debout / assis / allonge / course
 var pose_point = null # Vector3 ou null
 var footprint := Rect2() # emprise au sol (x, z) pour éviter de traverser l'objet
+var height := 1.0
 
 var _label: Label3D
+var _marker: Node3D
+var _visuals: Array = []
+var _overlay: StandardMaterial3D
+var _highlight := false
+var _time := 0.0
 
 
 func setup(id: String, p_name: String, p_actions: Array, pos: Vector3, size: Vector3) -> void:
@@ -20,6 +29,7 @@ func setup(id: String, p_name: String, p_actions: Array, pos: Vector3, size: Vec
 	display_name = p_name
 	actions = p_actions
 	position = pos
+	height = size.y
 	footprint = Rect2(pos.x - size.x / 2.0, pos.z - size.z / 2.0, size.x, size.z)
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -33,78 +43,106 @@ func setup(id: String, p_name: String, p_actions: Array, pos: Vector3, size: Vec
 	_label.no_depth_test = true
 	_label.font = load("res://fonts/Lexend.ttf")
 	_label.font_size = 64
-	_label.outline_size = 18
-	_label.pixel_size = 0.004
+	_label.outline_size = 20
+	_label.pixel_size = 0.0042
 	_label.modulate = Color(1, 1, 1)
-	_label.outline_modulate = Color(0.2, 0.25, 0.4)
-	_label.position = Vector3(0, size.y + 0.45, 0)
+	_label.outline_modulate = Color(0.16, 0.2, 0.36)
+	_label.position = Vector3(0, size.y + 0.5, 0)
 	_label.visible = false
+	_label.render_priority = 5
 	add_child(_label)
+	set_process(false)
 
+
+# --- Mise en évidence (survol de la souris, tutoriel) ---------------------------------------
 
 func set_highlight(on: bool) -> void:
-	_label.visible = on
+	if _label == null or on == _highlight:
+		return
+	_highlight = on
+	_label.visible = on or (_marker != null and _marker.visible)
+	if on and _overlay == null:
+		_overlay = StandardMaterial3D.new()
+		_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_overlay.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_overlay.albedo_color = Color(1.0, 0.9, 0.55, 0.16)
+		_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for v in _visuals:
+		if is_instance_valid(v):
+			v.material_overlay = _overlay if on else null
+	_update_processing()
 
 
-# --- Petites briques visuelles arrondies -------------------------------------------
-
-static func material(color: Color, rough := 0.85) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = rough
-	return m
-
-
-func add_box(size: Vector3, color: Color, offset: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return _add_mesh(mesh, color, offset, rot_deg)
-
-
-## Boîte aux bords arrondis : une boîte un peu plus fine + des cylindres sur les arêtes.
-func add_soft_box(size: Vector3, color: Color, offset: Vector3, radius := 0.08) -> void:
-	var r := minf(radius, minf(size.x, minf(size.y, size.z)) * 0.45)
-	add_box(Vector3(size.x, size.y - 2.0 * r, size.z), color, offset)
-	add_box(Vector3(size.x - 2.0 * r, r * 2.0, size.z - 2.0 * r), color, offset + Vector3(0, size.y / 2.0 - r, 0))
-	add_box(Vector3(size.x - 2.0 * r, r * 2.0, size.z - 2.0 * r), color, offset - Vector3(0, size.y / 2.0 - r, 0))
-	for sx in [-1.0, 1.0]:
-		for sy in [-1.0, 1.0]:
-			add_cylinder(r, size.z - 2.0 * r, color, offset + Vector3(sx * (size.x / 2.0 - r), sy * (size.y / 2.0 - r), 0), Vector3(90, 0, 0))
-	for sz in [-1.0, 1.0]:
-		for sy in [-1.0, 1.0]:
-			add_cylinder(r, size.x - 2.0 * r, color, offset + Vector3(0, sy * (size.y / 2.0 - r), sz * (size.z / 2.0 - r)), Vector3(0, 0, 90))
+## Flèche qui rebondit au-dessus de l'objet (tutoriel, objectif en cours).
+func set_marker(on: bool) -> void:
+	if _label == null:
+		return
+	if on and _marker == null:
+		_marker = Node3D.new()
+		add_child(_marker)
+		var gold := M.glowing(Color(1.0, 0.78, 0.25), 0.6)
+		var cone := M.add(_marker, M.cylinder(0.0, 0.34, 0.17, 20), gold, Vector3(0, 0.0, 0))
+		cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var stem := M.add(_marker, M.cylinder(0.07, 0.26, 0.07, 16), gold, Vector3(0, 0.3, 0))
+		stem.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if _marker != null:
+		_marker.visible = on
+	_label.visible = on or _highlight
+	_update_processing()
 
 
-func add_cylinder(radius: float, height: float, color: Color, offset: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 20
-	return _add_mesh(mesh, color, offset, rot_deg)
+func _update_processing() -> void:
+	set_process(_highlight or (_marker != null and _marker.visible))
 
 
-func add_sphere(radius: float, color: Color, offset: Vector3, scale_v := Vector3.ONE) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	var mi := _add_mesh(mesh, color, offset, Vector3.ZERO)
-	mi.scale = scale_v
+func _process(delta: float) -> void:
+	_time += delta
+	if _highlight and _overlay != null:
+		_overlay.albedo_color.a = 0.13 + 0.07 * sin(_time * 5.0)
+	if _marker != null and _marker.visible:
+		_marker.position = Vector3(0, height + 0.95 + 0.12 * absf(sin(_time * 3.5)), 0)
+		_marker.rotation.y = _time * 1.5
+
+
+# --- Briques visuelles ------------------------------------------------------------------------
+# `material` : un matériau (voir meshes.gd) ou simplement une couleur.
+
+func _reg(mi: MeshInstance3D) -> MeshInstance3D:
+	_visuals.append(mi)
 	return mi
 
 
-func add_capsule(radius: float, height: float, color: Color, offset: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
-	var mesh := CapsuleMesh.new()
-	mesh.radius = radius
-	mesh.height = height
-	return _add_mesh(mesh, color, offset, rot_deg)
+## Boîte aux bords arrondis.
+func box(size: Vector3, material, pos: Vector3, radius := 0.03, rot_deg := Vector3.ZERO) -> MeshInstance3D:
+	return _reg(M.add(self, M.rounded_box(size, radius), material, pos, rot_deg))
 
 
-func _add_mesh(mesh: PrimitiveMesh, color: Color, offset: Vector3, rot_deg: Vector3) -> MeshInstance3D:
-	mesh.material = material(color)
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.position = offset
-	mi.rotation_degrees = rot_deg
-	add_child(mi)
+func cyl(radius: float, h: float, material, pos: Vector3, rot_deg := Vector3.ZERO, top_radius := -1.0) -> MeshInstance3D:
+	return _reg(M.add(self, M.cylinder(radius, h, top_radius), material, pos, rot_deg))
+
+
+func ball(radius: float, material, pos: Vector3, scale_v := Vector3.ONE) -> MeshInstance3D:
+	return _reg(M.add(self, M.sphere(radius), material, pos, Vector3.ZERO, scale_v))
+
+
+func cap(radius: float, h: float, material, pos: Vector3, rot_deg := Vector3.ZERO, scale_v := Vector3.ONE) -> MeshInstance3D:
+	return _reg(M.add(self, M.capsule(radius, h), material, pos, rot_deg, scale_v))
+
+
+func lathe(profile: Array, material, pos: Vector3, rot_deg := Vector3.ZERO, scale_v := Vector3.ONE) -> MeshInstance3D:
+	return _reg(M.add(self, M.lathe(profile), material, pos, rot_deg, scale_v))
+
+
+func tube(path: Array, radius: float, material, pos := Vector3.ZERO, rot_deg := Vector3.ZERO) -> MeshInstance3D:
+	return _reg(M.add(self, M.tube(path, radius), material, pos, rot_deg))
+
+
+func ring(ring_radius: float, thickness: float, material, pos: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
+	return _reg(M.add(self, M.torus(ring_radius, thickness), material, pos, rot_deg))
+
+
+## Rectangle plat (image, écran…). Par défaut il regarde vers +Z.
+func flat(size: Vector2, material, pos: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
+	var mi := _reg(M.add(self, M.quad(size), material, pos, rot_deg))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return mi

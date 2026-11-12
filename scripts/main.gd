@@ -90,6 +90,9 @@ func _set_screen(screen: Node) -> void:
 
 func _start_demo(args: Array) -> void:
 	_game().start_demo()
+	for a in args:
+		if a.begins_with("--heure="):
+			_game().profile["game_minutes"] = float(a.substr(8)) * 60.0
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
