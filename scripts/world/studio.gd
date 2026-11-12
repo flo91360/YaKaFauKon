@@ -4,6 +4,7 @@ extends Node3D
 
 const Furniture = preload("res://scripts/world/furniture.gd")
 const M = preload("res://scripts/world/meshes.gd")
+const Data = preload("res://scripts/core/data.gd")
 
 const ROOM_MIN := Vector2(-5.0, -4.0) # (x, z)
 const ROOM_MAX := Vector2(5.0, 4.0)
@@ -11,6 +12,10 @@ const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4),
 const GROUND_Y := -0.3
 
 # Palette douce et chaleureuse
+const CAM_HOME := Vector3(8.0, 9.4, 10.6)
+const CAM_LOOK := Vector3(-0.15, 0.35, -0.25)
+const CAM_FOCUS_DISTANCE := 8.6
+
 const C_WOOD := Color(0.80, 0.60, 0.42)
 const C_WOOD_LIGHT := Color(0.90, 0.74, 0.54)
 const C_WOOD_DARK := Color(0.52, 0.37, 0.27)
@@ -46,6 +51,11 @@ var _wood_light: Material
 var _wood_dark: Material
 var _steel: Material
 var _fabric_n := "tissu_n"
+var _fx: Array = [] # effets de l'activité en cours (particules, invités…)
+var _belt_on := false
+var _cam_focus = null # point regardé de près pendant une activité (Vector3) ou null
+var _cam_pos := CAM_HOME
+var _cam_look := CAM_LOOK
 
 
 func _ready() -> void:
@@ -72,6 +82,13 @@ func _process(delta: float) -> void:
 	if absf(target - _lamps_level) > 0.001:
 		_lamps_level = move_toward(_lamps_level, target, delta * 1.2)
 		_apply_lamps()
+	_move_camera(delta)
+	if _belt_on: # la bande du tapis de course défile
+		for c in get_object("tapis").get_children():
+			if c.has_meta("belt"):
+				c.position.z += delta * 1.5
+				if c.position.z > 0.9:
+					c.position.z -= 1.68
 
 
 # --- Lumière, ciel et caméra --------------------------------------------------------------
@@ -112,8 +129,8 @@ func _build_environment() -> void:
 	camera.near = 0.3
 	camera.far = 140.0
 	add_child(camera)
-	camera.position = Vector3(8.0, 9.4, 10.6)
-	camera.look_at(Vector3(-0.15, 0.35, -0.25), Vector3.UP)
+	camera.position = CAM_HOME
+	camera.look_at(CAM_LOOK, Vector3.UP)
 	camera.current = true
 	apply_quality(quality)
 
@@ -918,3 +935,154 @@ func pick(screen_pos: Vector2) -> Dictionary:
 	if hit.collider.is_in_group("floor"):
 		return {"floor": hit.position}
 	return {}
+
+
+# --- Caméra ------------------------------------------------------------------------------------
+
+## Rapproche la caméra d'un point pendant une activité. Le point est cadré dans
+## la moitié haute de l'écran, au-dessus du panneau de frappe.
+func focus_on(point: Vector3) -> void:
+	_cam_focus = point
+
+
+func unfocus() -> void:
+	_cam_focus = null
+
+
+func _move_camera(delta: float) -> void:
+	var want_pos := CAM_HOME
+	var want_look := CAM_LOOK
+	if _cam_focus != null:
+		var dir := (CAM_HOME - CAM_LOOK).normalized()
+		var up := dir.cross(Vector3.UP).cross(dir).normalized()
+		var focus: Vector3 = _cam_focus
+		want_look = focus + Vector3(0, 0.9, 0) - up * 1.25
+		want_pos = want_look + dir * CAM_FOCUS_DISTANCE
+	if _cam_pos.distance_to(want_pos) < 0.002 and _cam_look.distance_to(want_look) < 0.002:
+		return
+	var k := 1.0 - exp(-delta * 3.2)
+	_cam_pos = _cam_pos.lerp(want_pos, k)
+	_cam_look = _cam_look.lerp(want_look, k)
+	camera.position = _cam_pos
+	camera.look_at(_cam_look, Vector3.UP)
+
+
+# --- Effets des activités ---------------------------------------------------------------------
+
+## Lance les effets visuels d'une action sur un objet (eau, vapeur, invités, Zzz…).
+func start_activity(f: Furniture, action_id: String) -> void:
+	stop_activity()
+	var fx_point: Vector3 = f.position + f.get_meta("fx_point", Vector3(0, f.height, 0))
+	match action_id:
+		"dormir":
+			var head: Vector3 = f.pose_point + Vector3(0.1, 0.45, -0.75)
+			for i in 3:
+				var z := Label3D.new()
+				z.text = "Z"
+				z.font = load("res://fonts/Lexend.ttf")
+				z.font_size = 96 + i * 24
+				z.pixel_size = 0.0028
+				z.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+				z.modulate = Color(0.75, 0.82, 1.0)
+				z.outline_modulate = Color(0.2, 0.25, 0.5)
+				z.outline_size = 14
+				z.no_depth_test = true
+				add_child(z)
+				_fx.append(z)
+				var tween := z.create_tween().set_loops()
+				tween.tween_property(z, "position", head + Vector3(0.45, 1.0, 0.0), 2.7).from(head)
+				tween.parallel().tween_property(z, "modulate:a", 0.0, 2.7).from(1.0)
+				tween.custom_step(i * 0.9)
+		"cuisiner", "manger":
+			if action_id == "cuisiner":
+				_fx.append(_particles(fx_point, Color(1, 1, 1, 0.5), 14, 1.6, Vector3.UP, 12.0, 0.35, Vector3(0, 0.1, 0), 0.05))
+		"dents":
+			_fx.append(_particles(fx_point + Vector3(0, 0.12, -0.08), Color(0.6, 0.82, 1.0, 0.85), 24, 0.35, Vector3.DOWN, 3.0, 0.7, Vector3(0, -4.0, 0), 0.018))
+		"douche":
+			_fx.append(_particles(fx_point, Color(0.62, 0.84, 1.0, 0.8), 90, 0.75, Vector3.DOWN, 13.0, 1.6, Vector3(0, -6.0, 0), 0.02))
+			_fx.append(_particles(f.position + Vector3(0, 0.5, 0), Color(1, 1, 1, 0.3), 12, 2.2, Vector3.UP, 30.0, 0.3, Vector3(0, 0.15, 0), 0.09))
+		"sport":
+			_belt_on = true
+		"bois":
+			_fx.append(_particles(fx_point, Color(0.86, 0.68, 0.45), 16, 0.7, Vector3.UP, 50.0, 1.3, Vector3(0, -5.0, 0), 0.018))
+		"peindre":
+			_fx.append(_particles(f.position + Vector3(0.1, 1.25, 0), Color(1.0, 0.85, 0.4, 0.9), 5, 1.2, Vector3.UP, 60.0, 0.25, Vector3(0, 0.2, 0), 0.02, true))
+		"miroir", "appeler":
+			_fx.append(_particles(f.use_point + Vector3(0, 1.85, 0), Color(1.0, 0.6, 0.72, 0.9), 4, 1.5, Vector3.UP, 35.0, 0.3, Vector3(0, 0.25, 0), 0.03, true))
+		"inviter":
+			var Character = load("res://scripts/world/character.gd")
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			# Un ami assis sur le canapé, deux amis debout en face (on voit leur visage).
+			var seats: Array = f.get_meta("guest_points", [])
+			var spots := [
+				{"pos": seats[0] if not seats.is_empty() else f.use_point, "pose": "assis", "anim": "sit_chat", "look": Vector3(0.4, 0, 0.0)},
+				{"pos": f.position + Vector3(0.95, 0, -1.75), "pose": "debout", "anim": "talk", "look": f.position},
+				{"pos": f.position + Vector3(-0.75, 0, -1.9), "pose": "debout", "anim": "wave", "look": f.position},
+			]
+			for spot in spots:
+				var point: Vector3 = spot["pos"]
+				var guest: Node3D = Character.new()
+				add_child(guest)
+				guest.build(Data.random_appearance(rng))
+				guest.position = point
+				guest.start_acting(spot["pose"], point, spot["look"], spot["anim"])
+				guest.scale = Vector3.ONE * 0.01
+				guest.create_tween().tween_property(guest, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				_fx.append(guest)
+			_fx.append(_particles(f.position + Vector3(0, 1.75, 0), Color(1.0, 0.6, 0.72, 0.9), 6, 1.5, Vector3.UP, 50.0, 0.3, Vector3(0, 0.25, 0), 0.03, true))
+
+
+func stop_activity() -> void:
+	for node in _fx:
+		if is_instance_valid(node):
+			node.queue_free()
+	_fx.clear()
+	_belt_on = false
+
+
+## Petite pluie de confettis (niveau gagné, série terminée, objectif atteint).
+func burst(pos: Vector3) -> void:
+	var colors := [C_CORAL, C_MUSTARD, C_TEAL, Color(0.6, 0.48, 0.86), Color(0.36, 0.56, 0.86)]
+	for color in colors:
+		var c: Color = color
+		var p := _particles(pos + Vector3(0, 1.7, 0), c, 14, 1.5, Vector3.UP, 65.0, 3.2, Vector3(0, -6.5, 0), 0.03, true)
+		p.one_shot = true
+		p.explosiveness = 0.95
+		p.restart()
+		get_tree().create_timer(2.5).timeout.connect(p.queue_free)
+
+
+func _particles(pos: Vector3, color: Color, amount: int, lifetime: float, dir: Vector3, spread: float, speed: float, gravity: Vector3, size: float, glow := false) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.position = pos
+	p.amount = amount
+	p.lifetime = lifetime
+	p.direction = dir
+	p.spread = spread
+	p.initial_velocity_min = speed * 0.7
+	p.initial_velocity_max = speed
+	p.gravity = gravity
+	p.scale_amount_min = 0.7
+	p.scale_amount_max = 1.3
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 0.6))
+	curve.add_point(Vector2(0.3, 1.0))
+	curve.add_point(Vector2(1, 0.0))
+	p.scale_amount_curve = curve
+	var mesh := SphereMesh.new()
+	mesh.radius = size
+	mesh.height = size * 2.0
+	mesh.radial_segments = 6
+	mesh.rings = 3
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	if color.a < 1.0:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	if glow:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mesh.material = mat
+	p.mesh = mesh
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(p)
+	return p

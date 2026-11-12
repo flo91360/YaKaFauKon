@@ -113,6 +113,39 @@ func _start_demo(args: Array) -> void:
 		screen._open_mission()
 		screen._mission_panel.state["step"] = "question"
 		screen._mission_panel.refresh()
+	if "--demo-serie" in args: # série de mots sur le tapis de course (2 mots déjà réussis)
+		var tapis = screen.studio.get_object("tapis")
+		screen._start_typing(tapis, "sport")
+		screen.typing.force_close()
+		screen._state = "walking"
+		screen.character.position = tapis.use_point
+		screen._on_arrived()
+		for i in 2:
+			screen._on_series_word_ok({"cps": 2.0})
+			screen._series["index"] += 1
+		screen._open_series_word()
+		screen.typing._input.text = "cou"
+		screen.typing._refresh_model()
+	if "--demo-objectifs" in args:
+		screen._open_objectives()
+	if "--demo-guide" in args:
+		screen._open_guide()
+	if "--demo-pause" in args:
+		screen._toggle_pause()
+	if "--demo-look" in args:
+		screen._open_look()
+	if "--demo-tuto" in args:
+		screen.start_tutorial()
+	for a in args:
+		if a.begins_with("--demo-action="): # ex. --demo-action=cuisine:cuisiner
+			var parts: PackedStringArray = a.substr(14).split(":")
+			var f = screen.studio.get_object(parts[0])
+			screen._object = f
+			screen._action_id = parts[1]
+			screen._state = "walking"
+			screen.character.position = f.use_point
+			screen._on_arrived()
+			screen.typing.force_close()
 	if "--demo-frappe" in args:
 		var f = screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]
 		screen._start_typing(f, "toilettes")

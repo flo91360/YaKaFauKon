@@ -185,7 +185,6 @@ static func badge(icon_name: String, color: Color, size := 40.0) -> PanelContain
 static func icon_button(icon_name: String, text: String, color := COL_ACCENT, size := 20) -> Button:
 	var b := button(text, color, size)
 	b.icon = icon_texture(icon_name)
-	b.expand_icon = true
 	b.add_theme_constant_override("icon_max_width", int(size * 1.35))
 	return b
 
