@@ -10,6 +10,19 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.0.1] - 2026-11-13
+
+### Corrigé
+
+- Tutoriel : la bulle d'explication passe en bas de l'écran quand elle
+  cacherait la flèche dorée (étapes « lavabo » et « tapis de course »).
+- Création du personnage : le visage « Carré » ne colle plus un bloc sous le
+  visage, c'est la mâchoire elle-même qui devient carrée. Les joues rondes
+  font aussi partie du visage (plus de bosses visibles).
+- Lumière : le soleil n'éclaire plus l'intérieur de la maison et ne tourne
+  plus, donc les ombres ne bougent plus en permanence (murs, douche). La pièce
+  a sa propre lumière douce, plus faible la nuit quand les lampes s'allument.
+
 ## [2.0.0] - 2026-11-12
 
 ### Ajouté

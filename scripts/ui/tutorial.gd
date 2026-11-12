@@ -24,6 +24,11 @@ const STEPS := [
 
 var child_name := ""
 var step := -1
+## Points de l'écran à ne pas cacher (la flèche dorée) : la bulle passe alors en bas.
+var avoid_points: Array = []
+
+const TOP := 124.0
+const BOTTOM_MARGIN := 36.0
 
 var _text: Label
 var _count: Label
@@ -39,7 +44,7 @@ func _ready() -> void:
 	_panel.anchor_right = 0.5
 	_panel.offset_left = -300
 	_panel.offset_right = 300
-	_panel.offset_top = 124
+	_panel.offset_top = TOP
 	var style: StyleBoxFlat = get_theme_stylebox("panel", "PanelContainer").duplicate()
 	style.bg_color = Color(1.0, 0.98, 0.9)
 	style.border_color = UiTheme.COL_GOLD
@@ -76,6 +81,23 @@ func _ready() -> void:
 	buttons.add_child(_next)
 	if step < 0:
 		_show(0)
+
+
+func _process(_delta: float) -> void:
+	if _panel == null:
+		return
+	var h := _panel.size.y
+	var top_rect := Rect2(size.x * 0.5 - 300.0, TOP, 600.0, h).grow(50.0)
+	var at_bottom := false
+	for p in avoid_points:
+		if top_rect.has_point(p):
+			at_bottom = true
+	var anchor := 1.0 if at_bottom else 0.0
+	if _panel.anchor_top != anchor or (at_bottom and absf(_panel.offset_top + h + BOTTOM_MARGIN) > 0.5):
+		_panel.anchor_top = anchor
+		_panel.anchor_bottom = anchor
+		_panel.offset_top = -h - BOTTOM_MARGIN if at_bottom else TOP
+		_panel.offset_bottom = -BOTTOM_MARGIN if at_bottom else TOP + h
 
 
 func current_id() -> String:

@@ -109,6 +109,8 @@ func _process(delta: float) -> void:
 	var profile: Dictionary = game.profile
 	if profile.is_empty(): # joueur en train de changer : l'écran va disparaître
 		return
+	if tutorial != null:
+		_tutorial_avoid()
 	if not paused:
 		var sleeping: bool = _state == "acting" and Data.ACTIONS[_action_id].get("sleep", false)
 		var factor := SLEEP_TIME_FACTOR if sleeping else 1.0
@@ -594,6 +596,18 @@ func start_tutorial() -> void:
 func _tutorial_event(event_name: String) -> void:
 	if tutorial != null:
 		tutorial.event(event_name)
+
+
+## La bulle du tutoriel ne doit pas cacher la flèche dorée (seulement quand le
+## panneau de frappe n'occupe pas le bas de l'écran).
+func _tutorial_avoid() -> void:
+	var pts: Array = []
+	if _state != "typing" and _state != "series":
+		for f in studio.furniture:
+			for p in f.marker_points():
+				if not studio.camera.is_position_behind(p):
+					pts.append(studio.camera.unproject_position(p))
+	tutorial.avoid_points = pts
 
 
 func _on_tutorial_step(step_id: String) -> void:

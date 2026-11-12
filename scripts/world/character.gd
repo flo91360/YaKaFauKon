@@ -192,13 +192,8 @@ func _build_head(head: Node3D, a: Dictionary, skin: Color, hair: Color) -> void:
 	var skull := Node3D.new()
 	skull.scale = head_scale
 	head.add_child(skull)
-	M.add(skull, M.sphere(0.25, 20), m_skin)
-	if face == 2: # mâchoire plus carrée
-		M.add(skull, M.rounded_box(Vector3(0.43, 0.26, 0.4), 0.12), m_skin, Vector3(0, -0.1, -0.015))
-	if cheeks == 2: # joues rondes
-		for sx in [-1.0, 1.0]:
-			var s: float = sx
-			M.add(skull, M.sphere(0.082, 10), m_skin, Vector3(s * 0.118, -0.092, -0.128))
+	# Visage carré et joues rondes : c'est le crâne lui-même qui change de forme.
+	M.add(skull, M.head(0.25, 1.0 if face == 2 else 0.0, 1.0 if cheeks == 2 else 0.0, 20), m_skin)
 	for sx in [-1.0, 1.0]: # oreilles
 		var s: float = sx
 		M.add(skull, M.sphere(0.052, 8), m_skin, Vector3(s * 0.243, -0.02, 0.01), Vector3.ZERO, Vector3(0.5, 1.0, 0.8))
@@ -255,7 +250,7 @@ func _build_head(head: Node3D, a: Dictionary, skin: Color, hair: Color) -> void:
 		var blush_mat := M.mat(Color(1.0, 0.5, 0.52, 0.42 if blush == 1 else 0.75), 0.9)
 		for sx in [-1.0, 1.0]:
 			var s: float = sx
-			var disc := M.add(head, M.sphere(0.05, 8), blush_mat, Vector3(s * 0.158 * head_scale.x, -0.07, -0.2 if cheeks != 2 else -0.215), Vector3(0, s * -38.0, 0), Vector3(1.0, 0.7, 0.16))
+			var disc := M.add(head, M.sphere(0.05, 8), blush_mat, Vector3(s * 0.145 * head_scale.x, -0.07, -0.196 if cheeks != 2 else -0.212), Vector3(0, s * -38.0, 0), Vector3(1.0, 0.7, 0.16))
 			disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if a["freckles"] == 1:
 		var freckle := M.mat(skin.darkened(0.3), 0.8)
