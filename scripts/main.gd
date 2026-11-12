@@ -30,6 +30,10 @@ func _ready() -> void:
 		_show_gallery(args)
 	elif "--ecran=creation" in args:
 		show_create()
+		for a in args:
+			if a.begins_with("--onglet="):
+				_screen.appearance = load("res://scripts/core/data.gd").random_appearance()
+				_screen._show_tab(int(a.substr(9)))
 	elif "--ecran=ergo-demo" in args:
 		show_ergo(_demo_profiles(), false)
 	else:

@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 
 func _place_camera(k: float) -> void:
 	var s: float = Data.HEIGHT_SCALES[appearance.get("height", 2)]
-	var target := Vector3(0, 1.5 * s, 1.75) if _close_up else Vector3(0, 0.98 * s, 3.9)
+	var target := Vector3(0, 1.52 * s, 2.3) if _close_up else Vector3(0, 0.98 * s, 3.9)
 	_camera.position = _camera.position.lerp(target, k)
 
 

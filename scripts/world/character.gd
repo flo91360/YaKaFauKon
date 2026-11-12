@@ -167,7 +167,9 @@ func _dress_torso(spine: Node3D, hips: Node3D, style: int, top: Color, bottom: C
 			_skirt = Node3D.new()
 			_skirt.position = Vector3(0, 0.0, 0)
 			hips.add_child(_skirt)
-			M.add(_skirt, M.lathe([Vector2(hip_w * 0.96, 0.04), Vector2(hip_w * 1.25, -0.12), Vector2(hip_w * 1.55, -0.3), Vector2(hip_w * 1.6, -0.34), Vector2(hip_w * 1.5, -0.34)], 24), M.mat(top, 0.85), Vector3.ZERO, Vector3.ZERO, Vector3(1, 1, depth * 1.08))
+			var skirt_mat: StandardMaterial3D = M.mat(top, 0.85).duplicate()
+			skirt_mat.cull_mode = BaseMaterial3D.CULL_DISABLED # on voit aussi l'intérieur de la jupe
+			M.add(_skirt, M.lathe([Vector2(hip_w * 1.6, -0.34), Vector2(hip_w * 1.55, -0.3), Vector2(hip_w * 1.25, -0.12), Vector2(hip_w * 0.96, 0.04)], 24), skirt_mat, Vector3.ZERO, Vector3.ZERO, Vector3(1, 1, depth * 1.08))
 			M.add(spine, M.torus(waist * 1.0, 0.018), M.mat(top.darkened(0.25), 0.7), Vector3(0, 0.14, 0), Vector3.ZERO, Vector3(1, 1, depth))
 		4: # Salopette : bavette et bretelles
 			var m_b := M.mat(bottom, 0.85)
@@ -175,7 +177,7 @@ func _dress_torso(spine: Node3D, hips: Node3D, style: int, top: Color, bottom: C
 			M.add(spine, M.rounded_box(Vector3(0.2, 0.2, 0.03), 0.012), m_b, Vector3(0, 0.29, -(lerpf(waist, shoulder, 0.5) * depth + 0.004)))
 			for sx in [-1.0, 1.0]:
 				var s: float = sx
-				M.add(spine, M.tube([Vector3(s * 0.085, 0.38, -(shoulder * depth * 0.96)), Vector3(s * 0.11, 0.5, -0.03), Vector3(s * 0.1, 0.5, 0.05), Vector3(s * 0.08, 0.3, shoulder * depth * 0.98)], 0.02), m_b)
+				M.add(spine, M.tube([Vector3(s * 0.085, 0.38, -(shoulder * depth * 0.96)), Vector3(s * 0.11, 0.5, -0.03), Vector3(s * 0.1, 0.5, 0.05), Vector3(s * 0.085, 0.36, shoulder * depth * 0.99), Vector3(s * 0.07, 0.18, waist * depth * 1.05)], 0.02), m_b)
 				M.add(spine, M.sphere(0.018, 6), M.mat(Color(0.95, 0.8, 0.35), 0.4), Vector3(s * 0.08, 0.37, -(shoulder * depth * 0.97 + 0.012)))
 
 
@@ -279,8 +281,7 @@ func _build_head(head: Node3D, a: Dictionary, skin: Color, hair: Color) -> void:
 	var beard: int = a["beard"]
 	var m_beard := M.mat(hair.darkened(0.1), 0.8)
 	if beard == 1:
-		M.add(head, M.sphere(0.2, 12), m_beard, Vector3(0, -0.125, -0.07), Vector3.ZERO, Vector3(1.05 * head_scale.x, 0.62, 0.98))
-		_mouth.position.z -= 0.022
+		M.add(head, M.sphere(0.205, 14), m_beard, Vector3(0, -0.165, -0.035), Vector3.ZERO, Vector3(1.04 * head_scale.x, 0.5, 0.97))
 	elif beard == 2:
 		for sx in [-1.0, 1.0]:
 			var s: float = sx
