@@ -5,7 +5,11 @@ extends Node
 ##   --demo, --demo-frappe, --demo-competences, --demo-travail, --demo-mission :
 ##       profil de démonstration jamais sauvegardé, ouvert directement sur un écran ;
 ##   --ecran=creation, --ecran=ergo-demo : affiche un écran (données fictives pour l'ergo) ;
-##   --capture=chemin.png : enregistre une capture d'écran puis quitte.
+##   --achats=lecture,jeux,guitare,terrasse,chat (ou --achats=tout), --pieces=N : maison et
+##       pièces du profil de démonstration ; --demo-magasin ouvre le magasin,
+##       --demo-achat=terrasse montre l'instant de l'achat ;
+##   --capture=chemin.png : enregistre une capture d'écran puis quitte
+##       (--images=N : après N images au lieu de 90).
 
 const GameScreen = preload("res://scripts/screens/game_screen.gd")
 const ProfileScreen = preload("res://scripts/screens/profile_screen.gd")
@@ -107,6 +111,12 @@ func _start_demo(args: Array) -> void:
 	for a in args:
 		if a.begins_with("--heure="):
 			_game().profile["game_minutes"] = float(a.substr(8)) * 60.0
+		if a.begins_with("--pieces="):
+			_game().profile["money"] = int(a.substr(9))
+		if a.begins_with("--achats="):
+			var Data = load("res://scripts/core/data.gd")
+			var wanted: Array = Data.SHOP_ORDER.duplicate() if a.substr(9) == "tout" else Array(a.substr(9).split(","))
+			_game().profile["achats"] = load("res://scripts/core/shop.gd").clean(wanted)
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
@@ -140,6 +150,12 @@ func _start_demo(args: Array) -> void:
 		screen.typing._refresh_model()
 	if "--demo-objectifs" in args:
 		screen._open_objectives()
+	if "--demo-magasin" in args:
+		screen._open_shop()
+	for a in args:
+		if a.begins_with("--demo-achat="): # ex. --demo-achat=terrasse : l'achat vient d'être fait
+			_game().profile["money"] = 500
+			screen._on_shop_bought(a.substr(13))
 	if "--demo-guide" in args:
 		screen._open_guide()
 	if "--demo-pause" in args:
@@ -196,7 +212,7 @@ func _demo_profiles() -> Array:
 
 
 ## Galerie de contrôle : plusieurs personnages et animations côte à côte.
-## --galerie=anim1,anim2… (une animation par personnage), --graine=N, --zoom
+## --galerie=anim1,anim2… (une animation par personnage), --graine=N, --zoom, --profil
 func _show_gallery(args: Array) -> void:
 	var Character = load("res://scripts/world/character.gd")
 	var Data = load("res://scripts/core/data.gd")
@@ -245,6 +261,8 @@ func _show_gallery(args: Array) -> void:
 		c.build(Data.random_appearance(rng))
 		c.position = Vector3((i - (n - 1) / 2.0) * (0.75 if zoom else 1.25), 0, 0)
 		c.rotation_degrees.y = 180.0 - 18.0 * signf(c.position.x) * minf(absf(c.position.x), 1.0)
+		if "--profil" in args: # vus de côté (ils regardent vers la gauche)
+			c.rotation_degrees.y = 90.0
 		var anim: String = anims[i]
 		if anim.begins_with("sit"):
 			c.position.y = 0.5
@@ -256,7 +274,11 @@ func _show_gallery(args: Array) -> void:
 
 
 func _capture_later(path: String) -> void:
-	for i in 90:
+	var frames := 90
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--images="): # nombre d'images avant la capture
+			frames = int(a.substr(9))
+	for i in frames:
 		await get_tree().process_frame
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(path)

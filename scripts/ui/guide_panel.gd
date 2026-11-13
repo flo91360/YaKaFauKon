@@ -16,6 +16,8 @@ const HOW := [
 	["clavier", "Recopie le mot affiché, puis appuie sur la touche Entrée."],
 	["etoile", "Dans une activité, chaque mot réussi fait monter ta compétence."],
 	["cible", "Choisis un objectif pour gagner des pièces et des étoiles."],
+	["travail", "Choisis un métier : les missions de travail rapportent des pièces."],
+	["magasin", "Au magasin, tes pièces achètent de nouveaux objets pour ta maison."],
 	["pause", "La touche Échap met le jeu en pause."],
 ]
 

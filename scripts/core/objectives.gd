@@ -5,6 +5,7 @@ extends RefCounted
 
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Shop = preload("res://scripts/core/shop.gd")
 
 const CARE_ACTIONS := ["dormir", "manger", "toilettes", "douche", "dents"]
 const OFFER_COUNT := 3
@@ -28,15 +29,17 @@ static func candidates(profile: Dictionary) -> Array:
 	var done: int = int(profile.get("objectifs_finis", 0))
 	var career: String = profile["career"]["current"]
 	# Monter une compétence d'un niveau
-	for s in Data.active_skills():
+	for s in Data.available_skills(profile):
 		var level := Progression.skill_level(profile, s)
 		if level < Data.SKILL_MAX:
 			result.append({"type": "competence", "skill": s, "target": level + 1,
 				"label": "Monter %s au niveau %d" % [Data.SKILLS[s]["label"], level + 1],
-				"aide": Data.SKILLS[s]["aide"], "pieces": 15 + 5 * (level + 1), "icone": s})
+				"aide": Data.skill_help(s, profile), "pieces": 15 + 5 * (level + 1), "icone": s})
 	# Taper des mots d'une activité
 	var words := 8 if done < 3 else (12 if done < 8 else 15)
 	for a in Data.LEXIQUE:
+		if not Data.is_available(a, profile):
+			continue
 		result.append({"type": "mots", "action": a, "target": words,
 			"label": "Taper %d mots : %s" % [words, Data.ACTIONS[a]["label"].to_lower()],
 			"aide": "Choisis l'activité « %s » et tape les mots qui s'affichent." % Data.ACTIONS[a]["label"],
@@ -55,6 +58,13 @@ static func candidates(profile: Dictionary) -> Array:
 		"label": "Garder toutes les jauges hors du rouge pendant 2 minutes",
 		"aide": "Surveille les jauges en haut à gauche et occupe-toi de celles qui baissent.",
 		"pieces": 20, "icone": "coeur"})
+	# Agrandir la maison : le prochain achat du magasin
+	var item := Shop.next_item(profile)
+	if item != "" and done >= 1:
+		result.append({"type": "achat", "item": item, "target": int(Data.SHOP[item]["prix"]),
+			"label": "Acheter au magasin : %s" % Data.SHOP[item]["label"].to_lower(),
+			"aide": "Il faut %d pièces. Gagne des pièces avec les objectifs et le travail, puis clique sur « Magasin »." % int(Data.SHOP[item]["prix"]),
+			"pieces": 10, "icone": "magasin"})
 	# Travail
 	if career == "":
 		if done >= 1:
@@ -145,7 +155,7 @@ static func abandon(profile: Dictionary) -> void:
 
 ## Signale un événement du jeu. Renvoie true si l'objectif vient d'être atteint.
 ## Événements : "mot" {action}, "serie" {action}, "action" {action}, "argent" {amount},
-## "mission", "metier", "palier", "temps" {sec, rouge}.
+## "mission", "metier", "palier", "temps" {sec, rouge}. (Un achat se voit dans le profil.)
 static func notify(profile: Dictionary, event: String, data: Dictionary = {}) -> bool:
 	var o := current(profile)
 	if o.is_empty() or is_done(profile):
@@ -186,6 +196,8 @@ static func is_done(profile: Dictionary) -> bool:
 			return Progression.current_tier(profile) >= int(o["target"])
 		"metier":
 			return profile["career"]["current"] != ""
+		"achat":
+			return Shop.owns(profile, o["item"])
 	return o["count"] >= o["target"]
 
 
@@ -209,6 +221,8 @@ static func fraction(profile: Dictionary) -> float:
 			return clampf(missions / (Data.MISSIONS_PER_TIER + 1.0), 0.0, 0.95)
 		"metier":
 			return 0.0
+		"achat": # les pièces sont réunies : il reste à aller au magasin
+			return clampf(float(profile["money"]) / float(o["target"]), 0.0, 0.95)
 	return clampf(o["count"] / float(o["target"]), 0.0, 1.0)
 
 
@@ -232,6 +246,8 @@ static func progress_text(profile: Dictionary) -> String:
 			return "%d / %d" % [int(o["count"]), int(o["target"])]
 		"argent":
 			return "%d / %d pièces" % [int(o["count"]), int(o["target"])]
+		"achat":
+			return "%d / %d pièces" % [mini(int(profile["money"]), int(o["target"])), int(o["target"])]
 	return ""
 
 

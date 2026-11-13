@@ -55,6 +55,13 @@ static func session_lines(s: Dictionary) -> Array:
 		lines.append("Mots de champ lexical réussis : %d%s" % [int(s.get("mots_ok", 0)), " (" + ", ".join(by_activity) + ")" if not by_activity.is_empty() else ""])
 		lines.append("Séries de 5 mots terminées : %d — arrêtées avant la fin : %d" % [int(s.get("series_finies", 0)), int(s.get("series_interrompues", 0))])
 		lines.append("Objectifs choisis : %d — atteints : %d — changés en cours : %d" % [int(s.get("objectifs_choisis", 0)), int(s.get("objectifs_finis", 0)), int(s.get("objectifs_abandonnes", 0))])
+	var bought: Array = s.get("achats", []) if s.get("achats", []) is Array else []
+	if not bought.is_empty(): # séances de la version 2.1
+		var names := []
+		for id in bought:
+			if Data.SHOP.has(id):
+				names.append(Data.SHOP[id]["label"].to_lower())
+		lines.append("Achats au magasin : %s (%d pièces dépensées)" % [", ".join(names), int(s.get("argent_depense", 0))])
 	lines.append("Temps avec au moins une jauge dans le rouge : %s" % format_duration(red_any_sec(s)))
 	return lines
 
@@ -168,7 +175,7 @@ static func skills_progress(profile: Dictionary) -> Array:
 	var lines := []
 	var sessions: Array = profile.get("sessions", [])
 	var start: Dictionary = sessions[0].get("competences_debut", {}) if not sessions.is_empty() else {}
-	for s in Data.active_skills():
+	for s in Data.available_skills(profile):
 		var now := Progression.skill_level(profile, s)
 		lines.append("%s : %d → %d sur 10" % [Data.SKILLS[s]["label"], int(start.get(s, 0)), now])
 	return lines

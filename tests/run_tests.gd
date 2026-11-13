@@ -6,6 +6,7 @@ const TypingCheck = preload("res://scripts/core/typing_check.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
+const Shop = preload("res://scripts/core/shop.gd")
 
 var _fails := 0
 var _count := 0
@@ -21,6 +22,7 @@ func _init() -> void:
 	_test_lexique()
 	_test_appearance()
 	_test_objectives()
+	_test_shop()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -193,6 +195,52 @@ func _test_lexique() -> void:
 		check(no_easy, "%s : niveau 3 = mots moyens et longs" % id)
 	check(Data.word_xp("endurance") > Data.word_xp("saut"), "un mot long rapporte plus qu'un mot court")
 	check(Data.main_skill("cuisiner") == "organisation" and Data.skill_weights("cuisiner")["creativite"] < 1.0, "compétence principale et secondaire")
+
+
+func _test_shop() -> void:
+	print("Magasin")
+	var p := _profile()
+	p["objectifs_finis"] = 2
+	var bought_actions := 0
+	for id in Data.ACTIONS:
+		if Data.ACTIONS[id].has("achat"):
+			bought_actions += 1
+			check(Data.SHOP.has(Data.ACTIONS[id]["achat"]) and Data.SHOP[Data.ACTIONS[id]["achat"]]["action"] == id, "action %s : liée à un achat du magasin" % id)
+	check(bought_actions == Data.SHOP.size() and Data.SHOP_ORDER.size() == Data.SHOP.size(), "chaque achat apporte une activité")
+	var prices_ok := true
+	for i in range(1, Data.SHOP_ORDER.size()):
+		prices_ok = prices_ok and Data.SHOP[Data.SHOP_ORDER[i]]["prix"] > Data.SHOP[Data.SHOP_ORDER[i - 1]]["prix"]
+	check(prices_ok, "achats rangés du moins cher au plus cher")
+	check(Data.available_skills(p) == ["physique", "creativite", "charisme", "organisation", "humour"], "au départ : 5 compétences à entraîner")
+	check(not Data.is_available("lire", p) and Data.is_available("sport", p), "lire demande le coin lecture")
+	check(not "lire" in Objectives.candidates(p).filter(func(o): return o["type"] == "mots").map(func(o): return o["action"]), "pas d'objectif sur une activité pas encore achetée")
+	check(not "logique" in Objectives.candidates(p).filter(func(o): return o["type"] == "competence").map(func(o): return o["skill"]), "pas d'objectif sur une compétence pas encore débloquée")
+	check(Shop.next_item(p) == "lecture" and Shop.missing(p, "lecture") == 40, "premier achat conseillé : le coin lecture (40 pièces)")
+	check(not Shop.can_buy(p, "lecture") and not Shop.buy(p, "lecture") and p["money"] == 0, "pas d'achat sans assez de pièces")
+	# Objectif « acheter »
+	var buy_offer: Array = Objectives.candidates(p).filter(func(o): return o["type"] == "achat")
+	check(buy_offer.size() == 1 and buy_offer[0]["item"] == "lecture", "objectif proposé : acheter le coin lecture")
+	Objectives.choose(p, buy_offer[0])
+	p["money"] = 20
+	check(is_equal_approx(Objectives.fraction(p), 0.5) and not Objectives.is_done(p), "objectif achat : barre à la moitié avec 20 pièces sur 40")
+	p["money"] = 45
+	check(Shop.can_buy(p, "lecture") and Shop.buy(p, "lecture"), "achat possible avec assez de pièces")
+	check(p["money"] == 5 and Shop.owns(p, "lecture"), "les pièces sont dépensées, l'achat est gardé")
+	check(Objectives.is_done(p), "objectif achat atteint")
+	Objectives.claim(p)
+	check(not Shop.buy(p, "lecture") and p["money"] == 5, "on n'achète pas deux fois la même chose")
+	check(Data.is_available("lire", p) and "logique" in Data.available_skills(p), "le coin lecture débloque « lire » et la logique")
+	check("lire" in Objectives.candidates(p).filter(func(o): return o["type"] == "mots").map(func(o): return o["action"]), "objectif de mots possible sur la nouvelle activité")
+	check(Shop.next_item(p) == "jeux", "achat suivant conseillé : la table de jeux")
+	check(Data.skill_help("logique", p).contains("lire un livre") and not Data.skill_help("logique", p).contains("jeu de société"), "conseil : seulement les activités possédées")
+	p["money"] = 1000
+	for id in Data.SHOP_ORDER:
+		Shop.buy(p, id)
+	check(Shop.next_item(p) == "" and Data.available_skills(p).size() == Data.SKILLS.size(), "tout acheté : les 10 compétences sont ouvertes")
+	check(not "achat" in Objectives.candidates(p).map(func(o): return o["type"]), "plus d'objectif d'achat quand tout est acheté")
+	check(Shop.clean(["chat", "inconnu", "chat", "lecture"]) == ["lecture", "chat"] and Shop.clean("x") == [], "liste d'achats nettoyée (inconnus, doublons)")
+	for s in Data.SKILLS:
+		check(not Data.shop_items_for_skill(s).is_empty() or s in ["physique", "creativite", "charisme", "organisation", "humour"], "compétence %s : une activité l'entraîne" % s)
 
 
 func _test_appearance() -> void:

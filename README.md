@@ -41,21 +41,27 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   barbe, 5 tenues et leurs couleurs. Bouton « Au hasard ». Le **miroir** du studio permet de changer de look.
 - **Studio en 3D** avec jardin, cycle jour / nuit, lampes qui s'allument le soir. Lit, cuisine, lavabo,
   toilettes, douche, bureau, miroir, canapé, tapis de course, chevalet, établi.
+- **Magasin** : les pièces gagnées (objectifs, missions) achètent de quoi agrandir la maison. Chaque achat
+  ajoute un objet et une activité : coin lecture (40 pièces, lire), table de jeux (60, jeu de société avec
+  un ami), guitare (80), terrasse et potager (120, jardiner), un chat (150, s'en occuper).
 - **Personnage animé** : il marche, court, dort, mange, cuisine, se brosse les dents, se douche,
-  téléphone, reçoit des amis, peint, parle au miroir, bricole, écrit… La caméra se rapproche pendant l'activité.
+  téléphone, reçoit des amis, peint, parle au miroir, bricole, écrit, lit, joue à un jeu de société,
+  joue de la guitare, arrose le potager, caresse le chat… La caméra se rapproche pendant l'activité.
 - **5 jauges** : faim, sommeil, toilettes, hygiène, vie sociale. Alerte quand une jauge passe au rouge.
 - **Frappe** : 3 niveaux de texte (« toilettes » → « les toilettes » → « aller aux toilettes »).
   Accents et majuscules ignorés, 1 faute admise sur un mot seul, 2 sur plusieurs mots.
   Les lettres bien tapées passent en vert, la première lettre différente en rouge (réglable).
+- **10 compétences** : physique, créativité, charisme, organisation et humour dès le départ ; logique,
+  sociabilité, patience, responsabilité et douceur avec les achats du magasin.
 - **Compétences par champ lexical** : dans une activité (sport, peinture, cuisine, planning, bois,
-  miroir, téléphone, invités), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
+  miroir, téléphone, invités, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
   Chaque mot réussi fait monter la **barre de la compétence** ; barre pleine = un niveau de plus.
   Les mots s'adaptent au niveau de texte de l'enfant (courts, moyens, longs). Bouton « Arrêter » :
   les points déjà gagnés sont gardés.
 - **Vitesse adaptative** : 6 premières frappes sans chronomètre pour mesurer la vitesse de base,
   puis un chronomètre régulier ; l'exigence suit les progrès puis se stabilise (au plus 2 × la vitesse de départ).
 - **Objectifs à choix** : le jeu propose 3 objectifs (monter une compétence, taper des mots, prendre soin
-  de soi, choisir un métier, réussir une mission…). L'enfant en choisit un, suit sa barre d'avancement
+  de soi, choisir un métier, réussir une mission, acheter au magasin…). L'enfant en choisit un, suit sa barre d'avancement
   et gagne des pièces et une étoile.
 - **Tutoriel** au premier lancement (on peut le passer et le revoir depuis la pause) et **Guide**
   qui présente toutes les actions possibles avec chaque objet.
@@ -76,13 +82,13 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
   nouvelle mesure de la vitesse, suppression du profil.
 - **Récapitulatif** : par séance datée (vitesse moyenne, types d'erreurs, temps de jeu,
   missions, tâches terminées/abandonnées, mots de champ lexical par activité, séries terminées ou
-  arrêtées, objectifs choisis/atteints, temps dans le rouge) et sur la durée
+  arrêtées, objectifs choisis/atteints, achats au magasin, temps dans le rouge) et sur la durée
   (évolution de la vitesse, persévérance, gestion de vie, compétences), avec un résumé en mots-clés.
   Rien n'est envoyé en ligne.
 
 ## Tests
 
-260 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+364 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
@@ -97,12 +103,13 @@ Release avec la section correspondante de `CHANGELOG.md`.
 
 ## Organisation du code
 
-- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, sauvegarde, récapitulatif.
+- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, magasin, sauvegarde, récapitulatif.
 - `scripts/world/` : studio (décor, lumière, caméra, effets), meubles, personnage articulé, formes 3D.
-- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, guide, tutoriel, pause).
+- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, magasin, guide, tutoriel, pause).
 - `scripts/screens/` : écrans (joueurs, création, jeu, ergothérapeute).
 - `tools/` : scripts Python qui fabriquent les textures, les pictogrammes, les sons et la musique.
 - Pour ajouter une activité, des mots, une compétence, une mission ou une carrière : `scripts/core/data.gd`
-  (les listes de mots sont dans `LEXIQUE`).
+  (les listes de mots sont dans `LEXIQUE`). Pour un nouvel achat du magasin : `SHOP` dans `data.gd`
+  et son décor dans `add_purchase` de `scripts/world/studio.gd`.
 
-Pas encore dans le jeu : autres carrières, agrandissement du logement, relations et famille, plateforme en ligne.
+Pas encore dans le jeu : objectif de vie, autres carrières, ressources à récolter, relations et famille, plateforme en ligne.

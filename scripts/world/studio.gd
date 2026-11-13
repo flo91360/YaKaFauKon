@@ -10,6 +10,9 @@ const ROOM_MIN := Vector2(-5.0, -4.0) # (x, z)
 const ROOM_MAX := Vector2(5.0, 4.0)
 const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4), Vector2(-2.4, 1.6), Vector2(2.6, 1.8), Vector2(0.4, 1.6)]
 const GROUND_Y := -0.3
+## Terrasse (achat du magasin) : plancher en bois à droite de la pièce.
+const TERRACE_MIN := Vector2(5.0, -3.2)
+const TERRACE_MAX := Vector2(7.25, 0.2)
 ## Calques de lumière : la pièce (calque 1, par défaut pour tout ce qui est ajouté,
 ## personnage compris) n'est éclairée que par `inside_light` et les lampes ;
 ## le jardin (calque 2) par le soleil. Ainsi aucune ombre de soleil ne bouge dans la maison.
@@ -66,6 +69,9 @@ var _cam_focus = null # point regardé de près pendant une activité (Vector3) 
 var _cam_lift := 0.85 # décalage du sujet vers le haut de l'écran (place pour le panneau de frappe)
 var _cam_pos := CAM_HOME
 var _cam_look := CAM_LOOK
+var _purchased := {} # achats du magasin déjà construits : identifiant → true
+var _terrace := false
+var _hidden: Array = [] # objets cachés pendant une activité (la guitare sur son pied)
 
 
 func _ready() -> void:
@@ -881,6 +887,280 @@ func _build_workbench() -> void:
 	bench.set_meta("fx_point", Vector3(0.05, 1.0, -0.06))
 
 
+# --- Achats du magasin (la maison s'agrandit) ---------------------------------------------
+
+## Construit les achats déjà faits (au chargement de la partie).
+func set_purchases(ids: Array) -> void:
+	for id in ids:
+		add_purchase(str(id))
+
+
+## Ajoute dans la maison ce qu'un achat du magasin apporte. Renvoie l'objet utilisable.
+## `animate` : les nouveaux éléments apparaissent en grossissant.
+func add_purchase(id: String, animate := false) -> Furniture:
+	if not Data.SHOP.has(id):
+		return null
+	var object_id: String = Data.SHOP[id]["objet"]
+	if _purchased.has(id):
+		return get_object(object_id)
+	_purchased[id] = true
+	var first := get_child_count()
+	match id:
+		"lecture":
+			_build_reading_corner()
+		"jeux":
+			_build_game_table()
+		"guitare":
+			_build_guitar()
+		"terrasse":
+			_build_terrace()
+		"chat":
+			_build_cat()
+	for i in range(first, get_child_count()):
+		var node := get_child(i)
+		if id == "terrasse":
+			_set_layers(node, LAYER_GARDEN)
+		if animate:
+			_pop_in(node)
+	apply_quality(quality)
+	_apply_lamps()
+	return get_object(object_id)
+
+
+func _pop_in(node: Node) -> void:
+	for c in node.get_children():
+		if c is MeshInstance3D:
+			var final: Vector3 = c.scale
+			c.scale = final * 0.01
+			c.create_tween().tween_property(c, "scale", final, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		else:
+			_pop_in(c)
+
+
+## Coin lecture : fauteuil tourné vers la pièce et bibliothèque basse sous la fenêtre.
+func _build_reading_corner() -> void:
+	var chair := _add_object("lecture", "Coin lecture", ["lire"], Vector3(-4.0, 0, -0.6), Vector3(0.95, 1.0, 0.95), Vector3(-3.1, 0, -0.6))
+	chair.footprint = Rect2(-4.97, -1.27, 1.45, 1.34)
+	var fabric := M.tex_mat("tissu", C_TEAL.lightened(0.12), 3.5, _fabric_n, 0.95, 0.9)
+	var fabric_dark := M.tex_mat("tissu", C_TEAL.darkened(0.08), 3.5, _fabric_n, 0.95, 0.9)
+	for x in [-0.32, 0.32]:
+		for z in [-0.34, 0.34]:
+			chair.cyl(0.035, 0.14, _wood_dark, Vector3(x, 0.07, z))
+	chair.box(Vector3(0.84, 0.22, 0.86), fabric_dark, Vector3(0, 0.25, 0), 0.09)
+	chair.box(Vector3(0.6, 0.16, 0.6), fabric, Vector3(0.08, 0.4, 0), 0.07) # assise
+	chair.box(Vector3(0.24, 0.72, 0.84), fabric, Vector3(-0.32, 0.66, 0), 0.11, Vector3(0, 0, 6)) # dossier
+	for z in [-0.37, 0.37]:
+		chair.box(Vector3(0.74, 0.34, 0.18), fabric_dark, Vector3(0.03, 0.5, z), 0.085) # accoudoirs
+	chair.box(Vector3(0.12, 0.3, 0.32), M.tex_mat("tissu", C_MUSTARD, 4.0, _fabric_n, 0.95, 0.9), Vector3(-0.17, 0.62, 0.1), 0.055, Vector3(8, 0, 10)) # coussin
+	chair.pose = "assis"
+	chair.pose_point = Vector3(-3.95, 0.5, -0.6)
+	chair.face_point = Vector3(0.0, 0, -0.6)
+	# Bibliothèque basse contre le mur
+	var bx := -0.78
+	chair.box(Vector3(0.03, 0.8, 1.26), _wood_dark, Vector3(bx - 0.165, 0.42, 0), 0.008)
+	for z in [-0.63, 0.63]:
+		chair.box(Vector3(0.36, 0.84, 0.05), _wood, Vector3(bx, 0.42, z), 0.012)
+	for y in [0.03, 0.43, 0.82]:
+		chair.box(Vector3(0.36, 0.045, 1.3), _wood, Vector3(bx, y, 0), 0.012)
+	var covers := [C_CORAL, C_TEAL, C_MUSTARD, C_NAVY, C_SAGE, C_BLUE, C_CORAL.lightened(0.25), Color(0.62, 0.48, 0.86)]
+	for row in 2:
+		var z := -0.56
+		var k := row * 3
+		while z < (0.5 if row == 0 else 0.18):
+			var w := 0.055 + (k % 3) * 0.018
+			var h := 0.26 + ((k * 7) % 4) * 0.025
+			chair.box(Vector3(0.22, h, w), M.mat(covers[k % covers.size()], 0.7), Vector3(bx + 0.02, 0.06 + row * 0.4 + h / 2.0, z + w / 2.0), 0.008)
+			z += w + 0.008
+			k += 1
+	chair.box(Vector3(0.24, 0.05, 0.17), M.mat(C_CORAL, 0.7), Vector3(bx + 0.02, 0.48, 0.4), 0.008, Vector3(0, 12, 0)) # livres posés à plat
+	chair.box(Vector3(0.22, 0.045, 0.16), M.mat(C_NAVY, 0.7), Vector3(bx + 0.02, 0.53, 0.4), 0.008, Vector3(0, -8, 0))
+	# Petite lampe et livre ouvert sur le dessus
+	var shade := M.glowing(Color(1.0, 0.9, 0.7), 0.2)
+	chair.lathe([Vector2(0.0, 0.0), Vector2(0.08, 0.0), Vector2(0.09, 0.02), Vector2(0.02, 0.05), Vector2(0.02, 0.2), Vector2(0.0, 0.2)], M.mat(C_CORAL, 0.4), Vector3(bx, 0.845, 0.48))
+	chair.lathe([Vector2(0.13, 0.0), Vector2(0.08, 0.16), Vector2(0.0, 0.16)], shade, Vector3(bx, 1.02, 0.48))
+	_add_lamp(Vector3(-4.6, 1.3, -0.2), 1.2, 3.4, shade)
+	chair.box(Vector3(0.2, 0.02, 0.3), M.mat(C_WHITE, 0.8), Vector3(bx + 0.02, 0.855, -0.3), 0.006, Vector3(0, 14, 0))
+	chair.box(Vector3(0.21, 0.012, 0.31), M.mat(C_BLUE, 0.7), Vector3(bx + 0.02, 0.847, -0.3), 0.004, Vector3(0, 14, 0))
+
+
+## Table de jeux : table ronde, jeu de société et deux tabourets (un ami vient jouer).
+func _build_game_table() -> void:
+	var table := _add_object("jeux", "Table de jeux", ["jeu"], Vector3(-1.6, 0, 0.2), Vector3(1.05, 0.95, 1.05), Vector3(-2.95, 0, 0.2))
+	table.footprint = Rect2(-2.65, -0.85, 1.6, 1.6)
+	table.cyl(0.52, 0.05, _wood_light, Vector3(0, 0.72, 0))
+	table.cyl(0.5, 0.03, _wood, Vector3(0, 0.685, 0))
+	table.cyl(0.05, 0.66, _wood_dark, Vector3(0, 0.35, 0))
+	table.lathe([Vector2(0.0, 0.0), Vector2(0.3, 0.0), Vector2(0.3, 0.03), Vector2(0.07, 0.07), Vector2(0.0, 0.07)], _wood_dark, Vector3.ZERO)
+	# Plateau de jeu, pions, dé et cartes
+	table.box(Vector3(0.5, 0.018, 0.5), M.mat(C_CREAM, 0.7), Vector3(0, 0.756, 0), 0.008, Vector3(0, 20, 0))
+	var squares := [C_CORAL, C_TEAL, C_MUSTARD, C_BLUE]
+	for k in 12: # cases de couleur autour du plateau
+		var a := deg_to_rad(k * 30.0 + 20.0)
+		table.box(Vector3(0.085, 0.006, 0.085), M.mat(squares[k % 4], 0.6), Vector3(cos(a) * 0.19, 0.768, sin(a) * 0.19), 0.004, Vector3(0, -k * 30.0 + 20.0, 0))
+	for k in 3:
+		var pawn := Vector3([-0.12, 0.06, 0.15][k], 0.766, [0.11, -0.16, 0.08][k])
+		table.lathe([Vector2(0.0, 0.0), Vector2(0.028, 0.0), Vector2(0.012, 0.05), Vector2(0.0, 0.05)], M.mat([C_CORAL, C_BLUE, C_MUSTARD][k], 0.4), pawn)
+		table.ball(0.018, M.mat([C_CORAL, C_BLUE, C_MUSTARD][k], 0.4), pawn + Vector3(0, 0.06, 0))
+	table.box(Vector3(0.05, 0.05, 0.05), M.mat(C_WHITE, 0.4), Vector3(0.02, 0.79, 0.02), 0.01, Vector3(0, 30, 0))
+	for k in 3:
+		table.box(Vector3(0.09, 0.004, 0.13), M.mat([C_WHITE, C_CORAL.lightened(0.3), C_WHITE][k], 0.7), Vector3(0.3, 0.75 + k * 0.004, -0.22), 0.002, Vector3(0, 35.0 + k * 9.0, 0))
+	# Tabourets : celui du joueur à gauche, celui de l'ami au fond (on voit leur visage)
+	for seat in [Vector3(-0.8, 0, 0), Vector3(0, 0, -0.8)]:
+		var sp: Vector3 = seat
+		table.cyl(0.2, 0.05, _wood, sp + Vector3(0, 0.44, 0))
+		table.cyl(0.19, 0.045, M.tex_mat("tissu", C_CORAL if sp.x < 0.0 else C_MUSTARD, 4.0, _fabric_n, 0.95, 0.9), sp + Vector3(0, 0.485, 0))
+		for k in 3:
+			var a := k * TAU / 3.0 + 0.5
+			table.cap(0.022, 0.46, _wood_dark, sp + Vector3(cos(a) * 0.13, 0.22, sin(a) * 0.13), Vector3(sin(a) * 9.0, 0, -cos(a) * 9.0))
+	table.pose = "assis"
+	table.pose_point = Vector3(-2.4, 0.51, 0.2)
+	table.face_point = Vector3(-1.6, 0, 0.2)
+	table.set_meta("guest_seat", Vector3(-1.6, 0.51, -0.6))
+
+
+## Guitare sur son pied, avec un petit ampli. Le personnage joue debout, face à nous.
+func _build_guitar() -> void:
+	var g := _add_object("guitare", "Guitare", ["musique"], Vector3(2.3, 0, -0.3), Vector3(0.8, 1.25, 0.6), Vector3(2.3, 0, 0.5))
+	g.face_point = Vector3(8.0, 0, 8.0)
+	var dark := M.mat(C_DARK, 0.5)
+	# Pied : trois branches et un support
+	for k in 3:
+		var a := k * TAU / 3.0 + 0.6
+		g.cap(0.016, 0.42, dark, Vector3(cos(a) * 0.15, 0.09, sin(a) * 0.15), Vector3(sin(a) * 62.0, 0, -cos(a) * 62.0))
+	g.cyl(0.018, 0.78, dark, Vector3(0, 0.56, -0.03))
+	g.box(Vector3(0.3, 0.03, 0.09), dark, Vector3(0, 0.3, 0.03), 0.012)
+	g.cap(0.014, 0.12, dark, Vector3(0, 0.95, 0.0), Vector3(90, 0, 0))
+	# La guitare (cachée pendant que le personnage joue)
+	var guitar := Node3D.new()
+	guitar.position = Vector3(0, 0.34, 0.07)
+	guitar.rotation_degrees = Vector3(-9, 0, 0)
+	g.add_child(guitar)
+	for mi in M.guitar(guitar):
+		g._reg(mi)
+	g.set_meta("guitar", guitar)
+	# Petit ampli
+	g.box(Vector3(0.4, 0.42, 0.26), M.mat(C_CORAL.darkened(0.1), 0.6), Vector3(0.52, 0.22, -0.05), 0.04)
+	g.box(Vector3(0.32, 0.26, 0.02), M.tex_mat("tissu", Color(0.3, 0.31, 0.36), 6.0, _fabric_n, 0.95, 1.2), Vector3(0.52, 0.19, 0.085), 0.02)
+	g.box(Vector3(0.32, 0.05, 0.02), M.mat(C_CREAM, 0.5), Vector3(0.52, 0.38, 0.085), 0.01)
+	for k in 3:
+		g.ball(0.014, _steel, Vector3(0.43 + k * 0.09, 0.38, 0.1))
+	g.cap(0.012, 0.2, dark, Vector3(0.52, 0.45, -0.05), Vector3(0, 0, 90))
+
+
+## Terrasse en bois à droite de la maison : elle mène au potager, où l'on peut jardiner.
+func _build_terrace() -> void:
+	_terrace = true
+	var size := TERRACE_MAX - TERRACE_MIN
+	var center := Vector3((TERRACE_MIN.x + TERRACE_MAX.x) / 2.0, 0, (TERRACE_MIN.y + TERRACE_MAX.y) / 2.0)
+	var body := StaticBody3D.new()
+	body.add_to_group("floor")
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(size.x, 0.2, size.y)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position = center + Vector3(0, -0.1, 0)
+	body.add_child(col)
+	add_child(body)
+	var d := _deco()
+	d.position = center
+	d.box(Vector3(size.x, 0.27, size.y), _wood_dark, Vector3(0, -0.165, 0), 0.02)
+	var planks := 9
+	var pw := size.y / planks
+	for i in planks:
+		d.box(Vector3(size.x + 0.04, 0.05, pw - 0.025), _wood if i % 2 == 0 else _wood_light, Vector3(0, -0.024, -size.y / 2.0 + pw * (i + 0.5)), 0.012)
+	# Barrière au fond
+	var white := M.mat(Color(0.96, 0.94, 0.9), 0.75)
+	var zb := -size.y / 2.0 + 0.06
+	for x in [-size.x / 2.0 + 0.06, 0.0, size.x / 2.0 - 0.06]:
+		d.box(Vector3(0.09, 0.9, 0.09), white, Vector3(x, 0.45, zb), 0.02)
+	for y in [0.4, 0.82]:
+		d.box(Vector3(size.x, 0.07, 0.06), white, Vector3(0, y, zb), 0.02)
+	# Lanterne sur le poteau du coin
+	var shade := M.glowing(Color(1.0, 0.88, 0.62), 0.25)
+	d.box(Vector3(0.14, 0.18, 0.14), shade, Vector3(size.x / 2.0 - 0.06, 1.0, zb), 0.03)
+	d.box(Vector3(0.18, 0.03, 0.18), M.mat(C_DARK, 0.5), Vector3(size.x / 2.0 - 0.06, 1.1, zb), 0.01)
+	_add_lamp(center + Vector3(size.x / 2.0 - 0.2, 1.35, zb + 0.3), 1.8, 5.5, shade)
+	# Jardinières fleuries le long de la barrière
+	var soil := M.mat(Color(0.45, 0.33, 0.26), 0.95)
+	var petals := [C_CORAL, C_MUSTARD, Color(0.98, 0.96, 0.92), Color(0.74, 0.56, 0.9)]
+	for side in [-1.0, 1.0]:
+		var px: float = side * 0.54
+		d.box(Vector3(0.88, 0.3, 0.32), M.mat(C_TEAL if side < 0.0 else C_CORAL, 0.6), Vector3(px, 0.15, zb + 0.3), 0.04)
+		d.box(Vector3(0.8, 0.04, 0.24), soil, Vector3(px, 0.29, zb + 0.3), 0.015)
+		for k in 5:
+			var fx := px - 0.32 + k * 0.16
+			var h := 0.16 + ((k * 3) % 4) * 0.035
+			d.cyl(0.011, h, C_LEAF, Vector3(fx, 0.31 + h / 2.0, zb + 0.3))
+			d.ball(0.055, M.mat(petals[(k + (1 if side > 0.0 else 0)) % 4], 0.7), Vector3(fx, 0.33 + h, zb + 0.3), Vector3(1, 0.75, 1))
+			d.ball(0.06, C_LEAF_LIGHT, Vector3(fx + 0.05, 0.33, zb + 0.34), Vector3(1.2, 0.5, 0.8))
+	# Paillasson devant l'entrée
+	d.box(Vector3(0.5, 0.02, 0.8), M.tex_mat("tissu", C_MUSTARD.darkened(0.1), 5.0, _fabric_n, 0.98, 1.2), Vector3(-size.x / 2.0 + 0.4, 0.01, 0.0), 0.008)
+
+	# Le potager devient utilisable : pieds de tomates, panneau et arrosoir
+	var bed := _add_object("potager", "Potager", ["jardiner"], Vector3(8.6, GROUND_Y, -1.6), Vector3(2.6, 0.9, 1.7), Vector3(TERRACE_MAX.x - 0.32, 0, -1.6))
+	bed.face_point = Vector3(8.6, 0, -1.6)
+	var tomato := M.mat(Color(0.9, 0.25, 0.22), 0.4)
+	for k in 4:
+		var p := Vector3(-0.8 + k * 0.53, 0.19, -0.26 if k % 2 == 0 else 0.26)
+		bed.cyl(0.014, 0.75, _wood_light, p + Vector3(0, 0.37, 0))
+		for j in 4:
+			var a := j * 1.7 + k
+			bed.ball(0.085, C_LEAF if j % 2 == 0 else C_LEAF_LIGHT, p + Vector3(cos(a) * 0.07, 0.14 + j * 0.15, sin(a) * 0.07), Vector3(1.1, 0.8, 1.1))
+			if j > 0:
+				bed.ball(0.04, tomato, p + Vector3(cos(a + 1.6) * 0.1, 0.1 + j * 0.15, sin(a + 1.6) * 0.1))
+	bed.cyl(0.02, 0.5, _wood_dark, Vector3(-1.05, 0.4, 0.72))
+	bed.box(Vector3(0.05, 0.2, 0.36), _wood_light, Vector3(-1.05, 0.62, 0.72), 0.02)
+	# Arrosoir posé au bord de la terrasse
+	var can_mat := M.mat(C_BLUE, 0.4, 0.2)
+	var can := Node3D.new() # caché pendant que le personnage arrose
+	can.position = Vector3(-1.52, 0.3, 0.75)
+	bed.add_child(can)
+	bed._reg(M.add(can, M.lathe([Vector2(0.0, 0.0), Vector2(0.1, 0.0), Vector2(0.11, 0.2), Vector2(0.09, 0.22), Vector2(0.0, 0.22)]), can_mat))
+	bed._reg(M.add(can, M.capsule(0.02, 0.26), can_mat, Vector3(0.14, 0.14, 0), Vector3(0, 0, -50)))
+	bed._reg(M.add(can, M.tube(M.arc_points(0.08, 20, 160, 8), 0.014), can_mat, Vector3(-0.1, 0.12, 0)))
+	bed.set_meta("can", can)
+	bed.set_meta("fx_point", Vector3(-1.1, 1.05, 0.0))
+
+
+## Un chat dans son panier, avec sa gamelle.
+func _build_cat() -> void:
+	var home := _add_object("chat", "Chat", ["animal"], Vector3(-3.3, 0, 3.45), Vector3(0.95, 0.75, 0.8), Vector3(-3.85, 0, 2.9))
+	var wicker := M.tex_mat("tissu", C_WOOD_LIGHT, 6.0, _fabric_n, 0.95, 1.5)
+	home.lathe([Vector2(0.0, 0.0), Vector2(0.31, 0.0), Vector2(0.37, 0.08), Vector2(0.38, 0.2), Vector2(0.34, 0.22), Vector2(0.3, 0.1), Vector2(0.0, 0.08)], wicker, Vector3.ZERO)
+	home.cyl(0.3, 0.07, M.tex_mat("tissu", C_CORAL.lightened(0.1), 4.0, _fabric_n, 0.95, 0.9), Vector3(0, 0.11, 0))
+	# Le chat regarde vers nous
+	var cat := Node3D.new()
+	cat.position = Vector3(0, 0.13, 0)
+	cat.rotation_degrees.y = 25.0
+	home.add_child(cat)
+	var fur := M.mat(Color(0.5, 0.52, 0.58), 0.85)
+	var white := M.mat(Color(0.97, 0.96, 0.94), 0.85)
+	var parts := []
+	parts.append(M.add(cat, M.sphere(0.14, 12), fur, Vector3(0, 0.14, -0.03), Vector3.ZERO, Vector3(1.0, 1.15, 1.15)))
+	parts.append(M.add(cat, M.sphere(0.085, 10), white, Vector3(0, 0.15, 0.085), Vector3.ZERO, Vector3(0.85, 1.15, 0.6)))
+	for x in [-0.055, 0.055]:
+		parts.append(M.add(cat, M.sphere(0.038, 8), white, Vector3(x, 0.03, 0.11), Vector3.ZERO, Vector3(1, 0.8, 1.3)))
+	parts.append(M.add(cat, M.tube([Vector3(0.08, 0.04, -0.14), Vector3(0.2, 0.03, -0.08), Vector3(0.23, 0.04, 0.05), Vector3(0.15, 0.05, 0.15)], 0.028), fur))
+	var head := Node3D.new()
+	head.position = Vector3(0, 0.345, 0.04)
+	cat.add_child(head)
+	parts.append(M.add(head, M.sphere(0.11, 12), fur, Vector3.ZERO, Vector3.ZERO, Vector3(1.12, 0.95, 1.0)))
+	for x in [-0.065, 0.065]:
+		parts.append(M.add(head, M.cylinder(0.045, 0.085, 0.0, 10), fur, Vector3(x, 0.115, -0.005), Vector3(0, 0, -x * 220.0)))
+		parts.append(M.add(head, M.cylinder(0.024, 0.05, 0.0, 8), M.mat(Color(0.98, 0.72, 0.76), 0.7), Vector3(x, 0.105, 0.012), Vector3(0, 0, -x * 220.0)))
+		parts.append(M.add(head, M.sphere(0.022, 8), M.mat(Color(0.45, 0.75, 0.4), 0.2), Vector3(x * 0.72, 0.015, 0.093)))
+		parts.append(M.add(head, M.sphere(0.012, 6), M.mat(Color(0.08, 0.08, 0.1), 0.2), Vector3(x * 0.72, 0.015, 0.11), Vector3.ZERO, Vector3(0.7, 1.3, 1)))
+	parts.append(M.add(head, M.sphere(0.048, 8), white, Vector3(0, -0.03, 0.085), Vector3.ZERO, Vector3(1.25, 0.75, 0.8)))
+	parts.append(M.add(head, M.sphere(0.014, 6), M.mat(Color(0.95, 0.55, 0.6), 0.4), Vector3(0, -0.012, 0.122)))
+	for mi in parts:
+		home._reg(mi)
+	_sway.append({"node": head, "speed": 1.3, "phase": 0.0, "amp": 0.07})
+	# Gamelle et petite balle
+	home.lathe([Vector2(0.0, 0.0), Vector2(0.11, 0.0), Vector2(0.09, 0.06), Vector2(0.075, 0.06), Vector2(0.07, 0.025), Vector2(0.0, 0.025)], M.mat(C_BLUE, 0.3), Vector3(0.56, 0, -0.12))
+	home.cyl(0.068, 0.02, M.mat(Color(0.6, 0.42, 0.28), 0.9), Vector3(0.56, 0.035, -0.12))
+	home.ball(0.05, M.mat(C_MUSTARD, 0.5), Vector3(-0.5, 0.05, -0.2))
+
+
 # --- Décor (sans action) -------------------------------------------------------------------
 
 func _build_decor() -> void:
@@ -958,6 +1238,8 @@ func _segment_clear(a: Vector2, b: Vector2, ignore) -> bool:
 
 
 func clamp_to_room(p: Vector3) -> Vector3:
+	if _terrace and p.x > ROOM_MAX.x - 0.4 and p.z > TERRACE_MIN.y and p.z < TERRACE_MAX.y:
+		return Vector3(minf(p.x, TERRACE_MAX.x - 0.35), 0, clampf(p.z, TERRACE_MIN.y + 0.35, TERRACE_MAX.y - 0.35))
 	return Vector3(clampf(p.x, ROOM_MIN.x + 0.4, ROOM_MAX.x - 0.4), 0, clampf(p.z, ROOM_MIN.y + 0.4, ROOM_MAX.y - 0.4))
 
 
@@ -1049,27 +1331,45 @@ func start_activity(f: Furniture, action_id: String) -> void:
 		"miroir", "appeler":
 			_fx.append(_particles(f.use_point + Vector3(0, 1.85, 0), Color(1.0, 0.6, 0.72, 0.9), 4, 1.5, Vector3.UP, 35.0, 0.3, Vector3(0, 0.25, 0), 0.03, true))
 		"inviter":
-			var Character = load("res://scripts/world/character.gd")
-			var rng := RandomNumberGenerator.new()
-			rng.randomize()
 			# Un ami assis sur le canapé, deux amis debout en face (on voit leur visage).
 			var seats: Array = f.get_meta("guest_points", [])
-			var spots := [
-				{"pos": seats[0] if not seats.is_empty() else f.use_point, "pose": "assis", "anim": "sit_chat", "look": Vector3(0.4, 0, 0.0)},
-				{"pos": f.position + Vector3(0.95, 0, -1.75), "pose": "debout", "anim": "talk", "look": f.position},
-				{"pos": f.position + Vector3(-0.75, 0, -1.9), "pose": "debout", "anim": "wave", "look": f.position},
-			]
-			for spot in spots:
-				var point: Vector3 = spot["pos"]
-				var guest: Node3D = Character.new()
-				add_child(guest)
-				guest.build(Data.random_appearance(rng))
-				guest.position = point
-				guest.start_acting(spot["pose"], point, spot["look"], spot["anim"])
-				guest.scale = Vector3.ONE * 0.01
-				guest.create_tween().tween_property(guest, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-				_fx.append(guest)
+			_add_guest(seats[0] if not seats.is_empty() else f.use_point, "assis", "sit_chat", Vector3(0.4, 0, 0.0))
+			_add_guest(f.position + Vector3(0.95, 0, -1.75), "debout", "talk", f.position)
+			_add_guest(f.position + Vector3(-0.75, 0, -1.9), "debout", "wave", f.position)
 			_fx.append(_particles(f.position + Vector3(0, 1.75, 0), Color(1.0, 0.6, 0.72, 0.9), 6, 1.5, Vector3.UP, 50.0, 0.3, Vector3(0, 0.25, 0), 0.03, true))
+		"jeu": # un ami vient jouer, assis en face
+			_add_guest(f.get_meta("guest_seat", f.use_point), "assis", "sit_play", f.position)
+			_fx.append(_particles(f.position + Vector3(0, 1.7, 0), Color(1.0, 0.82, 0.35, 0.9), 4, 1.5, Vector3.UP, 45.0, 0.3, Vector3(0, 0.25, 0), 0.03, true))
+		"musique": # la guitare quitte son pied ; des notes s'envolent
+			var on_stand = f.get_meta("guitar", null)
+			if on_stand != null:
+				on_stand.visible = false
+				_hidden.append(on_stand)
+			_fx.append(_particles(f.use_point + Vector3(0.25, 1.75, 0), Color(1.0, 0.82, 0.35, 0.95), 4, 1.6, Vector3.UP, 40.0, 0.4, Vector3(0, 0.3, 0), 0.035, true))
+			_fx.append(_particles(f.use_point + Vector3(-0.25, 1.65, 0), Color(0.5, 0.75, 1.0, 0.95), 3, 1.9, Vector3.UP, 40.0, 0.35, Vector3(0, 0.3, 0), 0.03, true))
+		"jardiner": # l'arrosoir est dans la main ; l'eau coule
+			var can = f.get_meta("can", null)
+			if can != null:
+				can.visible = false
+				_hidden.append(can)
+			_fx.append(_particles(fx_point, Color(0.6, 0.84, 1.0, 0.85), 26, 0.5, Vector3(0.5, -1, 0), 10.0, 1.2, Vector3(0, -5.0, 0), 0.018))
+		"animal": # le chat est content
+			_fx.append(_particles(f.position + Vector3(0, 0.95, 0), Color(1.0, 0.55, 0.68, 0.95), 4, 1.5, Vector3.UP, 30.0, 0.3, Vector3(0, 0.25, 0), 0.035, true))
+
+
+## Un ami arrive pour l'activité (il repart à la fin).
+func _add_guest(point: Vector3, pose: String, anim: String, look: Vector3) -> void:
+	var Character = load("res://scripts/world/character.gd")
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var guest: Node3D = Character.new()
+	add_child(guest)
+	guest.build(Data.random_appearance(rng))
+	guest.position = point
+	guest.start_acting(pose, point, look, anim)
+	guest.scale = Vector3.ONE * 0.01
+	guest.create_tween().tween_property(guest, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_fx.append(guest)
 
 
 func stop_activity() -> void:
@@ -1077,6 +1377,10 @@ func stop_activity() -> void:
 		if is_instance_valid(node):
 			node.queue_free()
 	_fx.clear()
+	for node in _hidden:
+		if is_instance_valid(node):
+			node.visible = true
+	_hidden.clear()
 	_belt_on = false
 
 

@@ -10,6 +10,36 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.1.0] - 2026-11-13
+
+### Ajouté
+
+- **Magasin** (nouveau bouton en haut à droite) : les pièces gagnées servent
+  enfin à quelque chose. L'enfant achète de quoi agrandir sa maison, et chaque
+  achat apporte une nouvelle activité :
+  - coin lecture (40 pièces) : lire un livre dans le fauteuil ;
+  - table de jeux (60 pièces) : jouer à un jeu de société, un ami vient jouer ;
+  - guitare (80 pièces) : jouer de la guitare ;
+  - terrasse et potager (120 pièces) : la maison s'agrandit dehors, on peut
+    jardiner ;
+  - un chat (150 pièces) : le caresser et s'occuper de lui.
+- 5 nouveaux champs lexicaux (145 mots) pour ces activités, avec leurs
+  animations : le personnage lit, joue, gratte la guitare, arrose, s'accroupit
+  près du chat.
+- 6 nouvelles compétences : humour (dès le départ, en invitant des amis), puis
+  logique, sociabilité, patience, responsabilité et douceur, qui s'ouvrent avec
+  les achats. Le panneau « Compétences » montre celles qui restent à découvrir.
+- Nouvel objectif à choisir : « Acheter au magasin ». Le bouton « Magasin »
+  brille quand l'enfant a assez de pièces.
+- Espace ergothérapeute : les achats de la séance et ceux de l'enfant
+  apparaissent dans le récapitulatif.
+
+### Modifié
+
+- Le panneau « Compétences » est sur deux colonnes, et ses conseils ne citent
+  que les activités que l'enfant possède.
+- Le tutoriel et le guide présentent le magasin.
+
 ## [2.0.1] - 2026-11-13
 
 ### Corrigé

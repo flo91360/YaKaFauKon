@@ -8,10 +8,12 @@ signal pause_pressed
 signal mission_pressed
 signal guide_pressed
 signal objective_pressed
+signal shop_pressed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
+const Shop = preload("res://scripts/core/shop.gd")
 
 const NEED_COLORS := {"faim": Color(0.93, 0.55, 0.3), "sommeil": Color(0.45, 0.5, 0.85), "toilettes": Color(0.3, 0.68, 0.7),
 	"hygiene": Color(0.35, 0.62, 0.9), "social": Color(0.9, 0.5, 0.68)}
@@ -32,6 +34,7 @@ var _status: Label
 var _action_bar: ProgressBar
 var _toast_box: VBoxContainer
 var _mission_button: Button
+var _shop_button: Button
 var _obj_title: Label
 var _obj_text: Label
 var _obj_bar: ProgressBar
@@ -148,6 +151,8 @@ func _ready() -> void:
 	buttons_row.alignment = BoxContainer.ALIGNMENT_END
 	buttons_row.add_theme_constant_override("separation", 8)
 	right.add_child(buttons_row)
+	_shop_button = _add_button("magasin", "Magasin", UiTheme.COL_ACCENT, func(): shop_pressed.emit())
+	_shop_button.tooltip_text = "Dépense tes pièces pour agrandir ta maison"
 	_add_button("etoile", "Compétences", UiTheme.COL_PURPLE, func(): skills_pressed.emit())
 	_add_button("travail", "Travail", UiTheme.COL_ORANGE, func(): career_pressed.emit())
 	_add_button("livre", "Guide", UiTheme.COL_TEAL, func(): guide_pressed.emit())
@@ -252,6 +257,11 @@ func update_display(profile: Dictionary, status_text: String, action_fraction :=
 	_status_panel.offset_top = -86.0 if action_fraction >= 0.0 else -62.0
 	_action_bar.value = clampf(action_fraction, 0.0, 1.0)
 	_update_objective(profile)
+	# Le bouton du magasin brille quand l'enfant peut s'offrir quelque chose.
+	var can_buy := false
+	for id in Data.SHOP_ORDER:
+		can_buy = can_buy or Shop.can_buy(profile, id)
+	_shop_button.modulate = Color(1, 1, 1).lerp(Color(1.3, 1.25, 1.0), 0.5 + 0.5 * sin(_time * 5.0)) if can_buy else Color.WHITE
 	if _mission_button.visible:
 		_mission_button.modulate = Color(1, 1, 1).lerp(Color(1.25, 1.2, 1.0), 0.5 + 0.5 * sin(_time * 5.0))
 
