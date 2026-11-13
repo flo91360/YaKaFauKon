@@ -38,6 +38,8 @@ func _run() -> void:
 	game.profile["career"] = {"current": "artisan", "tiers": {"artisan": 2}, "missions": {"artisan": 1}}
 	game.profile["settings"]["chrono"] = "souvent"
 	game.profile["typing"]["level"] = 3
+	check(game.buy("lecture") and game.profile["money"] == 15, "achat au magasin : 40 pièces dépensées")
+	check(not game.buy("chat"), "achat refusé sans assez de pièces")
 	game.session["duree_sec"] = 300.0
 	game.session["frappes_ok"] = 10
 	game.session["caracteres"] = 100
@@ -54,7 +56,10 @@ func _run() -> void:
 	game.load_profile(loaded)
 	var p: Dictionary = game.profile
 	check(is_equal_approx(p["needs"]["faim"], 12.0), "les jauges reprennent où l'enfant s'était arrêté")
-	check(p["money"] == 55 and typeof(p["money"]) == TYPE_INT, "argent conservé (entier)")
+	check(p["money"] == 15 and typeof(p["money"]) == TYPE_INT, "argent conservé (entier)")
+	check(p["achats"] == ["lecture"], "achats du magasin conservés")
+	check(p["sessions"][0].get("achats", []) == ["lecture"] and int(p["sessions"][0]["argent_depense"]) == 40, "achat noté dans la séance pour l'ergo")
+	check(Recap.session_lines(p["sessions"][0]).any(func(l): return l.begins_with("Achats au magasin : coin lecture")), "achat visible dans le récapitulatif")
 	check(Progression.skill_level(p, "physique") == 2, "compétences conservées")
 	check(Progression.current_tier(p) == 2, "palier de carrière conservé")
 	check(Progression.setting(p, "chrono") == "souvent", "réglage de l'ergo conservé")
@@ -101,6 +106,7 @@ func _run() -> void:
 	check(Progression.skill_level(o, "physique") == 2 and o["money"] == 40 and Progression.current_tier(o) == 2, "progression de la version 1 conservée")
 	check(Progression.setting(o, "tolerance") == "large" and Progression.setting(o, "aide_couleur") == "oui", "réglages conservés et complétés")
 	check(o["tuto_fait"] == false and o["etoiles"] == 0 and o["objectif"].is_empty(), "nouveautés prêtes : tutoriel à voir, pas d'objectif")
+	check(o["achats"] == [] and o["skills_xp"].has("douceur"), "version 2.1 : pas encore d'achat, nouvelles compétences à zéro")
 	check(Recap.session_lines(o["sessions"][0]).size() >= 8 and Recap.keywords(o).size() > 0, "récapitulatif des anciennes séances lisible")
 	check(game.session.has("series_finies") and Recap.session_lines(game.session).size() >= 11, "nouvelles statistiques dans la séance en cours")
 	var screen = load("res://scripts/screens/game_screen.gd").new()

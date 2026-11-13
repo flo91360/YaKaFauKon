@@ -18,6 +18,7 @@ const CareerPanel = preload("res://scripts/ui/career_panel.gd")
 const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 const ObjectivePanel = preload("res://scripts/ui/objective_panel.gd")
 const GuidePanel = preload("res://scripts/ui/guide_panel.gd")
+const ShopPanel = preload("res://scripts/ui/shop_panel.gd")
 const PausePanel = preload("res://scripts/ui/pause_panel.gd")
 const Tutorial = preload("res://scripts/ui/tutorial.gd")
 
@@ -56,6 +57,7 @@ func _ready() -> void:
 	var game = get_node("/root/Game")
 	studio = Studio.new()
 	add_child(studio)
+	studio.set_purchases(Data.purchases(game.profile))
 	character = Character.new()
 	studio.add_child(character)
 	character.build(game.profile["appearance"])
@@ -73,6 +75,7 @@ func _ready() -> void:
 	hud.mission_pressed.connect(_open_mission)
 	hud.guide_pressed.connect(_open_guide)
 	hud.objective_pressed.connect(_open_objectives)
+	hud.shop_pressed.connect(_open_shop)
 	typing = TypingPanel.new()
 	ui.add_child(typing)
 	typing.validated.connect(_on_typing_validated)
@@ -578,6 +581,43 @@ func _on_objective_chosen(offer: Dictionary) -> void:
 	hud.toast("Nouvel objectif : %s" % offer["label"], UiTheme.COL_CORAL, 4.5, "cible")
 	game.play_sound("clic")
 	game.save_profile()
+
+
+# --- Magasin : agrandir la maison ---------------------------------------------------------
+
+func _open_shop() -> void:
+	if typing.is_open() or _pause_menu != null:
+		return
+	var panel := ShopPanel.new()
+	panel.bought.connect(_on_shop_bought)
+	_open_overlay(panel)
+
+
+func _on_shop_bought(item: String) -> void:
+	var game = _game()
+	if not game.buy(item):
+		return
+	_close_overlay()
+	var f = studio.add_purchase(item, true)
+	game.play_sound("piece")
+	game.play_sound("bravo")
+	hud.toast("Nouveau dans ta maison : %s ! Clique dessus pour essayer." % Data.SHOP[item]["label"].to_lower(), UiTheme.COL_GOLD.darkened(0.15), 7.0, "maison")
+	if f == null:
+		return
+	studio.burst(f.position)
+	# La caméra montre la nouveauté quelques secondes, avec la flèche dorée.
+	f.set_marker(true)
+	if _state == "idle":
+		studio.focus_on(f.position, 0.15)
+	var show := create_tween() # lié à cet écran : s'arrête tout seul si on change de joueur
+	show.tween_interval(4.0)
+	show.tween_callback(func():
+		if _state != "acting" and _state != "series":
+			studio.unfocus())
+	show.tween_interval(8.0)
+	show.tween_callback(func():
+		if tutorial == null:
+			f.set_marker(false))
 
 
 # --- Tutoriel et guide ---------------------------------------------------------------------

@@ -7,6 +7,7 @@ const GameScreen = preload("res://scripts/screens/game_screen.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Data = preload("res://scripts/core/data.gd")
+const Shop = preload("res://scripts/core/shop.gd")
 
 var _fails := 0
 var _count := 0
@@ -150,6 +151,72 @@ func _run() -> void:
 	screen._overlay.appearance["hair_style"] = 6
 	screen._overlay._validate()
 	check(profile["appearance"]["hair_style"] == 6 and screen._overlay == null, "nouveau look enregistré")
+
+	print("Magasin : la maison s'agrandit")
+	var base_objects: int = screen.studio.furniture.size()
+	check(screen.studio.get_object("lecture") == null and screen.studio.get_object("potager") == null, "au départ : ni coin lecture ni potager utilisable")
+	check(is_equal_approx(screen.studio.clamp_to_room(Vector3(6.5, 0, -1.5)).x, 4.6), "sans terrasse : on ne sort pas de la pièce")
+	profile["money"] = 50
+	screen._open_shop()
+	check(screen._overlay != null and screen.paused, "le magasin s'ouvre (jeu en pause)")
+	check(not screen._overlay.find_child("Acheter_lecture", true, false).disabled and screen._overlay.find_child("Acheter_jeux", true, false).disabled, "bouton Acheter actif seulement avec assez de pièces")
+	screen._overlay.bought.emit("jeux")
+	check(profile["money"] == 50 and not Shop.owns(profile, "jeux") and screen._overlay != null, "achat trop cher refusé")
+	screen._overlay.bought.emit("lecture")
+	check(profile["money"] == 10 and Shop.owns(profile, "lecture") and screen._overlay == null, "coin lecture acheté : 40 pièces dépensées")
+	check(screen.studio.get_object("lecture") != null and screen.studio.furniture.size() == base_objects + 1, "le coin lecture apparaît dans la maison")
+	check(game.session["achats"] == ["lecture"] and game.session["argent_depense"] == 40, "achat compté pour l'ergo")
+	var logic_before: float = profile["skills_xp"]["logique"]
+	screen._start_typing(_object(screen, "lecture"), "lire")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	check(await _wait_state(screen, "series", 12.0), "le personnage va lire : la série commence")
+	check(screen.character.pose == "assis" and screen.character.anim == "sit_read", "il lit assis dans le fauteuil")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	await _wait(1.3)
+	check(profile["skills_xp"]["logique"] > logic_before, "lire fait monter la logique")
+	screen.typing._close({"status": "cancel"})
+	game.session["series_interrompues"] = 1
+	game.session["taches_abandonnees"] = 0
+	profile["money"] = 1000
+	for item in ["jeux", "guitare", "terrasse", "chat"]:
+		screen._on_shop_bought(item)
+	check(screen.studio.furniture.size() == base_objects + 5, "les 5 achats sont dans la maison")
+	var bed = screen.studio.get_object("potager")
+	check(bed != null and is_equal_approx(screen.studio.clamp_to_room(Vector3(6.5, 0, -1.5)).x, 6.5), "avec la terrasse : on peut marcher dehors")
+	var reachable := true
+	for f in screen.studio.furniture:
+		for g in screen.studio.furniture:
+			if f != g:
+				var path: Array = screen.studio.compute_path(f.use_point, g.use_point, g)
+				reachable = reachable and not path.is_empty() and path[-1] == g.use_point
+	check(reachable, "un chemin existe entre tous les objets")
+	var covered := true
+	for id in Data.ACTIONS:
+		var found := false
+		for f in screen.studio.furniture:
+			found = found or id in f.actions
+		covered = covered and found
+	check(covered, "chaque action a son objet dans la maison")
+	for pair in [["jeux", "jeu", "sit_play"], ["guitare", "musique", "guitar"], ["potager", "jardiner", "garden"], ["chat", "animal", "pet"]]:
+		var target = _object(screen, pair[0])
+		screen._object = target
+		screen._action_id = pair[1]
+		screen._state = "walking"
+		screen.character.position = target.use_point
+		screen._on_arrived()
+		check(screen._state == "series" and screen.character.anim == pair[2], "activité « %s » : série de mots et animation" % Data.ACTIONS[pair[1]]["label"])
+		screen.typing._close({"status": "cancel"})
+	check(screen.studio.get_object("guitare").get_meta("guitar").visible, "la guitare revient sur son pied après l'activité")
+	game.session["series_interrompues"] = 1
+	game.session["taches_abandonnees"] = 0
+	screen._open_skills()
+	check(screen._overlay != null, "le panneau des compétences s'ouvre avec les 10 compétences")
+	screen._close_overlay()
+	screen._open_shop()
+	check(screen._overlay != null and screen._overlay.find_child("Acheter_chat", true, false) == null, "magasin : tout est « déjà à toi »")
+	screen._close_overlay()
 
 	print("Annulation et chronomètre")
 	screen._start_typing(_object(screen, "lavabo"), "dents")

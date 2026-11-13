@@ -18,7 +18,7 @@ const STEPS := [
 	{"id": "action", "wait": "action_done", "text": "Bravo ! Ton personnage y va tout seul. La barre en bas à gauche montre où il en est."},
 	{"id": "activite", "wait": "series_started", "text": "Maintenant, clique sur le tapis de course et recopie le mot. Les activités font monter tes compétences."},
 	{"id": "serie", "wait": "series_end", "text": "Tape les mots un par un. À chaque mot réussi, ta barre de compétence monte !"},
-	{"id": "boutons", "wait": "", "text": "En haut à droite : « Compétences » montre tes niveaux, « Travail » te donne un métier, « Guide » explique toutes les actions."},
+	{"id": "boutons", "wait": "", "text": "En haut à droite : « Magasin » agrandit ta maison avec tes pièces, « Compétences » montre tes niveaux, « Travail » te donne un métier, « Guide » explique tout."},
 	{"id": "objectif", "wait": "", "text": "Dernière chose : choisis un objectif. Il te guide et te fait gagner des pièces et des étoiles !"},
 ]
 

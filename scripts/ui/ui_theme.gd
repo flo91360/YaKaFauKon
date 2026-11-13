@@ -23,6 +23,9 @@ const COL_TEAL := Color(0.25, 0.68, 0.68)
 const SKILL_COLORS := {
 	"physique": Color(0.93, 0.45, 0.38), "creativite": Color(0.62, 0.48, 0.86),
 	"charisme": Color(0.93, 0.5, 0.68), "organisation": Color(0.25, 0.68, 0.68),
+	"humour": Color(0.95, 0.66, 0.22), "logique": Color(0.36, 0.56, 0.86),
+	"sociabilite": Color(0.36, 0.72, 0.45), "patience": Color(0.68, 0.54, 0.38),
+	"responsabilite": Color(0.4, 0.45, 0.72), "douceur": Color(0.45, 0.76, 0.86),
 }
 
 

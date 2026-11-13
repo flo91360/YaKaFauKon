@@ -139,6 +139,11 @@ func _show_recap(p: Dictionary) -> void:
 	if o["objectifs_choisis"] > 0:
 		_line("Objectifs : %d choisis, %d atteints, %d changés en cours de route" % [o["objectifs_choisis"], o["objectifs_finis"], o["objectifs_abandonnes"]])
 	_line("Compétences : " + " ; ".join(Recap.skills_progress(p)))
+	var bought := []
+	for id in Data.purchases(p):
+		if Data.SHOP.has(id):
+			bought.append(Data.SHOP[id]["label"].to_lower())
+	_line("Maison : " + (", ".join(bought) if not bought.is_empty() else "aucun achat au magasin pour l'instant"))
 	var career: String = p["career"]["current"]
 	if career != "":
 		_line("Travail : %s, palier %d sur 5 — argent : %d pièces" % [Data.CAREERS[career]["label"], Progression.current_tier(p), int(p["money"])])

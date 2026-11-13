@@ -389,3 +389,18 @@ static func add(parent: Node3D, mesh: Mesh, material, pos := Vector3.ZERO, rot_d
 	mi.scale = scale
 	parent.add_child(mi)
 	return mi
+
+
+## Une guitare debout (manche vers le haut, table d'harmonie vers +Z), posée sur
+## son pied ou tenue par le personnage. Renvoie ses maillages.
+static func guitar(parent: Node3D, s := 1.0) -> Array:
+	var body := mat(Color(0.9, 0.6, 0.28), 0.35)
+	var neck := mat(Color(0.42, 0.28, 0.2), 0.6)
+	var list := []
+	list.append(add(parent, sphere(0.19 * s, 14), body, Vector3(0, 0.19, 0) * s, Vector3.ZERO, Vector3(1, 0.95, 0.26)))
+	list.append(add(parent, sphere(0.145 * s, 14), body, Vector3(0, 0.42, 0) * s, Vector3.ZERO, Vector3(1, 0.95, 0.3)))
+	list.append(add(parent, cylinder(0.05 * s, 0.012 * s), mat(Color(0.2, 0.14, 0.1), 0.8), Vector3(0, 0.33, 0.048) * s, Vector3(90, 0, 0)))
+	list.append(add(parent, rounded_box(Vector3(0.11, 0.022, 0.02) * s, 0.006 * s), neck, Vector3(0, 0.16, 0.05) * s))
+	list.append(add(parent, rounded_box(Vector3(0.05, 0.5, 0.03) * s, 0.01 * s), neck, Vector3(0, 0.74, 0.02) * s))
+	list.append(add(parent, rounded_box(Vector3(0.075, 0.13, 0.03) * s, 0.012 * s), neck, Vector3(0, 1.03, 0.012) * s))
+	return list

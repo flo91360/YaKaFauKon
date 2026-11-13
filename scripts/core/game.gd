@@ -8,6 +8,7 @@ signal settings_changed
 
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Shop = preload("res://scripts/core/shop.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
@@ -90,6 +91,7 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"etoiles": 0,
 		"tuto_fait": false,
 		"mots_tapes": {},
+		"achats": [],
 	}
 
 
@@ -187,6 +189,7 @@ func _sanitize(data: Dictionary) -> Dictionary:
 	if not data["objectif"] is Dictionary:
 		data["objectif"] = {}
 	data["tuto_fait"] = bool(data["tuto_fait"])
+	data["achats"] = Shop.clean(data["achats"])
 	for a in data["mots_tapes"]:
 		data["mots_tapes"][a] = int(data["mots_tapes"][a])
 	for c in data["career"]["tiers"]:
@@ -219,6 +222,7 @@ func start_session() -> void:
 		"mots_ok": 0, "mots_par_activite": {},
 		"series_finies": 0, "series_interrompues": 0,
 		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0,
+		"argent_depense": 0, "achats": [],
 	}
 	profile["sessions"].append(session)
 	_autosave_timer = 0.0
@@ -260,6 +264,19 @@ func add_money(amount: int) -> void:
 	profile["money"] += amount
 	session["argent_gagne"] = session.get("argent_gagne", 0) + amount
 	money_changed.emit(profile["money"])
+
+
+## Achète un objet du magasin avec les pièces du profil. Renvoie false si impossible.
+func buy(item: String) -> bool:
+	if not Shop.buy(profile, item):
+		return false
+	session["argent_depense"] = int(session.get("argent_depense", 0)) + int(Data.SHOP[item]["prix"])
+	if not session.get("achats") is Array:
+		session["achats"] = []
+	session["achats"].append(item)
+	money_changed.emit(profile["money"])
+	save_profile()
+	return true
 
 
 # --- Réglages de l'ordinateur, sons et musique ---------------------------------------

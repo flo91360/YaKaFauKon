@@ -17,22 +17,19 @@ const RED_THRESHOLD := 25.0
 const ORANGE_THRESHOLD := 50.0
 
 # --- Compétences -------------------------------------------------------------
-# "active" = utilisée dans la V1. Les autres sont prêtes pour la suite.
+# Une compétence se voit dans le jeu dès qu'une activité que l'enfant possède
+# l'entraîne (voir available_skills) : certaines arrivent avec le magasin.
 const SKILLS := {
-	"physique": {"label": "Physique", "active": true,
-		"aide": "Fais du sport sur le tapis de course ou travaille le bois à l'établi. Les missions d'artisan aident aussi."},
-	"creativite": {"label": "Créativité", "active": true,
-		"aide": "Peins au chevalet, fais la cuisine ou travaille le bois. Les missions aident aussi."},
-	"charisme": {"label": "Charisme", "active": true,
-		"aide": "Parle devant le miroir, appelle un ami ou invite des amis. Les missions d'organisateur aident aussi."},
-	"organisation": {"label": "Organisation", "active": true,
-		"aide": "Fais ton planning au bureau ou fais la cuisine. Les missions d'organisateur aident beaucoup."},
-	"logique": {"label": "Logique", "active": false, "aide": "Lire, jouer à des jeux de société."},
-	"humour": {"label": "Humour", "active": false, "aide": "Jouer à des jeux de société, inviter des gens."},
-	"sociabilite": {"label": "Sociabilité", "active": false, "aide": "Jouer à des jeux de société."},
-	"patience": {"label": "Patience", "active": false, "aide": "Jardiner, s'occuper des animaux."},
-	"responsabilite": {"label": "Responsabilité", "active": false, "aide": "S'occuper des animaux."},
-	"douceur": {"label": "Douceur", "active": false, "aide": "S'occuper des animaux."},
+	"physique": {"label": "Physique", "active": true},
+	"creativite": {"label": "Créativité", "active": true},
+	"charisme": {"label": "Charisme", "active": true},
+	"organisation": {"label": "Organisation", "active": true},
+	"humour": {"label": "Humour", "active": true},
+	"logique": {"label": "Logique", "active": true},
+	"sociabilite": {"label": "Sociabilité", "active": true},
+	"patience": {"label": "Patience", "active": true},
+	"responsabilite": {"label": "Responsabilité", "active": true},
+	"douceur": {"label": "Douceur", "active": true},
 }
 const SKILL_MAX := 10
 
@@ -60,7 +57,8 @@ static func active_skills() -> Array:
 # texts = [niveau 1 : mot-clé, niveau 2 : article + mot, niveau 3 : petite phrase]
 # minutes = durée en minutes de jeu ; needs = effet total sur les besoins ;
 # skills = XP gagnée ; sleep = le temps passe plus vite pendant l'action ;
-# anim = animation du personnage pendant l'action.
+# anim = animation du personnage pendant l'action ;
+# achat = l'action demande un achat du magasin (voir SHOP).
 # Les actions qui donnent de la compétence se jouent en « série de mots » : après le
 # mot de départ, l'enfant tape WORDS_PER_SERIES mots du champ lexical (voir LEXIQUE).
 const ACTIONS := {
@@ -79,7 +77,7 @@ const ACTIONS := {
 	"appeler": {"anim": "sit_phone", "label": "Appeler un ami", "texts": ["ami", "un ami", "appeler un ami"], "minutes": 30,
 		"needs": {"social": 45.0}, "skills": {"charisme": 4.0}, "verbe": "téléphone"},
 	"inviter": {"anim": "sit_chat", "label": "Inviter des amis", "texts": ["amis", "des amis", "inviter des amis"], "minutes": 90,
-		"needs": {"social": 80.0, "faim": -10.0}, "skills": {"charisme": 8.0}, "verbe": "reçoit des amis"},
+		"needs": {"social": 80.0, "faim": -10.0}, "skills": {"charisme": 8.0, "humour": 6.0}, "verbe": "reçoit des amis"},
 	"sport": {"anim": "run", "label": "Faire du sport", "texts": ["sport", "le sport", "faire du sport"], "minutes": 45,
 		"needs": {"hygiene": -20.0, "sommeil": -10.0}, "skills": {"physique": 12.0}, "verbe": "fait du sport"},
 	"peindre": {"anim": "paint", "label": "Peindre", "texts": ["peinture", "la peinture", "faire de la peinture"], "minutes": 45,
@@ -90,6 +88,16 @@ const ACTIONS := {
 		"needs": {"hygiene": -10.0}, "skills": {"physique": 6.0, "creativite": 6.0}, "verbe": "travaille le bois"},
 	"planning": {"anim": "sit_write", "label": "Faire mon planning", "texts": ["planning", "le planning", "faire mon planning"], "minutes": 30,
 		"needs": {}, "skills": {"organisation": 12.0}, "verbe": "fait son planning"},
+	"lire": {"anim": "sit_read", "label": "Lire un livre", "texts": ["livre", "un livre", "lire un livre"], "minutes": 45,
+		"needs": {}, "skills": {"logique": 12.0}, "verbe": "lit un livre", "achat": "lecture"},
+	"jeu": {"anim": "sit_play", "label": "Jouer à un jeu de société", "texts": ["jeu", "un jeu", "jouer à un jeu"], "minutes": 60,
+		"needs": {"social": 50.0}, "skills": {"sociabilite": 10.0, "logique": 8.0, "humour": 8.0}, "verbe": "joue avec un ami", "achat": "jeux"},
+	"musique": {"anim": "guitar", "label": "Jouer de la guitare", "texts": ["guitare", "la guitare", "jouer de la guitare"], "minutes": 45,
+		"needs": {}, "skills": {"creativite": 10.0, "charisme": 8.0}, "verbe": "joue de la guitare", "achat": "guitare"},
+	"jardiner": {"anim": "garden", "label": "Jardiner", "texts": ["potager", "le potager", "arroser le potager"], "minutes": 45,
+		"needs": {"hygiene": -15.0}, "skills": {"patience": 12.0, "physique": 6.0}, "verbe": "jardine", "achat": "terrasse"},
+	"animal": {"anim": "pet", "label": "S'occuper du chat", "texts": ["chat", "le chat", "caresser le chat"], "minutes": 30,
+		"needs": {"social": 25.0}, "skills": {"douceur": 10.0, "responsabilite": 10.0, "patience": 6.0}, "verbe": "s'occupe du chat", "achat": "chat"},
 }
 
 const WORDS_PER_SERIES := 5
@@ -137,6 +145,31 @@ const LEXIQUE := {
 		["jeu", "fête", "ami", "rire", "jus", "carte", "dés", "bravo", "goûter", "joie"],
 		["inviter", "partage", "gâteau", "musique", "accueil", "danser", "blague", "cadeau", "ensemble", "bienvenue"],
 		["invitation", "anniversaire", "amusement", "discussion", "chaleureux", "convivial", "partager", "surprise", "jeu de société"],
+	],
+	"lire": [
+		["page", "mot", "livre", "conte", "titre", "héros", "texte", "roman", "ligne", "fée"],
+		["histoire", "chapitre", "lecture", "auteur", "dragon", "enquête", "poème", "phrase", "image", "album"],
+		["bibliothèque", "aventure", "personnage", "imaginer", "comprendre", "détective", "dictionnaire", "bande dessinée", "magazine"],
+	],
+	"jeu": [
+		["dé", "pion", "carte", "tour", "case", "règle", "jeu", "point", "duel", "gagné"],
+		["plateau", "joueur", "partie", "équipe", "lancer", "piocher", "avancer", "énigme", "puzzle", "domino"],
+		["stratégie", "réfléchir", "adversaire", "fair-play", "rigolade", "échiquier", "devinette", "partenaire", "à ton tour"],
+	],
+	"musique": [
+		["note", "son", "air", "voix", "corde", "chant", "duo", "solo", "ton", "rock"],
+		["guitare", "musique", "chanson", "rythme", "accord", "mélodie", "chanter", "concert", "refrain", "tempo"],
+		["instrument", "musicien", "répétition", "partition", "guitariste", "spectacle", "harmonie", "composer", "applaudir"],
+	],
+	"jardiner": [
+		["eau", "terre", "fleur", "pot", "herbe", "fruit", "trou", "rose", "tige", "seau"],
+		["graine", "arroser", "plante", "tomate", "pousser", "feuille", "racine", "jardin", "salade", "râteau"],
+		["arrosoir", "potager", "récolter", "légumes", "jardinier", "patience", "citrouille", "tournesol", "printemps"],
+	],
+	"animal": [
+		["chat", "poil", "bol", "eau", "jeu", "doux", "câlin", "miaou", "lait", "nez"],
+		["caresse", "gamelle", "brosser", "ronron", "panier", "coussin", "nourrir", "moustache", "pattes", "chaton"],
+		["croquettes", "vétérinaire", "responsable", "ronronner", "tendresse", "compagnon", "attention", "délicatement", "confiance"],
 	],
 }
 
@@ -193,6 +226,72 @@ static func main_skill(action_id: String) -> String:
 		if best == "" or skills[s] > skills[best]:
 			best = s
 	return best
+
+
+# --- Magasin : agrandir la maison ---------------------------------------------------
+# Chaque achat (payé avec les pièces) ajoute un objet dans la maison et une
+# nouvelle activité. « objet » = identifiant de l'objet construit par studio.gd.
+const SHOP := {
+	"lecture": {"label": "Coin lecture", "prix": 40, "action": "lire", "objet": "lecture", "icone": "logique",
+		"description": "Un fauteuil et des livres sous la fenêtre, pour lire tranquillement."},
+	"jeux": {"label": "Table de jeux", "prix": 60, "action": "jeu", "objet": "jeux", "icone": "sociabilite",
+		"description": "Une table et un jeu de société. Un ami vient jouer avec toi."},
+	"guitare": {"label": "Guitare", "prix": 80, "action": "musique", "objet": "guitare", "icone": "creativite",
+		"description": "Une guitare pour jouer de la musique dans le salon."},
+	"terrasse": {"label": "Terrasse et potager", "prix": 120, "action": "jardiner", "objet": "potager", "icone": "patience",
+		"description": "La maison s'agrandit ! Une terrasse en bois mène au potager, pour jardiner."},
+	"chat": {"label": "Un chat", "prix": 150, "action": "animal", "objet": "chat", "icone": "douceur",
+		"description": "Un chat vient vivre avec toi. Il aime les caresses et compte sur toi."},
+}
+const SHOP_ORDER := ["lecture", "jeux", "guitare", "terrasse", "chat"]
+
+
+## Achats du profil (liste d'identifiants de SHOP).
+static func purchases(profile: Dictionary) -> Array:
+	var list = profile.get("achats", [])
+	return list if list is Array else []
+
+
+## L'action est-elle possible pour ce profil ? (objet de base, ou objet acheté)
+static func is_available(action_id: String, profile: Dictionary) -> bool:
+	var item: String = ACTIONS[action_id].get("achat", "")
+	return item == "" or item in purchases(profile)
+
+
+## Compétences que l'enfant peut entraîner avec ce qu'il possède (dans l'ordre de SKILLS).
+static func available_skills(profile: Dictionary) -> Array:
+	var trained := {}
+	for id in ACTIONS:
+		if is_available(id, profile):
+			for s in ACTIONS[id]["skills"]:
+				trained[s] = true
+	var result := []
+	for s in SKILLS:
+		if trained.has(s):
+			result.append(s)
+	return result
+
+
+## Conseil pour progresser : les activités que l'enfant possède et qui entraînent la compétence.
+static func skill_help(skill: String, profile: Dictionary) -> String:
+	var names := []
+	for id in ACTIONS:
+		if ACTIONS[id]["skills"].has(skill) and is_available(id, profile):
+			names.append(ACTIONS[id]["label"].to_lower())
+	var text := "Pour progresser : %s." % ", ".join(names)
+	var career: String = profile.get("career", {}).get("current", "")
+	if career != "" and CAREERS[career]["mission_skills"].has(skill):
+		text += " Tes missions de travail aident aussi."
+	return text
+
+
+## Achats du magasin qui entraînent cette compétence.
+static func shop_items_for_skill(skill: String) -> Array:
+	var result := []
+	for id in SHOP_ORDER:
+		if ACTIONS[SHOP[id]["action"]]["skills"].has(skill):
+			result.append(id)
+	return result
 
 
 # --- Carrières -----------------------------------------------------------------

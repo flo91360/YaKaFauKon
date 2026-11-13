@@ -295,6 +295,66 @@ def bulle(d):  # « i » d'information
     disc(d, 50, 28, 7, 0); box(d, 44, 42, 56, 76, 5, 0)
 
 
+@icon
+def logique(d):  # ampoule
+    disc(d, 50, 38, 30)
+    poly(d, [(30, 56), (70, 56), (62, 72), (38, 72)])
+    box(d, 37, 75, 63, 82, 3); box(d, 41, 85, 59, 92, 3)
+    line(d, [(42, 44), (50, 34), (58, 44)], 4, 0)
+    box(d, 48, 44, 52, 68, 1, 0)
+
+
+@icon
+def humour(d):  # visage qui rit
+    disc(d, 50, 50, 42)
+    arc(d, 34, 42, 8, 180, 360, 5, 0); arc(d, 66, 42, 8, 180, 360, 5, 0)
+    d.pieslice([P(26), P(34), P(74), P(82)], 0, 180, fill=0)
+
+
+@icon
+def sociabilite(d):  # deux personnes
+    disc(d, 32, 30, 15); oval(d, 6, 50, 58, 108)
+    disc(d, 70, 36, 13); oval(d, 48, 54, 94, 106)
+    box(d, 0, 90, 100, 110, 0, 0)
+
+
+@icon
+def patience(d):  # sablier
+    box(d, 20, 6, 80, 16, 4); box(d, 20, 84, 80, 94, 4)
+    poly(d, [(26, 16), (74, 16), (54, 50), (74, 84), (26, 84), (46, 50)])
+    poly(d, [(36, 22), (64, 22), (50, 42)], 0)
+    poly(d, [(50, 60), (40, 78), (60, 78)], 0)
+
+
+@icon
+def responsabilite(d):  # bouclier avec une coche
+    poly(d, [(50, 6), (86, 20), (86, 50), (50, 94), (14, 50), (14, 20)])
+    disc(d, 68, 58, 20); disc(d, 32, 58, 20)
+    line(d, [(32, 48), (45, 62), (68, 34)], 8, 0)
+
+
+@icon
+def douceur(d):  # patte de chat
+    oval(d, 26, 46, 74, 90)
+    oval(d, 8, 34, 28, 58); oval(d, 72, 34, 92, 58)
+    oval(d, 26, 10, 46, 38); oval(d, 54, 10, 74, 38)
+
+
+@icon
+def magasin(d):  # sac de courses
+    arc(d, 50, 32, 18, 180, 360, 7)
+    poly(d, [(18, 32), (82, 32), (90, 90), (10, 90)])
+    disc(d, 36, 46, 5, 0); disc(d, 64, 46, 5, 0)
+
+
+@icon
+def maison(d):
+    poly(d, [(50, 8), (94, 48), (6, 48)])
+    box(d, 18, 44, 82, 92, 4)
+    box(d, 42, 60, 58, 92, 3, 0)
+    box(d, 68, 14, 80, 40, 2)
+
+
 def main():
     os.makedirs(DIR, exist_ok=True)
     for name, f in ICONS.items():
