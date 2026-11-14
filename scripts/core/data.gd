@@ -58,7 +58,9 @@ static func active_skills() -> Array:
 # minutes = durée en minutes de jeu ; needs = effet total sur les besoins ;
 # skills = XP gagnée ; sleep = le temps passe plus vite pendant l'action ;
 # anim = animation du personnage pendant l'action ;
-# achat = l'action demande un achat du magasin (voir SHOP).
+# achat = l'action demande un achat du magasin (voir SHOP) ;
+# construction = l'action demande une construction du jardin (voir CONSTRUCTIONS) ;
+# recolte = chaque mot réussi de la série rapporte une ressource (voir RESOURCES).
 # Les actions qui donnent de la compétence se jouent en « série de mots » : après le
 # mot de départ, l'enfant tape WORDS_PER_SERIES mots du champ lexical (voir LEXIQUE).
 const ACTIONS := {
@@ -98,6 +100,18 @@ const ACTIONS := {
 		"needs": {"hygiene": -15.0}, "skills": {"patience": 12.0, "physique": 6.0}, "verbe": "jardine", "achat": "terrasse"},
 	"animal": {"anim": "pet", "label": "S'occuper du chat", "texts": ["chat", "le chat", "caresser le chat"], "minutes": 30,
 		"needs": {"social": 25.0}, "skills": {"douceur": 10.0, "responsabilite": 10.0, "patience": 6.0}, "verbe": "s'occupe du chat", "achat": "chat"},
+	# Jardin : récolter des ressources
+	"couper": {"anim": "chop", "label": "Couper du bois", "texts": ["bûches", "des bûches", "couper des bûches"], "minutes": 45,
+		"needs": {"hygiene": -15.0, "sommeil": -8.0}, "skills": {"physique": 10.0}, "verbe": "coupe du bois", "recolte": "bois"},
+	"pierres": {"anim": "pick", "label": "Ramasser des pierres", "texts": ["pierres", "des pierres", "ramasser des pierres"], "minutes": 45,
+		"needs": {"hygiene": -15.0, "sommeil": -8.0}, "skills": {"physique": 10.0}, "verbe": "ramasse des pierres", "recolte": "pierre"},
+	# Jardin : ce que l'enfant a construit
+	"repos": {"anim": "sit_rest", "label": "Se reposer sur le banc", "texts": ["banc", "le banc", "se reposer sur le banc"], "minutes": 30,
+		"needs": {"sommeil": 25.0}, "skills": {}, "verbe": "se repose sur le banc", "construction": "banc"},
+	"fontaine": {"anim": "wash", "label": "Se laver à la fontaine", "texts": ["fontaine", "la fontaine", "se laver à la fontaine"], "minutes": 10,
+		"needs": {"hygiene": 40.0}, "skills": {}, "verbe": "se lave à la fontaine", "construction": "fontaine"},
+	"barbecue": {"anim": "cook", "label": "Faire un barbecue", "texts": ["barbecue", "le barbecue", "faire un barbecue"], "minutes": 45,
+		"needs": {"faim": 65.0, "social": 30.0}, "skills": {}, "verbe": "fait un barbecue avec un ami", "construction": "barbecue"},
 }
 
 const WORDS_PER_SERIES := 5
@@ -170,6 +184,16 @@ const LEXIQUE := {
 		["chat", "poil", "bol", "eau", "jeu", "doux", "câlin", "miaou", "lait", "nez"],
 		["caresse", "gamelle", "brosser", "ronron", "panier", "coussin", "nourrir", "moustache", "pattes", "chaton"],
 		["croquettes", "vétérinaire", "responsable", "ronronner", "tendresse", "compagnon", "attention", "délicatement", "confiance"],
+	],
+	"couper": [
+		["bois", "arbre", "tronc", "hache", "bûche", "feu", "tas", "pin", "sapin", "scie"],
+		["branche", "écorce", "forêt", "couper", "fendre", "racine", "chêne", "souche", "fagot", "planche"],
+		["bûcheron", "brindille", "clairière", "ramasser", "empiler", "brouette", "cheminée", "charpente", "tronçonner"],
+	],
+	"pierres": [
+		["pierre", "roc", "sable", "dur", "gris", "mur", "tas", "lourd", "sol", "galet"],
+		["caillou", "rocher", "gravier", "porter", "pioche", "solide", "falaise", "ardoise", "granit", "marbre"],
+		["carrière", "soulever", "construire", "montagne", "minéral", "transporter", "fondation", "maçonnerie", "escalader"],
 	],
 }
 
@@ -246,16 +270,52 @@ const SHOP := {
 const SHOP_ORDER := ["lecture", "jeux", "guitare", "terrasse", "chat"]
 
 
+# --- Jardin : ressources à récolter et constructions ----------------------------------
+# Les ressources se récoltent dans le jardin : un mot réussi = une ressource.
+const RESOURCES := {
+	"bois": {"label": "Bois", "un": "bûche", "plusieurs": "bûches", "icone": "buche", "action": "couper"},
+	"pierre": {"label": "Pierres", "un": "pierre", "plusieurs": "pierres", "icone": "pierre", "action": "pierres"},
+}
+const RESOURCE_ORDER := ["bois", "pierre"]
+
+# Ce que l'enfant construit avec ses ressources (bouton « Construire »). « cout » =
+# ressources dépensées ; « competences » = niveaux demandés ; « objet » = identifiant
+# de l'objet construit par studio.gd ; « action » = activité que la construction ouvre.
+const CONSTRUCTIONS := {
+	"banc": {"label": "Banc de jardin", "cout": {"bois": 6}, "competences": {}, "action": "repos", "objet": "banc", "icone": "sommeil",
+		"description": "Un banc en bois dans la cour, pour se reposer au soleil."},
+	"fontaine": {"label": "Fontaine", "cout": {"pierre": 10}, "competences": {"physique": 2}, "action": "fontaine", "objet": "fontaine", "icone": "hygiene",
+		"description": "Une fontaine en pierre. Son eau fraîche sert à se laver."},
+	"barbecue": {"label": "Barbecue", "cout": {"pierre": 8, "bois": 6}, "competences": {"physique": 3, "creativite": 2}, "action": "barbecue", "objet": "barbecue", "icone": "faim",
+		"description": "Un barbecue en pierre, pour manger dehors avec un ami."},
+}
+const CONSTRUCTION_ORDER := ["banc", "fontaine", "barbecue"]
+
+
+## « 1 bûche », « 6 bûches », « 0 pierre ».
+static func resource_text(res: String, amount: int) -> String:
+	return "%d %s" % [amount, RESOURCES[res]["un" if amount <= 1 else "plusieurs"]]
+
+
+## Constructions du profil (liste d'identifiants de CONSTRUCTIONS).
+static func constructions(profile: Dictionary) -> Array:
+	var list = profile.get("constructions", [])
+	return list if list is Array else []
+
+
 ## Achats du profil (liste d'identifiants de SHOP).
 static func purchases(profile: Dictionary) -> Array:
 	var list = profile.get("achats", [])
 	return list if list is Array else []
 
 
-## L'action est-elle possible pour ce profil ? (objet de base, ou objet acheté)
+## L'action est-elle possible pour ce profil ? (objet de base, acheté ou construit)
 static func is_available(action_id: String, profile: Dictionary) -> bool:
 	var item: String = ACTIONS[action_id].get("achat", "")
-	return item == "" or item in purchases(profile)
+	if item != "" and not item in purchases(profile):
+		return false
+	var built: String = ACTIONS[action_id].get("construction", "")
+	return built == "" or built in constructions(profile)
 
 
 ## Compétences que l'enfant peut entraîner avec ce qu'il possède (dans l'ordre de SKILLS).

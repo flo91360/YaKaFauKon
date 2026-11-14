@@ -385,6 +385,11 @@ func _build_props(top: Color) -> void:
 		M.add(p, M.cylinder(0.065, 0.14), can, Vector3(0, -0.02, 0.1), Vector3(90, 0, 0))
 		M.add(p, M.capsule(0.016, 0.24), can, Vector3(0, -0.15, 0.13), Vector3(-25, 0, 0))
 		M.add(p, M.cylinder(0.035, 0.02), can, Vector3(0, -0.26, 0.18), Vector3(-25, 0, 0)))
+	_props["hache"] = _prop(hand_r, func(p):
+		M.add(p, M.capsule(0.018, 0.5), wood, Vector3(0, -0.02, -0.2), Vector3(90, 0, 0))
+		M.add(p, M.rounded_box(Vector3(0.035, 0.19, 0.12), 0.012), steel, Vector3(0, -0.07, -0.42)))
+	_props["caillou"] = _prop(hand_r, func(p):
+		M.add(p, M.sphere(0.07, 7), M.mat(Color(0.68, 0.69, 0.72), 0.9), Vector3(0, -0.05, -0.04), Vector3.ZERO, Vector3(1.1, 0.8, 1.0)))
 	# La guitare est portée contre le ventre (manche vers la main gauche).
 	_props["guitare"] = _prop(_joints["spine"], func(p):
 		var g := Node3D.new()
@@ -455,7 +460,7 @@ func _set_anim(anim_name: String) -> void:
 func _show_props(anim_name: String) -> void:
 	var wanted: Array = {"paint": ["pinceau", "palette"], "hammer": ["marteau"], "sit_phone": ["telephone"], "brush": ["brosse"],
 		"eat": ["cuillere", "bol"], "cook": ["cuillere"], "sit_write": ["stylo"], "sit_read": ["livre"],
-		"guitar": ["guitare"], "garden": ["arrosoir"]}.get(anim_name, [])
+		"guitar": ["guitare"], "garden": ["arrosoir"], "chop": ["hache"], "pick": ["caillou"]}.get(anim_name, [])
 	for key in _props:
 		_props[key].visible = key in wanted
 
@@ -569,7 +574,7 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 			p["el_r"] = Vector3(8, 0, 0)
 			p["neck"] = Vector3(0, 0, 4)
 			p["offset"] = Vector3(0, 0, -breathe * 0.006)
-		"sit", "sit_type", "sit_write", "sit_phone", "sit_chat", "sit_read", "sit_play":
+		"sit", "sit_type", "sit_write", "sit_phone", "sit_chat", "sit_read", "sit_play", "sit_rest":
 			p["hp_l"] = Vector3(86, 0, -5)
 			p["hp_r"] = Vector3(86, 0, 5)
 			p["kn_l"] = Vector3(-86, 0, 0)
@@ -615,6 +620,15 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 					p["el_l"] = Vector3(54, 0, 0)
 					p["neck"] = Vector3(-10.0 + reach * 6.0, sin(t * 0.55) * 20.0, 0)
 					p["spine"] = Vector3(-4.0 - reach * 8.0, 0, 0)
+				"sit_rest": # détendu sur le banc, il regarde le jardin
+					p["sh_l"] = Vector3(16, 0, -10)
+					p["sh_r"] = Vector3(16, 0, 10)
+					p["el_l"] = Vector3(40, 0, 0)
+					p["el_r"] = Vector3(40, 0, 0)
+					p["spine"] = Vector3(-7.0 + breathe * 1.2, 0, 0)
+					p["neck"] = Vector3(-6, sin(t * 0.45) * 26.0, sin(t * 0.3) * 4.0)
+					p["kn_l"] = Vector3(-70, 0, 0)
+					p["kn_r"] = Vector3(-78, 0, 0)
 				"sit_read":
 					p["sh_l"] = Vector3(46, 0, 6)
 					p["sh_r"] = Vector3(46, 0, -6)
@@ -671,6 +685,38 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 			p["sh_l"] = Vector3(46, 0, -4)
 			p["el_l"] = Vector3(36, 0, 0)
 			p["spine"] = Vector3(13.0 - h * 4.0, 0, 0)
+			p["neck"] = Vector3(12, 0, 0)
+		"chop": # les deux mains lèvent la hache puis l'abattent sur la bûche
+			var up := pow(0.5 + 0.5 * sin(t * 4.4), 1.6)
+			p["sh_r"] = Vector3(44.0 + up * 104.0, 0, -16)
+			p["sh_l"] = Vector3(44.0 + up * 104.0, 0, 16)
+			p["el_r"] = Vector3(46.0 - up * 18.0, 0, 0)
+			p["el_l"] = Vector3(46.0 - up * 18.0, 0, 0)
+			p["spine"] = Vector3(20.0 - up * 26.0, 0, 0)
+			p["neck"] = Vector3(12.0 - up * 10.0, 0, 0)
+			p["hp_l"] = Vector3(0, 0, -9)
+			p["hp_r"] = Vector3(0, 0, 9)
+		"pick": # il se penche, ramasse une pierre et se relève
+			var down := 0.5 + 0.5 * sin(t * 2.6)
+			p["spine"] = Vector3(8.0 + down * 46.0, 0, 0)
+			p["neck"] = Vector3(6.0 - down * 22.0, 0, 0)
+			p["hp_l"] = Vector3(down * 38.0, 0, -7)
+			p["hp_r"] = Vector3(down * 38.0, 0, 7)
+			p["kn_l"] = Vector3(-down * 70.0, 0, 0)
+			p["kn_r"] = Vector3(-down * 70.0, 0, 0)
+			p["sh_l"] = Vector3(26.0 + down * 30.0, 0, 8)
+			p["sh_r"] = Vector3(26.0 + down * 30.0, 0, -8)
+			p["el_l"] = Vector3(70.0 - down * 56.0, 0, 0)
+			p["el_r"] = Vector3(70.0 - down * 56.0, 0, 0)
+			p["offset"] = Vector3(0, -down * 0.12, 0)
+		"wash": # les mains dans l'eau de la fontaine, puis sur le visage
+			var rub := sin(t * 7.0)
+			var face_up := pow(maxf(sin(t * 1.1), 0.0), 2.0)
+			p["sh_r"] = Vector3(58.0 + rub * 4.0 + face_up * 14.0, 0, -12)
+			p["sh_l"] = Vector3(58.0 - rub * 4.0 + face_up * 14.0, 0, 12)
+			p["el_r"] = Vector3(40.0 + rub * 8.0 + face_up * 78.0, 0, 0)
+			p["el_l"] = Vector3(40.0 - rub * 8.0 + face_up * 78.0, 0, 0)
+			p["spine"] = Vector3(16.0 - face_up * 8.0, 0, 0)
 			p["neck"] = Vector3(12, 0, 0)
 		"guitar": # debout, la main droite gratte les cordes
 			p["sh_r"] = Vector3(16, 38, 8)

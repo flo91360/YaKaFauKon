@@ -21,6 +21,8 @@ const GuidePanel = preload("res://scripts/ui/guide_panel.gd")
 const ShopPanel = preload("res://scripts/ui/shop_panel.gd")
 const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
+const BuildPanel = preload("res://scripts/ui/build_panel.gd")
+const Build = preload("res://scripts/core/build.gd")
 const PausePanel = preload("res://scripts/ui/pause_panel.gd")
 const Tutorial = preload("res://scripts/ui/tutorial.gd")
 
@@ -54,6 +56,7 @@ var _series: Dictionary = {} # série de mots en cours : {action, words, index, 
 var _objective_announced := false
 var _dream_intro := false # le choix du rêve ouvre la partie : la suite vient après
 var _dream_wait := 0.0
+var _char_zone := "maison" # où est le personnage : la caméra le suit quand il change de zone
 var _fps_time := 0.0
 var _fps_frames := 0
 
@@ -63,6 +66,7 @@ func _ready() -> void:
 	studio = Studio.new()
 	add_child(studio)
 	studio.set_purchases(Data.purchases(game.profile))
+	studio.set_constructions(Data.constructions(game.profile))
 	character = Character.new()
 	studio.add_child(character)
 	character.build(game.profile["appearance"])
@@ -82,6 +86,8 @@ func _ready() -> void:
 	hud.objective_pressed.connect(_open_objectives)
 	hud.shop_pressed.connect(_open_shop)
 	hud.dream_pressed.connect(_open_dream)
+	hud.build_pressed.connect(_open_build)
+	hud.view_pressed.connect(_toggle_view)
 	typing = TypingPanel.new()
 	ui.add_child(typing)
 	typing.validated.connect(_on_typing_validated)
@@ -108,6 +114,8 @@ func _welcome() -> void:
 		start_tutorial()
 	else:
 		hud.toast("Bonjour %s ! Clique sur un objet pour agir." % profile["name"], UiTheme.COL_ACCENT, 5.0)
+		if not profile.get("jardin_vu", false):
+			hud.toast("Nouveau : le jardin ! Clique sur « Jardin », en bas à droite.", UiTheme.COL_GOOD.darkened(0.1), 8.0, "feuille")
 
 
 func _game():
@@ -149,6 +157,12 @@ func _process(delta: float) -> void:
 		fraction = _action_done_minutes / float(Data.ACTIONS[_action_id]["minutes"])
 	hud.update_display(profile, "" if typing.is_open() else _status_text(), fraction)
 	hud.dream_button.visible = not typing.is_open() # le panneau de frappe a besoin de la place
+	hud.garden_box.visible = not typing.is_open() and tutorial == null
+	# La caméra suit le personnage quand il passe de la maison au jardin (ou revient).
+	var zone: String = studio.zone_of(character.position)
+	if zone != _char_zone:
+		_char_zone = zone
+		_set_view(zone)
 	_watch_fps(delta)
 
 
@@ -238,7 +252,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _choose_object(f) -> void:
 	if f.actions.size() == 1:
-		_start_typing(f, f.actions[0])
+		if f.actions[0] == "construire":
+			_open_build()
+		else:
+			_start_typing(f, f.actions[0])
 		return
 	_open_action_menu(f)
 
@@ -269,6 +286,8 @@ func _open_action_menu(f) -> void:
 				_open_career()
 			elif a == "look":
 				_open_look()
+			elif a == "construire":
+				_open_build()
 			else:
 				_start_typing(f, a))
 		box.add_child(b)
@@ -282,6 +301,8 @@ func _action_label(a: String) -> String:
 		return "Mon travail"
 	if a == "look":
 		return "Changer de look"
+	if a == "construire":
+		return "Construire"
 	return Data.ACTIONS[a]["label"]
 
 
@@ -290,7 +311,11 @@ func _action_icon(a: String) -> String:
 		return "travail"
 	if a == "look":
 		return "perso"
+	if a == "construire":
+		return "marteau"
 	var action: Dictionary = Data.ACTIONS[a]
+	if action.has("recolte"):
+		return Data.RESOURCES[action["recolte"]]["icone"]
 	if not action["skills"].is_empty():
 		return Data.main_skill(a)
 	for n in action["needs"]:
@@ -304,6 +329,10 @@ func _action_color(a: String) -> Color:
 		return UiTheme.COL_ORANGE
 	if a == "look":
 		return UiTheme.COL_ACCENT
+	if a == "construire":
+		return UiTheme.COL_ORANGE
+	if a != "travail" and Data.ACTIONS[a].has("recolte"):
+		return UiTheme.RESOURCE_COLORS[Data.ACTIONS[a]["recolte"]]
 	var icon_name := _action_icon(a)
 	return UiTheme.SKILL_COLORS.get(icon_name, Hud.NEED_COLORS.get(icon_name, UiTheme.COL_ACCENT))
 
@@ -328,6 +357,7 @@ func _start_typing(f, action_id: String) -> void:
 	_object = f
 	_action_id = action_id
 	_last_typing_chars = text.length()
+	_set_view(studio.zone_of(f.position)) # la caméra montre déjà où le personnage va aller
 	typing.open(text, "Pour « %s », recopie :" % action["label"], timed, limit)
 	_tutorial_event("typing_opened")
 
@@ -474,8 +504,11 @@ func _open_series_word() -> void:
 	var limit := Progression.time_limit(profile, word) if timed else 0.0
 	var total: int = _series["words"].size()
 	_typing_mode = "series"
-	typing.open_series(word, "%s · mot %d sur %d" % [Data.ACTIONS[_action_id]["label"], _series["index"] + 1, total],
-		timed, limit, total, _series["results"])
+	var title := "%s · mot %d sur %d" % [Data.ACTIONS[_action_id]["label"], _series["index"] + 1, total]
+	var res: String = Data.ACTIONS[_action_id].get("recolte", "")
+	if res != "": # récolte : la réserve s'affiche et grandit à chaque mot
+		title += " · tu as %s" % Data.resource_text(res, Build.stock(profile, res))
+	typing.open_series(word, title, timed, limit, total, _series["results"])
 	var skill := Data.main_skill(_action_id)
 	typing.set_skill(skill, Progression.skill_level(profile, skill), _skill_fraction(skill))
 
@@ -501,6 +534,10 @@ func _on_series_word_ok(result: Dictionary) -> void:
 	game.session["mots_par_activite"][action_id] = int(game.session["mots_par_activite"].get(action_id, 0)) + 1
 	profile["mots_tapes"][action_id] = int(profile["mots_tapes"].get(action_id, 0)) + 1
 	Objectives.notify(profile, "mot", {"action": action_id})
+	if action.has("recolte"): # un mot réussi = une bûche ou une pierre
+		game.add_resource(action["recolte"], 1)
+		_series["recolte"] = int(_series.get("recolte", 0)) + 1
+		Objectives.notify(profile, "recolte", {"res": action["recolte"], "amount": 1})
 	var after := Progression.skill_level(profile, skill)
 	typing.animate_skill(after, _skill_fraction(skill), xp, after > before)
 	_series["results"].append(true)
@@ -538,8 +575,14 @@ func _finish_series() -> void:
 			game.add_skill_xp(s, action["skills"][s])
 	Objectives.notify(game.profile, "serie", {"action": action_id})
 	Objectives.notify(game.profile, "action", {"action": action_id})
-	hud.toast("Série terminée : %d mots sur %d ! + %s" % [ok_count, _series["words"].size(), Data.SKILLS[Data.main_skill(action_id)]["label"]],
-		UiTheme.COL_GOOD, 4.0, "etoile")
+	if action.has("recolte"):
+		var res: String = action["recolte"]
+		hud.toast("Récolte terminée : + %s ! Tu en as %d." % [Data.resource_text(res, int(_series.get("recolte", 0))), Build.stock(game.profile, res)],
+			UiTheme.COL_GOOD, 5.0, Data.RESOURCES[res]["icone"])
+		game.save_profile()
+	else:
+		hud.toast("Série terminée : %d mots sur %d ! + %s" % [ok_count, _series["words"].size(), Data.SKILLS[Data.main_skill(action_id)]["label"]],
+			UiTheme.COL_GOOD, 4.0, "etoile")
 	game.play_sound("bravo")
 	var where: Vector3 = _object.use_point if _object != null else character.position
 	_leave_object()
@@ -675,6 +718,8 @@ func _on_shop_bought(item: String) -> void:
 		return
 	_close_overlay()
 	var f = studio.add_purchase(item, true)
+	if f != null:
+		_set_view(studio.zone_of(f.position))
 	game.play_sound("piece")
 	game.play_sound("bravo")
 	hud.toast("Nouveau dans ta maison : %s ! Clique dessus pour essayer." % Data.SHOP[item]["label"].to_lower(), UiTheme.COL_GOLD.darkened(0.15), 7.0, "maison")
@@ -686,6 +731,66 @@ func _on_shop_bought(item: String) -> void:
 	if _state == "idle":
 		studio.focus_on(f.position, 0.15)
 	var show := create_tween() # lié à cet écran : s'arrête tout seul si on change de joueur
+	show.tween_interval(4.0)
+	show.tween_callback(func():
+		if _state != "acting" and _state != "series":
+			studio.unfocus())
+	show.tween_interval(8.0)
+	show.tween_callback(func():
+		if tutorial == null:
+			f.set_marker(false))
+
+
+# --- Jardin : changer de vue, construire ---------------------------------------------------
+
+## Montre la maison ou le jardin (la caméra glisse de l'un à l'autre).
+func _set_view(view: String) -> void:
+	if studio.view == view:
+		return
+	studio.set_view(view)
+	hud.set_view(view)
+	var profile: Dictionary = _game().profile
+	if view == "jardin" and not profile.get("jardin_vu", false):
+		profile["jardin_vu"] = true
+		hud.toast("Voici le jardin ! Clique sur le tas de bois ou sur les rochers pour récolter.", UiTheme.COL_GOOD.darkened(0.1), 8.0, "feuille")
+
+
+func _toggle_view() -> void:
+	if typing.is_open() or _overlay != null or _pause_menu != null:
+		return
+	_game().play_sound("clic")
+	_set_view("maison" if studio.view == "jardin" else "jardin")
+
+
+func _open_build() -> void:
+	if typing.is_open() or _pause_menu != null:
+		return
+	var panel := BuildPanel.new()
+	panel.built.connect(_on_built)
+	panel.garden_requested.connect(func():
+		_close_overlay()
+		_set_view("jardin"))
+	_open_overlay(panel)
+
+
+func _on_built(item: String) -> void:
+	var game = _game()
+	if not game.build(item):
+		return
+	_close_overlay()
+	var f = studio.add_construction(item, true)
+	game.play_sound("fini")
+	game.play_sound("bravo")
+	hud.toast("Tu as construit : %s ! Clique dessus pour essayer." % Data.CONSTRUCTIONS[item]["label"].to_lower(), UiTheme.COL_GOLD.darkened(0.15), 7.0, "marteau")
+	_set_view("jardin")
+	if f == null:
+		return
+	studio.burst(Vector3(f.position.x, 0, f.position.z))
+	# La caméra montre la construction quelques secondes, avec la flèche dorée.
+	f.set_marker(true)
+	if _state == "idle":
+		studio.focus_on(Vector3(f.position.x, 0, f.position.z), 0.15)
+	var show := create_tween()
 	show.tween_interval(4.0)
 	show.tween_callback(func():
 		if _state != "acting" and _state != "series":

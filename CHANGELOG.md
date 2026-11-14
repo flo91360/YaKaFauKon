@@ -10,6 +10,35 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.3.0] - 2026-11-14
+
+### Ajouté
+
+- **Ressources à récolter** : dans le jardin, l'enfant coupe du bois et ramasse
+  des pierres. Chaque mot réussi de la série rapporte une bûche ou une pierre,
+  gardée dans sa réserve (affichée en bas à droite de l'écran).
+- **Construire** : avec sa réserve, il construit dans la cour un banc de jardin
+  (6 bûches), une fontaine (10 pierres, physique niveau 2) puis un barbecue
+  (6 bûches et 8 pierres, physique niveau 3 et créativité niveau 2). Chaque
+  construction ajoute une activité : se reposer sur le banc, se laver à la
+  fontaine, faire un barbecue avec un ami. L'écran « Construire » montre ce
+  qu'il a déjà et ce qu'il lui manque.
+- **Vue du jardin** : un bouton « Jardin » / « Maison », en bas à droite, passe
+  d'une vue à l'autre. La caméra suit aussi le personnage quand il sort ou
+  rentre. Une cour pavée relie la maison au tas de bois et aux rochers.
+- Deux nouveaux objectifs : récolter des bûches ou des pierres, et construire
+  la prochaine construction du jardin.
+- Espace ergothérapeute : la réserve et les constructions de l'enfant, et par
+  séance ce qu'il a récolté et construit.
+
+### Modifié
+
+- Couper du bois et ramasser des pierres entraînent la compétence physique et
+  font baisser un peu l'hygiène et le sommeil, comme le sport.
+- Le guide présente le jardin, la récolte et le bouton « Construire ».
+- La boîte aux lettres et les pas japonais du jardin ont été déplacés pour
+  laisser la place à la cour.
+
 ## [2.2.0] - 2026-11-14
 
 ### Ajouté

@@ -36,6 +36,7 @@ const CAREER_COLORS := {
 	"nature": Color(0.36, 0.72, 0.45), "maison": Color(0.9, 0.66, 0.16),
 }
 const COL_DREAM := Color(0.9, 0.66, 0.16)
+const RESOURCE_COLORS := {"bois": Color(0.68, 0.48, 0.32), "pierre": Color(0.52, 0.56, 0.64)}
 
 
 static func build() -> Theme:

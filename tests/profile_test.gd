@@ -45,6 +45,12 @@ func _run() -> void:
 	game.choose_dream("maison")
 	game.choose_dream("artisan")
 	check(game.session["reves_changes"] == 1, "changement de rêve noté dans la séance")
+	check(game.profile["ressources"] == {"bois": 0, "pierre": 0} and game.profile["constructions"] == [] and game.profile["jardin_vu"] == false, "nouveau profil : jardin à découvrir, réserve vide")
+	for i in 9:
+		game.add_resource("bois")
+	game.add_resource("pierre", 4)
+	check(not game.build("fontaine") and game.build("banc") and game.profile["ressources"] == {"bois": 3, "pierre": 4}, "jardin : 9 bûches récoltées, banc construit, 3 bûches restent")
+	game.profile["jardin_vu"] = true
 	game.session["duree_sec"] = 300.0
 	game.session["frappes_ok"] = 10
 	game.session["caracteres"] = 100
@@ -74,6 +80,10 @@ func _run() -> void:
 	p["money"] = 15
 	check(p["sessions"][0].get("achats", []) == ["lecture"] and int(p["sessions"][0]["argent_depense"]) == 40, "achat noté dans la séance pour l'ergo")
 	check(Recap.session_lines(p["sessions"][0]).any(func(l): return l.begins_with("Achats au magasin : coin lecture")), "achat visible dans le récapitulatif")
+	check(p["ressources"] == {"bois": 3, "pierre": 4} and typeof(p["ressources"]["bois"]) == TYPE_INT and p["constructions"] == ["banc"] and p["jardin_vu"] == true, "réserve et constructions du jardin conservées")
+	check(p["sessions"][0].get("recoltes", {}).get("bois", 0) == 9 and p["sessions"][0].get("constructions", []) == ["banc"], "récolte et construction notées dans la séance")
+	check(Recap.session_lines(p["sessions"][0]).has("Récolte dans le jardin : 9 bûches, 4 pierres") and Recap.session_lines(p["sessions"][0]).has("Construit dans le jardin : banc de jardin"), "jardin visible dans le récapitulatif de la séance")
+	check(Recap.garden_line(p).contains("3 bûches et 4 pierres") and Recap.garden_line(p).contains("banc de jardin (1 sur 3)"), "jardin visible pour l'ergo")
 	check(Progression.skill_level(p, "physique") == 2, "compétences conservées")
 	check(Progression.current_tier(p) == 2, "palier de carrière conservé")
 	check(Progression.setting(p, "chrono") == "souvent", "réglage de l'ergo conservé")
@@ -122,6 +132,7 @@ func _run() -> void:
 	check(o["tuto_fait"] == false and o["etoiles"] == 0 and o["objectif"].is_empty(), "nouveautés prêtes : tutoriel à voir, pas d'objectif")
 	check(o["achats"] == [] and o["skills_xp"].has("douceur"), "version 2.1 : pas encore d'achat, nouvelles compétences à zéro")
 	check(o["reve"]["id"] == "" and o["reve"]["realises"] == [], "version 2.2 : le rêve reste à choisir")
+	check(o["ressources"] == {"bois": 0, "pierre": 0} and o["constructions"] == [] and o["jardin_vu"] == false, "version 2.3 : réserve vide, jardin à découvrir")
 	check(Recap.session_lines(o["sessions"][0]).size() >= 8 and Recap.keywords(o).size() > 0, "récapitulatif des anciennes séances lisible")
 	check(game.session.has("series_finies") and Recap.session_lines(game.session).size() >= 11, "nouvelles statistiques dans la séance en cours")
 	var screen = load("res://scripts/screens/game_screen.gd").new()

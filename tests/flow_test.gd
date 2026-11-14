@@ -94,9 +94,12 @@ func _run() -> void:
 	ergo._select(index, "recap")
 	check(ergo._content.get_child_count() > 3, "récapitulatif affiché")
 	var dream_shown := false
+	var garden_shown := false
 	for l in ergo._content.find_children("*", "Label", true, false):
 		dream_shown = dream_shown or l.text.begins_with("Rêve : devenir une star de la chanson")
+		garden_shown = garden_shown or l.text.begins_with("Jardin : 0 bûche et 0 pierre en réserve")
 	check(dream_shown, "le rêve de l'enfant est dans le récapitulatif")
+	check(garden_shown, "le jardin (réserve et constructions) est dans le récapitulatif")
 	game.delete_profile(id)
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])

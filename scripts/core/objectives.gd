@@ -7,8 +7,9 @@ const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
+const Build = preload("res://scripts/core/build.gd")
 
-const CARE_ACTIONS := ["dormir", "manger", "toilettes", "douche", "dents"]
+const CARE_ACTIONS := ["dormir", "manger", "toilettes", "douche", "dents", "repos", "fontaine", "barbecue"]
 const OFFER_COUNT := 3
 
 
@@ -66,6 +67,31 @@ static func candidates(profile: Dictionary) -> Array:
 			"label": "Acheter au magasin : %s" % Data.SHOP[item]["label"].to_lower(),
 			"aide": "Il faut %d pièces. Gagne des pièces avec les objectifs et le travail, puis clique sur « Magasin »." % int(Data.SHOP[item]["prix"]),
 			"pieces": 10, "icone": "magasin"})
+	# Jardin : récolter des ressources, puis construire
+	if done >= 1:
+		var to_build := Build.next_item(profile)
+		var amount := 6 if done < 5 else 10
+		# S'il manque des ressources pour la prochaine construction, on propose celles-là.
+		var lack: Dictionary = Build.missing_resources(profile, to_build) if to_build != "" else {}
+		for res in Data.RESOURCE_ORDER:
+			if not lack.is_empty() and not lack.has(res):
+				continue
+			var info: Dictionary = Data.RESOURCES[res]
+			result.append({"type": "recolte", "res": res, "target": amount,
+				"label": "Récolter %s dans le jardin" % Data.resource_text(res, amount),
+				"aide": "Clique sur « Jardin », puis choisis « %s ». Chaque mot réussi rapporte une %s." % [Data.ACTIONS[info["action"]]["label"], info["un"]],
+				"pieces": 10 + amount, "icone": info["icone"]})
+		if to_build != "":
+			var build_help := "Il faut %s. Récolte dans le jardin, puis clique sur « Construire »." % Build.cost_text(to_build)
+			var skills: Dictionary = Data.CONSTRUCTIONS[to_build]["competences"]
+			if not skills.is_empty():
+				var needed := []
+				for s in skills:
+					needed.append("%s niveau %d" % [Data.SKILLS[s]["label"].to_lower(), int(skills[s])])
+				build_help = "Il faut %s, et %s. Récolte dans le jardin, puis clique sur « Construire »." % [Build.cost_text(to_build), ", ".join(needed)]
+			result.append({"type": "construction", "item": to_build, "target": 1,
+				"label": "Construire : %s" % Data.CONSTRUCTIONS[to_build]["label"].to_lower(),
+				"aide": build_help, "pieces": 25, "icone": "marteau"})
 	# Travail
 	if career == "":
 		if done >= 1:
@@ -176,7 +202,8 @@ static func abandon(profile: Dictionary) -> void:
 
 ## Signale un événement du jeu. Renvoie true si l'objectif vient d'être atteint.
 ## Événements : "mot" {action}, "serie" {action}, "action" {action}, "argent" {amount},
-## "mission", "metier", "palier", "temps" {sec, rouge}. (Un achat se voit dans le profil.)
+## "mission", "metier", "palier", "temps" {sec, rouge}, "recolte" {res, amount}.
+## (Un achat ou une construction se voit dans le profil.)
 static func notify(profile: Dictionary, event: String, data: Dictionary = {}) -> bool:
 	var o := current(profile)
 	if o.is_empty() or is_done(profile):
@@ -203,6 +230,9 @@ static func notify(profile: Dictionary, event: String, data: Dictionary = {}) ->
 		"metier":
 			if event == "metier":
 				o["count"] = 1
+		"recolte":
+			if event == "recolte" and data.get("res", "") == o["res"]:
+				o["count"] += data.get("amount", 1)
 	return is_done(profile)
 
 
@@ -219,6 +249,8 @@ static func is_done(profile: Dictionary) -> bool:
 			return profile["career"]["current"] != ""
 		"achat":
 			return Shop.owns(profile, o["item"])
+		"construction":
+			return Build.owns(profile, o["item"])
 	return o["count"] >= o["target"]
 
 
@@ -244,6 +276,8 @@ static func fraction(profile: Dictionary) -> float:
 			return 0.0
 		"achat": # les pièces sont réunies : il reste à aller au magasin
 			return clampf(float(profile["money"]) / float(o["target"]), 0.0, 0.95)
+		"construction": # les ressources sont réunies : il reste à construire
+			return clampf(Build.fraction(profile, o["item"]), 0.0, 0.95)
 	return clampf(o["count"] / float(o["target"]), 0.0, 1.0)
 
 
@@ -269,6 +303,10 @@ static func progress_text(profile: Dictionary) -> String:
 			return "%d / %d pièces" % [int(o["count"]), int(o["target"])]
 		"achat":
 			return "%d / %d pièces" % [mini(int(profile["money"]), int(o["target"])), int(o["target"])]
+		"recolte":
+			return "%d / %s" % [int(o["count"]), Data.resource_text(o["res"], int(o["target"]))]
+		"construction":
+			return "%d %%" % int(fraction(profile) * 100.0)
 	return ""
 
 

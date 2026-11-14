@@ -48,9 +48,13 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **Magasin** : les pièces gagnées (objectifs, missions) achètent de quoi agrandir la maison. Chaque achat
   ajoute un objet et une activité : coin lecture (40 pièces, lire), table de jeux (60, jeu de société avec
   un ami), guitare (80), terrasse et potager (120, jardiner), un chat (150, s'en occuper).
+- **Jardin, ressources et constructions** : un bouton « Jardin » / « Maison » change de vue. Dans le
+  jardin, l'enfant coupe du bois et ramasse des pierres (un mot réussi = une bûche ou une pierre), puis
+  construit dans la cour un banc (se reposer), une fontaine (se laver) et un barbecue (manger avec un ami).
+  L'écran « Construire » montre sa réserve et ce qu'il lui manque (ressources, niveaux de compétence).
 - **Personnage animé** : il marche, court, dort, mange, cuisine, se brosse les dents, se douche,
   téléphone, reçoit des amis, peint, parle au miroir, bricole, écrit, lit, joue à un jeu de société,
-  joue de la guitare, arrose le potager, caresse le chat… La caméra se rapproche pendant l'activité.
+  joue de la guitare, arrose le potager, caresse le chat, coupe du bois, ramasse des pierres… La caméra se rapproche pendant l'activité.
 - **5 jauges** : faim, sommeil, toilettes, hygiène, vie sociale. Alerte quand une jauge passe au rouge.
 - **Frappe** : 3 niveaux de texte (« toilettes » → « les toilettes » → « aller aux toilettes »).
   Accents et majuscules ignorés, 1 faute admise sur un mot seul, 2 sur plusieurs mots.
@@ -58,14 +62,14 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **10 compétences** : physique, créativité, charisme, organisation et humour dès le départ ; logique,
   sociabilité, patience, responsabilité et douceur avec les achats du magasin ou les missions de certains métiers.
 - **Compétences par champ lexical** : dans une activité (sport, peinture, cuisine, planning, bois,
-  miroir, téléphone, invités, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
+  miroir, téléphone, invités, bois et pierres du jardin, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
   Chaque mot réussi fait monter la **barre de la compétence** ; barre pleine = un niveau de plus.
   Les mots s'adaptent au niveau de texte de l'enfant (courts, moyens, longs). Bouton « Arrêter » :
   les points déjà gagnés sont gardés.
 - **Vitesse adaptative** : 6 premières frappes sans chronomètre pour mesurer la vitesse de base,
   puis un chronomètre régulier ; l'exigence suit les progrès puis se stabilise (au plus 2 × la vitesse de départ).
 - **Objectifs à choix** : le jeu propose 3 objectifs (monter une compétence, taper des mots, prendre soin
-  de soi, choisir un métier, réussir une mission, acheter au magasin…). L'enfant en choisit un, suit sa barre d'avancement
+  de soi, choisir un métier, réussir une mission, acheter au magasin, récolter, construire…). L'enfant en choisit un, suit sa barre d'avancement
   et gagne des pièces et une étoile.
 - **Tutoriel** au premier lancement (on peut le passer et le revoir depuis la pause) et **Guide**
   qui présente toutes les actions possibles avec chaque objet.
@@ -87,13 +91,13 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
   nouvelle mesure de la vitesse, suppression du profil.
 - **Récapitulatif** : par séance datée (vitesse moyenne, types d'erreurs, temps de jeu,
   missions, tâches terminées/abandonnées, mots de champ lexical par activité, séries terminées ou
-  arrêtées, objectifs choisis/atteints, achats au magasin, rêve réalisé ou changé, temps dans le rouge) et sur la durée
+  arrêtées, objectifs choisis/atteints, achats au magasin, récoltes et constructions du jardin, rêve réalisé ou changé, temps dans le rouge) et sur la durée
   (évolution de la vitesse, persévérance, gestion de vie, compétences), avec un résumé en mots-clés.
   Rien n'est envoyé en ligne.
 
 ## Tests
 
-521 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+623 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
@@ -108,13 +112,15 @@ Release avec la section correspondante de `CHANGELOG.md`.
 
 ## Organisation du code
 
-- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, objectif de vie (`dreams.gd`), magasin, sauvegarde, récapitulatif.
+- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, objectif de vie (`dreams.gd`), magasin, jardin (`build.gd`), sauvegarde, récapitulatif.
 - `scripts/world/` : studio (décor, lumière, caméra, effets), meubles, personnage articulé, formes 3D.
-- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, rêve, magasin, guide, tutoriel, pause).
+- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, rêve, magasin, construire, guide, tutoriel, pause).
 - `scripts/screens/` : écrans (joueurs, création, jeu, ergothérapeute).
 - `tools/` : scripts Python qui fabriquent les textures, les pictogrammes, les sons et la musique.
 - Pour ajouter une activité, des mots, une compétence, une mission ou une carrière : `scripts/core/data.gd`
   (les listes de mots sont dans `LEXIQUE`, les carrières dans `CAREERS` et `CAREER_ORDER`, les rêves dans `DREAMS`). Pour un nouvel achat du magasin : `SHOP` dans `data.gd`
-  et son décor dans `add_purchase` de `scripts/world/studio.gd`.
+  et son décor dans `add_purchase` de `scripts/world/studio.gd`. Pour une nouvelle construction du jardin :
+  `CONSTRUCTIONS` dans `data.gd` et son décor dans `add_construction` de `studio.gd` ; pour une nouvelle
+  ressource : `RESOURCES`, une action avec `recolte` et son objet dans `_build_yard`.
 
-Pas encore dans le jeu : ressources à récolter, relations et famille (et le rêve « fonder une famille »), plateforme en ligne.
+Pas encore dans le jeu : relations et famille (et le rêve « fonder une famille »), plateforme en ligne.

@@ -8,11 +8,15 @@ const Data = preload("res://scripts/core/data.gd")
 
 const ROOM_MIN := Vector2(-5.0, -4.0) # (x, z)
 const ROOM_MAX := Vector2(5.0, 4.0)
-const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4), Vector2(-2.4, 1.6), Vector2(2.6, 1.8), Vector2(0.4, 1.6)]
+const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4), Vector2(-2.4, 1.6), Vector2(2.6, 1.8), Vector2(0.4, 1.6),
+	Vector2(4.7, 2.25), Vector2(6.2, 2.2), Vector2(8.6, 2.2), Vector2(10.0, 2.25), Vector2(5.8, 0.3)] # sortie vers la cour, cour, passage vers la terrasse
 const GROUND_Y := -0.3
 ## Terrasse (achat du magasin) : plancher en bois à droite de la pièce.
 const TERRACE_MIN := Vector2(5.0, -3.2)
 const TERRACE_MAX := Vector2(7.25, 0.2)
+# La cour pavée du jardin (au niveau de la maison) : on y récolte et on y construit.
+const PATIO_MIN := Vector2(5.0, 0.2)
+const PATIO_MAX := Vector2(11.4, 3.3)
 ## Calques de lumière : la pièce (calque 1, par défaut pour tout ce qui est ajouté,
 ## personnage compris) n'est éclairée que par `inside_light` et les lampes ;
 ## le jardin (calque 2) par le soleil. Ainsi aucune ombre de soleil ne bouge dans la maison.
@@ -26,6 +30,7 @@ const INSIDE_DIR := Vector3(0.32, 0.9, 0.45)
 const CAM_HOME := Vector3(8.0, 9.4, 10.6)
 const CAM_LOOK := Vector3(-0.15, 0.35, -0.25)
 const CAM_FOCUS_DISTANCE := 8.6
+const VIEW_SHIFT := Vector3(8.3, 0, 1.7) # la vue « jardin » est la même, décalée vers la cour
 
 const C_WOOD := Color(0.80, 0.60, 0.42)
 const C_WOOD_LIGHT := Color(0.90, 0.74, 0.54)
@@ -72,6 +77,8 @@ var _cam_look := CAM_LOOK
 var _purchased := {} # achats du magasin déjà construits : identifiant → true
 var _terrace := false
 var _hidden: Array = [] # objets cachés pendant une activité (la guitare sur son pied)
+var _built := {} # constructions du jardin déjà posées : identifiant → true
+var view := "maison" # ce que montre la caméra au repos : "maison" ou "jardin"
 
 
 func _ready() -> void:
@@ -88,6 +95,10 @@ func _ready() -> void:
 		_set_layers(get_child(i), LAYER_GARDEN)
 	_build_furniture()
 	_build_decor()
+	var first_yard := get_child_count()
+	_build_yard()
+	for i in range(first_yard, get_child_count()):
+		_set_layers(get_child(i), LAYER_GARDEN)
 	set_time(_minutes, false, true)
 
 
@@ -380,13 +391,13 @@ func _build_garden() -> void:
 			d.ball(0.07, C_LEAF_LIGHT, Vector3(x + 0.06, GROUND_Y + 0.14, z + 0.05), Vector3(1.2, 0.5, 0.8))
 	# Dalles de pierre qui mènent à la maison
 	var stone := M.tex_mat("crepi", Color(0.8, 0.79, 0.77), 1.2, "crepi_n", 0.9, 1.2)
-	for i in 7:
-		var p := Vector3(5.75 + i * 0.95, GROUND_Y + 0.02, 2.6 + sin(i * 0.9) * 0.35 - i * 0.12)
+	for i in 6:
+		var p := Vector3(11.7 + i * 0.95, GROUND_Y + 0.02, 1.9 + sin(i * 0.9) * 0.3 - i * 0.1)
 		d.lathe([Vector2(0.0, 0.0), Vector2(0.3, 0.0), Vector2(0.34, 0.03), Vector2(0.3, 0.06), Vector2(0.0, 0.06)], stone, p, Vector3(0, i * 40.0, 0), Vector3(1.0 + (i % 2) * 0.2, 1, 0.85))
 	# Boîte aux lettres
-	d.cyl(0.04, 1.0, M.mat(C_WOOD_DARK, 0.7), Vector3(6.1, GROUND_Y + 0.5, 3.9))
-	d.box(Vector3(0.3, 0.24, 0.44), M.mat(C_CORAL, 0.5), Vector3(6.1, GROUND_Y + 1.1, 3.9), 0.1)
-	d.box(Vector3(0.02, 0.14, 0.1), M.mat(C_WHITE, 0.5), Vector3(6.26, GROUND_Y + 1.14, 3.76), 0.008)
+	d.cyl(0.04, 1.0, M.mat(C_WOOD_DARK, 0.7), Vector3(12.0, GROUND_Y + 0.5, 3.4))
+	d.box(Vector3(0.3, 0.24, 0.44), M.mat(C_CORAL, 0.5), Vector3(12.0, GROUND_Y + 1.1, 3.4), 0.1)
+	d.box(Vector3(0.02, 0.14, 0.1), M.mat(C_WHITE, 0.5), Vector3(12.16, GROUND_Y + 1.14, 3.26), 0.008)
 	# Petit potager
 	d.box(Vector3(2.6, 0.2, 1.7), M.mat(C_WOOD, 0.8), Vector3(8.6, GROUND_Y + 0.06, -1.6), 0.04)
 	d.box(Vector3(2.42, 0.2, 1.52), soil, Vector3(8.6, GROUND_Y + 0.09, -1.6), 0.04)
@@ -887,6 +898,197 @@ func _build_workbench() -> void:
 	bench.set_meta("fx_point", Vector3(0.05, 1.0, -0.06))
 
 
+# --- Jardin jouable : la cour, les ressources et les constructions ------------------------
+
+## La cour pavée (toujours là) : le tas de bois, les rochers et le panneau « À construire ».
+func _build_yard() -> void:
+	var size := PATIO_MAX - PATIO_MIN
+	var center := Vector3((PATIO_MIN.x + PATIO_MAX.x) / 2.0, 0, (PATIO_MIN.y + PATIO_MAX.y) / 2.0)
+	var body := StaticBody3D.new()
+	body.add_to_group("floor")
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(size.x, 0.2, size.y)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position = center + Vector3(0, -0.1, 0)
+	body.add_child(col)
+	add_child(body)
+	var d := _deco()
+	d.position = center
+	# (pierres assez foncées : le soleil du jardin les éclaircit beaucoup)
+	var stone := M.tex_mat("crepi", Color(0.6, 0.58, 0.55), 1.2, "crepi_n", 0.9, 1.2)
+	var stone_light := M.tex_mat("crepi", Color(0.68, 0.65, 0.6), 1.2, "crepi_n", 0.9, 1.2)
+	var stone_dark := M.tex_mat("crepi", Color(0.47, 0.46, 0.45), 1.2, "crepi_n", 0.9, 1.2)
+	d.box(Vector3(size.x, 0.27, size.y), stone_dark, Vector3(0, -0.165, 0), 0.02)
+	# Pavés posés en quinconce
+	var rows := 5
+	var cols := 10
+	var pw := size.x / cols
+	var pd := size.y / rows
+	for r in rows:
+		for c in cols + (r % 2):
+			var w := pw
+			var x := -size.x / 2.0 + pw * (c + 0.5) - (pw / 2.0 if r % 2 == 1 else 0.0)
+			if r % 2 == 1 and (c == 0 or c == cols): # demi-pavés au bord
+				w = pw / 2.0
+				x = -size.x / 2.0 + w / 2.0 if c == 0 else size.x / 2.0 - w / 2.0
+			d.box(Vector3(w - 0.03, 0.05, pd - 0.03), [stone, stone_light, stone_dark][(r * 3 + c * 2) % 3], Vector3(x, -0.024, -size.y / 2.0 + pd * (r + 0.5)), 0.012)
+	# Lanterne au coin de la cour
+	var shade := M.glowing(Color(1.0, 0.88, 0.62), 0.25)
+	var lx := size.x / 2.0 - 0.16
+	var lz := -size.y / 2.0 + 0.16
+	d.cyl(0.035, 1.5, M.mat(C_DARK, 0.5), Vector3(lx, 0.75, lz))
+	d.box(Vector3(0.18, 0.22, 0.18), shade, Vector3(lx, 1.6, lz), 0.03)
+	d.box(Vector3(0.24, 0.035, 0.24), M.mat(C_DARK, 0.5), Vector3(lx, 1.73, lz), 0.01)
+	_add_lamp(center + Vector3(lx - 0.4, 1.9, lz + 0.4), 2.0, 7.0, shade)
+
+	# Panneau « À construire » : un plan affiché sur deux piquets
+	var board := _add_object("chantier", "À construire", ["construire"], Vector3(10.95, 0, 3.05), Vector3(0.95, 1.5, 0.35), Vector3(10.2, 0, 2.6))
+	for x in [-0.36, 0.36]:
+		board.box(Vector3(0.07, 1.3, 0.07), _wood_dark, Vector3(x, 0.65, 0), 0.015)
+	board.box(Vector3(0.9, 0.62, 0.05), _wood_light, Vector3(0, 1.06, 0.04), 0.02)
+	board.box(Vector3(0.74, 0.46, 0.012), M.mat(Color(0.86, 0.92, 0.99), 0.8), Vector3(0, 1.06, 0.07), 0.006)
+	var ink := M.mat(C_BLUE.darkened(0.1), 0.7)
+	# Le plan : une petite maison dessinée
+	board.box(Vector3(0.26, 0.16, 0.006), ink, Vector3(-0.14, 0.98, 0.08), 0.004)
+	board.box(Vector3(0.24, 0.02, 0.006), ink, Vector3(-0.2, 1.11, 0.08), 0.002, Vector3(0, 0, 38))
+	board.box(Vector3(0.24, 0.02, 0.006), ink, Vector3(-0.08, 1.11, 0.08), 0.002, Vector3(0, 0, -38))
+	for k in 3:
+		board.box(Vector3(0.24, 0.018, 0.006), ink, Vector3(0.2, 1.14 - k * 0.1, 0.08), 0.002)
+	board.ball(0.11, M.mat(C_MUSTARD, 0.5), Vector3(0.36, 1.33, 0), Vector3(1, 0.75, 1)) # casque de chantier
+	board.box(Vector3(0.26, 0.02, 0.14), M.mat(C_MUSTARD, 0.5), Vector3(0.36, 1.31, 0.06), 0.008)
+
+	# Tas de bois : le billot, la hache et les bûches rangées (sur la pelouse, devant la cour)
+	var wood := _add_object("bois_jardin", "Tas de bois", ["couper"], Vector3(6.4, GROUND_Y, 3.95), Vector3(1.8, 1.0, 1.1), Vector3(6.4, 0, 2.95))
+	var log_mat := M.tex_mat("bois", Color(0.62, 0.46, 0.34), 2.0, "bois_n", 0.9, 1.0)
+	var cut := M.mat(Color(0.93, 0.8, 0.6), 0.8)
+	wood.cyl(0.27, 0.6, log_mat, Vector3(0, 0.3, -0.3)) # billot
+	wood.cyl(0.24, 0.605, cut, Vector3(0, 0.3, -0.3))
+	wood.cyl(0.1, 0.32, log_mat, Vector3(0.02, 0.76, -0.3)) # bûche à fendre
+	wood.cyl(0.085, 0.325, cut, Vector3(0.02, 0.76, -0.3))
+	for row in 3: # bûches rangées en pyramide, entre deux piquets
+		for k in 4 - row:
+			var lp := Vector3(-0.36 + k * 0.24 + row * 0.12, 0.12 + row * 0.2, 0.28)
+			wood.cyl(0.115, 0.62, log_mat, lp, Vector3(90, 0, 0))
+			wood.cyl(0.095, 0.625, cut, lp, Vector3(90, 0, 0))
+	for x in [-0.56, 0.56]:
+		wood.box(Vector3(0.07, 0.7, 0.07), _wood_dark, Vector3(x, 0.35, 0.28), 0.015)
+	var axe := Node3D.new() # plantée dans le billot ; cachée pendant que le personnage coupe
+	axe.position = Vector3(-0.14, 0.62, -0.32)
+	axe.rotation_degrees = Vector3(0, 20, -38)
+	wood.add_child(axe)
+	wood._reg(M.add(axe, M.capsule(0.02, 0.56), _wood_light, Vector3(0, 0.3, 0)))
+	wood._reg(M.add(axe, M.rounded_box(Vector3(0.2, 0.13, 0.035), 0.012), _steel, Vector3(0.07, 0.06, 0)))
+	wood.set_meta("axe", axe)
+	wood.set_meta("fx_point", Vector3(0.02, 0.95, -0.3))
+	for k in 4: # copeaux au sol
+		wood.box(Vector3(0.1, 0.02, 0.04), cut, Vector3(-0.5 + k * 0.28, 0.02, -0.52 + (k % 2) * 0.12), 0.006, Vector3(0, k * 50.0, 0))
+
+	# Rochers : de gros cailloux et des pierres à ramasser
+	var rocks := _add_object("rochers", "Rochers", ["pierres"], Vector3(8.7, GROUND_Y, 3.95), Vector3(1.8, 0.9, 1.1), Vector3(8.7, 0, 2.95))
+	var greys := [M.tex_mat("crepi", Color(0.5, 0.52, 0.56), 1.5, "crepi_n", 0.9, 1.4), M.tex_mat("crepi", Color(0.4, 0.42, 0.47), 1.5, "crepi_n", 0.9, 1.4),
+		M.tex_mat("crepi", Color(0.58, 0.57, 0.55), 1.5, "crepi_n", 0.9, 1.4)]
+	for k in [[0.0, 0.2, 0.42, 1.2, 0.8, 0.95], [-0.52, 0.12, 0.3, 1.0, 0.75, 1.1], [0.5, 0.05, 0.34, 1.1, 0.7, 0.9], [0.14, -0.26, 0.24, 1.2, 0.7, 1.0],
+			[-0.3, -0.34, 0.17, 1.0, 0.8, 1.2], [0.62, -0.36, 0.14, 1.1, 0.8, 1.0], [-0.72, -0.24, 0.12, 1.0, 0.8, 1.0], [0.36, -0.46, 0.1, 1.2, 0.8, 1.0]]:
+		var rock := rocks.ball(k[2], greys[int(absf(k[0]) * 10.0) % 3], Vector3(k[0], k[2] * k[4] * 0.8, k[1]), Vector3(k[3], k[4], k[5]))
+		rock.rotation_degrees = Vector3(0, k[0] * 140.0, 0)
+	rocks.set_meta("fx_point", Vector3(0.1, 0.35, -0.35))
+
+
+## Construit ce que l'enfant a déjà fabriqué (au chargement de la partie).
+func set_constructions(ids: Array) -> void:
+	for id in ids:
+		add_construction(str(id))
+
+
+## Pose dans le jardin une construction de l'enfant. Renvoie l'objet utilisable.
+func add_construction(id: String, animate := false) -> Furniture:
+	if not Data.CONSTRUCTIONS.has(id):
+		return null
+	var object_id: String = Data.CONSTRUCTIONS[id]["objet"]
+	if _built.has(id):
+		return get_object(object_id)
+	_built[id] = true
+	var first := get_child_count()
+	match id:
+		"banc":
+			_build_bench()
+		"fontaine":
+			_build_fountain()
+		"barbecue":
+			_build_barbecue()
+	for i in range(first, get_child_count()):
+		var node := get_child(i)
+		_set_layers(node, LAYER_GARDEN)
+		if animate:
+			_pop_in(node)
+	apply_quality(quality)
+	return get_object(object_id)
+
+
+## Banc en bois, au fond de la cour, tourné vers le jardin.
+func _build_bench() -> void:
+	var bench := _add_object("banc", "Banc", ["repos"], Vector3(7.3, 0, 0.72), Vector3(1.6, 0.95, 0.6), Vector3(7.3, 0, 1.5))
+	for x in [-0.66, 0.66]:
+		bench.box(Vector3(0.08, 0.45, 0.08), _wood_dark, Vector3(x, 0.225, 0.2), 0.015)
+		bench.box(Vector3(0.08, 0.92, 0.08), _wood_dark, Vector3(x, 0.46, -0.2), 0.015, Vector3(-6, 0, 0))
+		bench.box(Vector3(0.07, 0.05, 0.5), _wood_dark, Vector3(x, 0.62, 0.0), 0.015) # accoudoirs
+	for k in 3:
+		bench.box(Vector3(1.5, 0.045, 0.13), _wood if k % 2 == 0 else _wood_light, Vector3(0, 0.45, -0.12 + k * 0.15), 0.015)
+	for k in 2:
+		bench.box(Vector3(1.5, 0.13, 0.04), _wood_light if k == 0 else _wood, Vector3(0, 0.68 + k * 0.17, -0.235 - k * 0.018), 0.015, Vector3(-6, 0, 0))
+	bench.pose = "assis"
+	bench.pose_point = Vector3(7.3, 0.49, 0.76)
+	bench.face_point = Vector3(7.3, 0, 5.0)
+
+
+## Fontaine en pierre, au coin de la cour.
+func _build_fountain() -> void:
+	var f := _add_object("fontaine", "Fontaine", ["fontaine"], Vector3(10.55, 0, 0.95), Vector3(1.35, 1.5, 1.35), Vector3(10.55, 0, 2.05))
+	var stone := M.tex_mat("crepi", Color(0.62, 0.61, 0.6), 1.5, "crepi_n", 0.85, 1.2)
+	var stone_dark := M.tex_mat("crepi", Color(0.5, 0.5, 0.52), 1.5, "crepi_n", 0.85, 1.2)
+	var water := M.mat(Color(0.38, 0.66, 0.84), 0.12, 0.2)
+	f.lathe([Vector2(0.0, 0.0), Vector2(0.62, 0.0), Vector2(0.66, 0.05), Vector2(0.6, 0.12), Vector2(0.58, 0.42), Vector2(0.66, 0.48), Vector2(0.66, 0.56),
+		Vector2(0.52, 0.56), Vector2(0.5, 0.3), Vector2(0.0, 0.3)], stone, Vector3.ZERO)
+	f.cyl(0.51, 0.03, water, Vector3(0, 0.47, 0))
+	f.lathe([Vector2(0.0, 0.0), Vector2(0.15, 0.0), Vector2(0.1, 0.1), Vector2(0.085, 0.58), Vector2(0.28, 0.7), Vector2(0.3, 0.76), Vector2(0.25, 0.76),
+		Vector2(0.21, 0.72), Vector2(0.0, 0.7)], stone_dark, Vector3(0, 0.3, 0))
+	f.cyl(0.23, 0.02, water, Vector3(0, 1.04, 0))
+	f.ball(0.075, stone, Vector3(0, 1.12, 0))
+	# L'eau coule de la vasque dans le bassin (toujours)
+	var fall := _particles(Vector3.ZERO, Color(0.66, 0.86, 1.0, 0.8), 18, 0.45, Vector3.UP, 80.0, 0.9, Vector3(0, -5.5, 0), 0.016)
+	remove_child(fall)
+	fall.position = Vector3(0, 1.06, 0)
+	f.add_child(fall)
+	f.set_meta("fx_point", Vector3(0, 0.62, 0.42))
+
+
+## Barbecue en pierre, au fond de la cour (la cheminée derrière, la grille devant).
+func _build_barbecue() -> void:
+	var b := _add_object("barbecue", "Barbecue", ["barbecue"], Vector3(9.0, 0, 0.72), Vector3(1.0, 1.7, 0.9), Vector3(9.0, 0, 1.75))
+	var stone := M.tex_mat("crepi", Color(0.6, 0.57, 0.54), 1.4, "crepi_n", 0.9, 1.3)
+	var stone_dark := M.tex_mat("crepi", Color(0.45, 0.45, 0.47), 1.4, "crepi_n", 0.9, 1.3)
+	b.box(Vector3(0.95, 0.8, 0.85), stone, Vector3(0, 0.4, 0), 0.03)
+	b.box(Vector3(0.55, 0.36, 0.3), M.mat(C_DARK, 0.9), Vector3(0, 0.32, 0.3), 0.02) # réserve de bois
+	var log_mat := M.tex_mat("bois", Color(0.62, 0.46, 0.34), 2.0, "bois_n", 0.9, 1.0)
+	for k in 3:
+		b.cyl(0.065, 0.2, log_mat, Vector3(-0.13 + (k % 2) * 0.16 + (0.08 if k == 2 else 0.0), 0.22 + (0.11 if k == 2 else 0.0), 0.36), Vector3(90, 0, 0))
+	b.box(Vector3(1.02, 0.07, 0.92), stone_dark, Vector3(0, 0.835, 0), 0.02)
+	b.box(Vector3(0.7, 0.05, 0.56), M.glowing(Color(1.0, 0.45, 0.2), 0.9), Vector3(0, 0.88, 0.12), 0.01) # braises
+	for k in 7: # grille
+		b.box(Vector3(0.015, 0.015, 0.56), _steel, Vector3(-0.33 + k * 0.11, 0.93, 0.12), 0.004)
+	for k in 2: # saucisses et brochette
+		b.cap(0.03, 0.2, M.mat(Color(0.62, 0.3, 0.2), 0.5), Vector3(-0.2 + k * 0.14, 0.965, 0.2), Vector3(90, 0, 0))
+	b.cyl(0.006, 0.42, _steel, Vector3(0.2, 0.96, 0.1), Vector3(90, 0, 0))
+	for k in 4:
+		b.ball(0.035, M.mat([C_CORAL, C_MUSTARD, C_LEAF, C_CORAL][k], 0.5), Vector3(0.2, 0.96, -0.04 + k * 0.09))
+	# Cheminée au fond
+	b.box(Vector3(0.95, 0.75, 0.28), stone, Vector3(0, 1.22, -0.28), 0.03)
+	b.box(Vector3(1.05, 0.07, 0.38), stone_dark, Vector3(0, 1.62, -0.28), 0.02)
+	b.set_meta("fx_point", Vector3(0, 1.2, 0.1))
+	b.set_meta("guest_point", Vector3(8.0, 0, 1.85))
+
+
 # --- Achats du magasin (la maison s'agrandit) ---------------------------------------------
 
 ## Construit les achats déjà faits (au chargement de la partie).
@@ -1234,12 +1436,32 @@ func _segment_clear(a: Vector2, b: Vector2, ignore) -> bool:
 			var p := a.lerp(b, float(i) / steps)
 			if rect.has_point(p):
 				return false
+	# Dehors, on reste sur la cour et la terrasse (pas de raccourci par la pelouse).
+	if not _in_room(a) or not _in_room(b):
+		for i in range(1, steps):
+			if not _walkable(a.lerp(b, float(i) / steps)):
+				return false
 	return true
+
+
+func _in_room(p: Vector2) -> bool:
+	return p.x >= ROOM_MIN.x - 0.01 and p.x <= ROOM_MAX.x + 0.01 and p.y >= ROOM_MIN.y - 0.01 and p.y <= ROOM_MAX.y + 0.01
+
+
+## Peut-on marcher ici ? (la pièce, la cour, et la terrasse quand elle est achetée)
+func _walkable(p: Vector2) -> bool:
+	if _in_room(p):
+		return true
+	if p.x <= PATIO_MAX.x + 0.01 and p.y >= PATIO_MIN.y - 0.01 and p.y <= PATIO_MAX.y + 0.01:
+		return true
+	return _terrace and p.x <= TERRACE_MAX.x + 0.01 and p.y >= TERRACE_MIN.y - 0.01 and p.y <= TERRACE_MAX.y + 0.01
 
 
 func clamp_to_room(p: Vector3) -> Vector3:
 	if _terrace and p.x > ROOM_MAX.x - 0.4 and p.z > TERRACE_MIN.y and p.z < TERRACE_MAX.y:
 		return Vector3(minf(p.x, TERRACE_MAX.x - 0.35), 0, clampf(p.z, TERRACE_MIN.y + 0.35, TERRACE_MAX.y - 0.35))
+	if p.x > ROOM_MAX.x - 0.4 and p.z >= PATIO_MIN.y and p.z < PATIO_MAX.y:
+		return Vector3(minf(p.x, PATIO_MAX.x - 0.35), 0, clampf(p.z, PATIO_MIN.y + 0.35, PATIO_MAX.y - 0.35))
 	return Vector3(clampf(p.x, ROOM_MIN.x + 0.4, ROOM_MAX.x - 0.4), 0, clampf(p.z, ROOM_MIN.y + 0.4, ROOM_MAX.y - 0.4))
 
 
@@ -1270,9 +1492,27 @@ func unfocus() -> void:
 	_cam_focus = null
 
 
+## Change ce que montre la caméra au repos : "maison" ou "jardin".
+## `instant` : sans glissement (au chargement, pour les tests).
+func set_view(new_view: String, instant := false) -> void:
+	view = "jardin" if new_view == "jardin" else "maison"
+	if instant:
+		var shift := VIEW_SHIFT if view == "jardin" else Vector3.ZERO
+		_cam_pos = CAM_HOME + shift
+		_cam_look = CAM_LOOK + shift
+		camera.position = _cam_pos
+		camera.look_at(_cam_look, Vector3.UP)
+
+
+## Où se trouve ce point : dans la "maison" ou dans le "jardin" (cour, terrasse, pelouse) ?
+func zone_of(point: Vector3) -> String:
+	return "jardin" if point.x > ROOM_MAX.x + 0.15 else "maison"
+
+
 func _move_camera(delta: float) -> void:
-	var want_pos := CAM_HOME
-	var want_look := CAM_LOOK
+	var shift := VIEW_SHIFT if view == "jardin" else Vector3.ZERO
+	var want_pos := CAM_HOME + shift
+	var want_look := CAM_LOOK + shift
 	if _cam_focus != null:
 		var dir := (CAM_HOME - CAM_LOOK).normalized()
 		var up := dir.cross(Vector3.UP).cross(dir).normalized()
@@ -1353,6 +1593,19 @@ func start_activity(f: Furniture, action_id: String) -> void:
 				can.visible = false
 				_hidden.append(can)
 			_fx.append(_particles(fx_point, Color(0.6, 0.84, 1.0, 0.85), 26, 0.5, Vector3(0.5, -1, 0), 10.0, 1.2, Vector3(0, -5.0, 0), 0.018))
+		"couper": # la hache est dans la main ; des copeaux volent
+			var axe = f.get_meta("axe", null)
+			if axe != null:
+				axe.visible = false
+				_hidden.append(axe)
+			_fx.append(_particles(fx_point, Color(0.9, 0.74, 0.5), 14, 0.7, Vector3.UP, 55.0, 1.4, Vector3(0, -5.0, 0), 0.02))
+		"pierres": # un peu de poussière
+			_fx.append(_particles(fx_point, Color(0.8, 0.78, 0.74, 0.7), 8, 1.0, Vector3.UP, 40.0, 0.5, Vector3(0, -0.6, 0), 0.035))
+		"fontaine": # éclaboussures
+			_fx.append(_particles(fx_point, Color(0.62, 0.84, 1.0, 0.85), 22, 0.45, Vector3.UP, 40.0, 1.1, Vector3(0, -5.0, 0), 0.018))
+		"barbecue": # la fumée monte ; un ami vient manger
+			_fx.append(_particles(fx_point, Color(1, 1, 1, 0.45), 14, 1.8, Vector3.UP, 14.0, 0.4, Vector3(0, 0.15, 0), 0.06))
+			_add_guest(f.get_meta("guest_point", f.use_point), "debout", "talk", f.position)
 		"animal": # le chat est content
 			_fx.append(_particles(f.position + Vector3(0, 0.95, 0), Color(1.0, 0.55, 0.68, 0.95), 4, 1.5, Vector3.UP, 30.0, 0.3, Vector3(0, 0.25, 0), 0.035, true))
 
