@@ -36,7 +36,7 @@ func _ready() -> void:
 	head.add_child(UiTheme.speak_button(func():
 		var parts := ["Choisis ton objectif."]
 		for i in offers.size():
-			parts.append("Choix %d : %s." % [i + 1, offers[i]["label"]])
+			parts.append("Choix %d : %s.%s" % [i + 1, offers[i]["label"], " C'est pour ton rêve." if offers[i].get("reve", false) else ""])
 		return " ".join(parts)))
 	if can_close:
 		var later := UiTheme.button("Plus tard", UiTheme.COL_GREY, 20)
@@ -61,6 +61,17 @@ func _card(offer: Dictionary) -> Control:
 	v.add_theme_constant_override("separation", 10)
 	card.add_child(v)
 	v.add_child(UiTheme.badge(icon_name, color, 64))
+	# Ruban doré : cet objectif fait avancer le rêve de l'enfant.
+	var ribbon := HBoxContainer.new()
+	ribbon.alignment = BoxContainer.ALIGNMENT_CENTER
+	ribbon.custom_minimum_size = Vector2(0, 26)
+	ribbon.visible = offers.any(func(o): return o.get("reve", false)) # même hauteur pour les 3 cartes
+	v.add_child(ribbon)
+	if offer.get("reve", false):
+		ribbon.add_child(UiTheme.icon("reve", 22, UiTheme.COL_DREAM))
+		var dream_label := UiTheme.label("Pour ton rêve", 17, UiTheme.COL_DREAM.darkened(0.3))
+		dream_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		ribbon.add_child(dream_label)
 	var label := UiTheme.label(offer["label"], 23)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.custom_minimum_size = Vector2(0, 92)

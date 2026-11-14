@@ -3,6 +3,7 @@ extends RefCounted
 
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 
 const ERROR_LABELS := {
 	"substitution": "lettres remplacées", "oubli": "lettres oubliées", "ajout": "lettres en trop",
@@ -62,8 +63,39 @@ static func session_lines(s: Dictionary) -> Array:
 			if Data.SHOP.has(id):
 				names.append(Data.SHOP[id]["label"].to_lower())
 		lines.append("Achats au magasin : %s (%d pièces dépensées)" % [", ".join(names), int(s.get("argent_depense", 0))])
+	var dreams_done: Array = s.get("reves_realises", []) if s.get("reves_realises", []) is Array else []
+	if not dreams_done.is_empty(): # séances de la version 2.2
+		var labels := []
+		for d in dreams_done:
+			if Data.DREAMS.has(d):
+				labels.append(Data.DREAMS[d]["label"].to_lower())
+		lines.append("Rêve réalisé : %s" % ", ".join(labels))
+	if int(s.get("reves_changes", 0)) > 0:
+		lines.append("A changé de rêve : %d fois" % int(s.get("reves_changes", 0)))
 	lines.append("Temps avec au moins une jauge dans le rouge : %s" % format_duration(red_any_sec(s)))
 	return lines
+
+
+## Où en est l'objectif de vie (« Mon rêve »), en une ligne.
+static func dream_line(profile: Dictionary) -> String:
+	var dream := Dreams.current(profile)
+	var parts := []
+	if dream == "":
+		parts.append("pas encore choisi")
+	elif Dreams.is_done(profile):
+		parts.append("%s (réalisé)" % Data.DREAMS[dream]["label"].to_lower())
+	else:
+		parts.append("%s, %d étape(s) sur %d" % [Data.DREAMS[dream]["label"].to_lower(), Dreams.steps_done(profile), Dreams.steps(profile).size()])
+	var others := []
+	for d in Dreams.achieved(profile):
+		if d != dream:
+			others.append(Data.DREAMS[d]["label"].to_lower())
+	if not others.is_empty():
+		parts.append("déjà réalisé : %s" % ", ".join(others))
+	var changes := int(profile.get("reve", {}).get("changements", 0))
+	if changes > 0:
+		parts.append("changé %d fois en cours de route" % changes)
+	return "Rêve : " + " — ".join(parts)
 
 
 static func format_duration(sec: float) -> String:
@@ -175,7 +207,7 @@ static func skills_progress(profile: Dictionary) -> Array:
 	var lines := []
 	var sessions: Array = profile.get("sessions", [])
 	var start: Dictionary = sessions[0].get("competences_debut", {}) if not sessions.is_empty() else {}
-	for s in Data.available_skills(profile):
+	for s in Data.visible_skills(profile):
 		var now := Progression.skill_level(profile, s)
 		lines.append("%s : %d → %d sur 10" % [Data.SKILLS[s]["label"], int(start.get(s, 0)), now])
 	return lines

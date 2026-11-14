@@ -19,11 +19,14 @@ const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 const ObjectivePanel = preload("res://scripts/ui/objective_panel.gd")
 const GuidePanel = preload("res://scripts/ui/guide_panel.gd")
 const ShopPanel = preload("res://scripts/ui/shop_panel.gd")
+const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 const PausePanel = preload("res://scripts/ui/pause_panel.gd")
 const Tutorial = preload("res://scripts/ui/tutorial.gd")
 
 const SLEEP_TIME_FACTOR := 24.0 # pendant le sommeil, le temps passe 24 fois plus vite
 const SLEEP_OTHER_NEEDS := 0.25 # les autres besoins baissent moins vite en dormant
+const DREAM_PARTY_DELAY := 3.0 # secondes de calme avant de fêter le rêve réalisé
 
 var studio
 var character
@@ -49,6 +52,8 @@ var _hovered = null
 var _was_red := {}
 var _series: Dictionary = {} # série de mots en cours : {action, words, index, results}
 var _objective_announced := false
+var _dream_intro := false # le choix du rêve ouvre la partie : la suite vient après
+var _dream_wait := 0.0
 var _fps_time := 0.0
 var _fps_frames := 0
 
@@ -76,6 +81,7 @@ func _ready() -> void:
 	hud.guide_pressed.connect(_open_guide)
 	hud.objective_pressed.connect(_open_objectives)
 	hud.shop_pressed.connect(_open_shop)
+	hud.dream_pressed.connect(_open_dream)
 	typing = TypingPanel.new()
 	ui.add_child(typing)
 	typing.validated.connect(_on_typing_validated)
@@ -87,10 +93,21 @@ func _ready() -> void:
 	for n in Data.NEED_ORDER:
 		_was_red[n] = game.profile["needs"][n] < Data.RED_THRESHOLD
 	_objective_announced = Objectives.is_done(game.profile)
-	if not game.profile.get("tuto_fait", false):
+	if not Dreams.has_current(game.profile):
+		# Début de partie : l'enfant choisit d'abord son objectif de vie.
+		_dream_intro = true
+		_open_dream()
+	else:
+		_welcome()
+
+
+## Accueil : le tutoriel au premier lancement, sinon un simple bonjour.
+func _welcome() -> void:
+	var profile: Dictionary = _game().profile
+	if not profile.get("tuto_fait", false):
 		start_tutorial()
 	else:
-		hud.toast("Bonjour %s ! Clique sur un objet pour agir." % game.profile["name"], UiTheme.COL_ACCENT, 5.0)
+		hud.toast("Bonjour %s ! Clique sur un objet pour agir." % profile["name"], UiTheme.COL_ACCENT, 5.0)
 
 
 func _game():
@@ -126,10 +143,12 @@ func _process(delta: float) -> void:
 		_update_missions(profile, delta)
 		studio.set_time(profile["game_minutes"], sleeping)
 		_check_objective()
+		_check_dream(delta)
 	var fraction := -1.0
 	if _state == "acting":
 		fraction = _action_done_minutes / float(Data.ACTIONS[_action_id]["minutes"])
 	hud.update_display(profile, "" if typing.is_open() else _status_text(), fraction)
+	hud.dream_button.visible = not typing.is_open() # le panneau de frappe a besoin de la place
 	_watch_fps(delta)
 
 
@@ -583,6 +602,63 @@ func _on_objective_chosen(offer: Dictionary) -> void:
 	game.save_profile()
 
 
+# --- Mon rêve : l'objectif de vie -----------------------------------------------------------
+
+func _open_dream() -> void:
+	if typing.is_open() or _pause_menu != null:
+		return
+	var panel := DreamPanel.new()
+	panel.first = _dream_intro
+	panel.chosen.connect(_on_dream_chosen)
+	_open_overlay(panel)
+	if _dream_intro: # « Plus tard » ou « Fermer » : la partie commence quand même
+		panel.closed.connect(_end_dream_intro)
+
+
+func _end_dream_intro() -> void:
+	if _dream_intro:
+		_dream_intro = false
+		_welcome()
+
+
+func _on_dream_chosen(dream: String) -> void:
+	var game = _game()
+	game.choose_dream(dream)
+	_dream_wait = 0.0
+	_close_overlay()
+	game.play_sound("clic")
+	hud.toast("Ton rêve : %s !" % Data.DREAMS[dream]["label"].to_lower(), UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
+	var career: String = Data.DREAMS[dream]["career"]
+	if not _dream_intro and career != "" and game.profile["career"]["current"] == "":
+		hud.toast("Clique sur « Travail » et choisis : %s." % Data.CAREERS[career]["label"], UiTheme.COL_ACCENT, 6.0, "travail")
+	_end_dream_intro()
+
+
+## Le rêve est réalisé : après quelques secondes de calme, on le fête.
+func _check_dream(delta: float) -> void:
+	var game = _game()
+	if not Dreams.to_celebrate(game.profile):
+		_dream_wait = 0.0
+		return
+	if _overlay != null or _mission_panel != null or tutorial != null or typing.is_open() or _state in ["acting", "series", "typing"]:
+		return
+	_dream_wait += delta
+	if _dream_wait < DREAM_PARTY_DELAY:
+		return
+	_dream_wait = 0.0
+	var reward: Dictionary = game.claim_dream()
+	if reward.is_empty():
+		return
+	game.play_sound("bravo")
+	game.play_sound("niveau")
+	studio.burst(character.position)
+	character.play_once("celebrate", 2.5)
+	var panel := DreamPanel.new()
+	panel.reward = reward
+	panel.chosen.connect(_on_dream_chosen)
+	_open_overlay(panel)
+
+
 # --- Magasin : agrandir la maison ---------------------------------------------------------
 
 func _open_shop() -> void:
@@ -780,6 +856,10 @@ func _on_career_chosen(career: String) -> void:
 		_drop_mission()
 		profile["mission_timer"] = 3.0 # première mission très vite
 		hud.toast("Ton nouveau travail : %s !" % Data.CAREERS[career]["label"], UiTheme.COL_GOOD, 4.0)
+		var dream := Dreams.current(profile)
+		if dream != "" and Data.DREAMS[dream]["career"] == career:
+			hud.toast("C'est le travail de ton rêve !", UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
+		_game().save_profile()
 
 
 # --- Missions ---------------------------------------------------------------------------

@@ -10,6 +10,34 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.2.0] - 2026-11-14
+
+### Ajouté
+
+- **Mon rêve**, l'objectif de vie : en début de partie, l'enfant choisit son
+  grand rêve parmi 8 (devenir champion, star de la chanson, grand savant, grand
+  inventeur, maître artisan, organiser de grandes fêtes, vivre dans la nature,
+  avoir une belle maison). Un nouveau cadre « Mon rêve », sous l'objectif,
+  montre où il en est ; un clic affiche les étapes et un conseil pour la
+  prochaine. Les joueurs déjà créés choisissent leur rêve à la prochaine partie.
+- Les objectifs qui rapprochent du rêve portent la mention « Pour ton rêve »,
+  et le jeu en propose toujours un quand c'est possible.
+- Rêve réalisé : une fête, 100 pièces et 3 étoiles, puis l'enfant peut choisir
+  un nouveau rêve. Il peut aussi en changer en cours de route.
+- **5 nouvelles carrières**, avec 5 paliers et 5 missions chacune (25 nouvelles
+  missions : consigne à lire, deux choix, liste à taper) : sportif, chanteur,
+  scientifique, ingénieur, vie dans la nature. Le choix du travail présente
+  les 7 métiers avec leur pictogramme et signale celui du rêve.
+- Espace ergothérapeute : le rêve de l'enfant, son avancement, les rêves
+  réalisés et le nombre de changements de rêve (par séance et sur la durée).
+
+### Modifié
+
+- Une compétence entraînée par les missions du métier (par exemple la patience
+  pour la vie dans la nature) apparaît dans « Compétences » même sans achat au
+  magasin, avec un conseil adapté.
+- Le guide présente « Mon rêve ».
+
 ## [2.1.0] - 2026-11-13
 
 ### Ajouté

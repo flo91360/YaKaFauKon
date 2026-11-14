@@ -6,6 +6,7 @@ extends RefCounted
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 
 const CARE_ACTIONS := ["dormir", "manger", "toilettes", "douche", "dents"]
 const OFFER_COUNT := 3
@@ -68,9 +69,13 @@ static func candidates(profile: Dictionary) -> Array:
 	# Travail
 	if career == "":
 		if done >= 1:
+			var job_help := "Clique sur le bouton « Travail » en haut à droite et choisis un métier."
+			var dream := Dreams.current(profile)
+			if dream != "" and Data.DREAMS[dream]["career"] != "":
+				job_help = "Clique sur le bouton « Travail » en haut à droite. Pour ton rêve, choisis : %s." % Data.CAREERS[Data.DREAMS[dream]["career"]]["label"]
 			result.append({"type": "metier", "target": 1,
 				"label": "Choisir un métier",
-				"aide": "Clique sur le bouton « Travail » en haut à droite et choisis un métier.",
+				"aide": job_help,
 				"pieces": 20, "icone": "travail"})
 	else:
 		var n := 1 if done < 5 else 2
@@ -85,9 +90,12 @@ static func candidates(profile: Dictionary) -> Array:
 		var tier := Progression.current_tier(profile)
 		if tier < 5:
 			result.append({"type": "palier", "target": tier + 1,
-				"label": "Devenir %s" % Data.CAREERS[career]["tiers"][tier]["title"],
+				"label": "Devenir %s" % _lower_first(Data.CAREERS[career]["tiers"][tier]["title"]),
 				"aide": "Réussis %d missions et monte les compétences demandées (bouton « Travail »)." % Data.MISSIONS_PER_TIER,
 				"pieces": 50, "icone": "travail"})
+	# Les objectifs qui font avancer le rêve de l'enfant sont signalés.
+	for c in result:
+		c["reve"] = Dreams.helps(profile, c)
 	return result
 
 
@@ -116,18 +124,31 @@ static func offers(profile: Dictionary, rng: RandomNumberGenerator = null) -> Ar
 				types.erase(t)
 		_shuffle(types, rng)
 		types = ordered + types
+		# Une des propositions fait avancer le rêve, quand c'est possible.
+		var helpers := all.filter(func(c): return c["reve"])
+		if not helpers.is_empty():
+			var pick: Dictionary = helpers[rng.randi() % helpers.size()]
+			result.append(pick)
+			types.erase(pick["type"])
 	for t in types:
 		if result.size() >= OFFER_COUNT:
 			break
 		var list: Array = by_type.get(t, [])
 		if list.is_empty():
 			continue
+		var for_dream := list.filter(func(c): return c["reve"])
+		if not for_dream.is_empty(): # d'abord ce qui rapproche du rêve
+			list = for_dream
 		if t == "competence": # la compétence la plus basse, pour équilibrer
 			list.sort_custom(func(a, b): return a["target"] < b["target"])
 			var lowest: int = list[0]["target"]
 			list = list.filter(func(c): return c["target"] == lowest)
 		result.append(list[rng.randi() % list.size()])
 	return result
+
+
+static func _lower_first(text: String) -> String:
+	return text.left(1).to_lower() + text.substr(1)
 
 
 static func _shuffle(list: Array, rng: RandomNumberGenerator) -> void:

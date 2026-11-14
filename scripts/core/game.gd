@@ -9,6 +9,7 @@ signal settings_changed
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
@@ -92,6 +93,7 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"tuto_fait": false,
 		"mots_tapes": {},
 		"achats": [],
+		"reve": Dreams.new_state(),
 	}
 
 
@@ -125,6 +127,7 @@ func load_profile(data: Dictionary) -> void:
 func start_demo() -> void:
 	profile = new_profile_data("Camille", {"skin": 1, "hair": 1, "hair_style": 4, "outfit": 3, "outfit_style": 1, "eye_color": 2, "blush": 1, "mouth": 1})
 	profile["tuto_fait"] = true
+	profile["reve"]["id"] = "artisan"
 	demo_mode = true
 	start_session()
 
@@ -190,6 +193,7 @@ func _sanitize(data: Dictionary) -> Dictionary:
 		data["objectif"] = {}
 	data["tuto_fait"] = bool(data["tuto_fait"])
 	data["achats"] = Shop.clean(data["achats"])
+	data["reve"] = Dreams.clean(data["reve"])
 	for a in data["mots_tapes"]:
 		data["mots_tapes"][a] = int(data["mots_tapes"][a])
 	for c in data["career"]["tiers"]:
@@ -223,6 +227,7 @@ func start_session() -> void:
 		"series_finies": 0, "series_interrompues": 0,
 		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0,
 		"argent_depense": 0, "achats": [],
+		"reves_changes": 0, "reves_realises": [],
 	}
 	profile["sessions"].append(session)
 	_autosave_timer = 0.0
@@ -277,6 +282,28 @@ func buy(item: String) -> bool:
 	money_changed.emit(profile["money"])
 	save_profile()
 	return true
+
+
+## Choisit l'objectif de vie (« Mon rêve »). Un changement en cours de route est
+## compté dans la séance, pour l'ergothérapeute.
+func choose_dream(dream: String) -> void:
+	if Dreams.choose(profile, dream):
+		session["reves_changes"] = int(session.get("reves_changes", 0)) + 1
+	save_profile()
+
+
+## Fête le rêve qui vient d'être réalisé : verse la récompense et la renvoie
+## ({} s'il n'y a rien à fêter).
+func claim_dream() -> Dictionary:
+	var reward := Dreams.claim(profile)
+	if reward.is_empty():
+		return reward
+	add_money(reward["pieces"])
+	if not session.get("reves_realises") is Array:
+		session["reves_realises"] = []
+	session["reves_realises"].append(Dreams.current(profile))
+	save_profile()
+	return reward
 
 
 # --- Réglages de l'ordinateur, sons et musique ---------------------------------------

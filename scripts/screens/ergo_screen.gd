@@ -144,6 +144,7 @@ func _show_recap(p: Dictionary) -> void:
 		if Data.SHOP.has(id):
 			bought.append(Data.SHOP[id]["label"].to_lower())
 	_line("Maison : " + (", ".join(bought) if not bought.is_empty() else "aucun achat au magasin pour l'instant"))
+	_line(Recap.dream_line(p))
 	var career: String = p["career"]["current"]
 	if career != "":
 		_line("Travail : %s, palier %d sur 5 — argent : %d pièces" % [Data.CAREERS[career]["label"], Progression.current_tier(p), int(p["money"])])

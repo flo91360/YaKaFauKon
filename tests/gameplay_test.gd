@@ -4,6 +4,8 @@ extends SceneTree
 ## Lancer : Godot --headless --path . --script res://tests/gameplay_test.gd
 
 const GameScreen = preload("res://scripts/screens/game_screen.gd")
+const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Data = preload("res://scripts/core/data.gd")
@@ -282,6 +284,49 @@ func _run() -> void:
 	check(game.session["choix_total"] == mission["questions"].size(), "choix comptés")
 	screen._on_career_chosen("organisateur")
 	check(profile["career"]["current"] == "artisan", "changement refusé au palier 1")
+
+	print("Mon rêve : l'objectif de vie")
+	check(profile["reve"]["id"] == "artisan", "le joueur de démonstration rêve de devenir maître artisan")
+	screen.hud.dream_button.pressed.emit()
+	check(screen._overlay is DreamPanel and screen.paused, "le bouton « Mon rêve » ouvre le panneau (jeu en pause)")
+	check(screen._overlay.find_child("ChangerReve", true, false) != null, "le panneau montre les étapes du rêve")
+	screen._overlay.find_child("ChangerReve", true, false).pressed.emit()
+	await process_frame
+	await process_frame
+	check(screen._overlay.find_child("Reve_sportif", true, false) != null and screen._overlay.find_child("Reve_artisan", true, false).disabled, "les 8 rêves sont proposés, le rêve actuel est marqué")
+	screen._overlay.find_child("Reve_sportif", true, false).pressed.emit()
+	check(profile["reve"]["id"] == "sportif" and screen._overlay == null and game.session["reves_changes"] == 1, "nouveau rêve choisi, changement compté pour l'ergo")
+	screen._open_objectives()
+	check(screen._overlay.offers.any(func(o): return o["reve"]), "un objectif « pour ton rêve » est proposé")
+	screen._close_overlay()
+	screen._open_career()
+	check(screen._overlay.find_child("Choisir_sportif", true, false) == null, "palier 1 : pas encore de changement de travail")
+	screen._close_overlay()
+	profile["career"]["tiers"]["artisan"] = 2
+	screen._open_career()
+	screen._overlay._show_choice(profile, true)
+	await process_frame
+	await process_frame
+	check(screen._overlay.find_child("Choisir_sportif", true, false) != null and screen._overlay.find_child("Choisir_nature", true, false) != null, "palier 2 : les autres métiers sont proposés")
+	screen._overlay.find_child("Choisir_sportif", true, false).pressed.emit()
+	check(profile["career"]["current"] == "sportif" and Dreams.steps_done(profile) == 1, "métier du rêve choisi : première étape faite")
+	await _wait(4.5)
+	check(not screen._mission_state.is_empty() and screen._mission_state["data"]["career"] == "sportif", "les missions sont celles du nouveau métier")
+	screen._open_mission()
+	check(screen._mission_panel != null, "la mission de sportif s'ouvre")
+	screen._close_mission_panel()
+	var stars_before: int = profile["etoiles"]
+	var coins_before: int = profile["money"]
+	profile["career"]["tiers"]["sportif"] = 5
+	await _wait(1.0)
+	check(screen._overlay == null, "rêve réalisé : la fête attend un moment de calme")
+	await _wait(3.5)
+	check(screen._overlay is DreamPanel and not screen._overlay.reward.is_empty(), "rêve réalisé : le panneau de fête s'ouvre")
+	check(profile["money"] == coins_before + 100 and profile["etoiles"] == stars_before + 3, "récompense du rêve : 100 pièces et 3 étoiles")
+	check(profile["reve"]["realises"] == ["sportif"] and game.session["reves_realises"] == ["sportif"], "rêve réalisé noté dans le profil et la séance")
+	screen._close_overlay()
+	await _wait(4.0)
+	check(screen._overlay == null, "le rêve n'est fêté qu'une fois")
 
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
