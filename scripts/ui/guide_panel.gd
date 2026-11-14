@@ -11,8 +11,8 @@ const Hud = preload("res://scripts/ui/hud.gd")
 var objects: Array = []
 
 const HOW := [
-	["souris", "Clique sur le sol pour te déplacer."],
-	["souris", "Clique sur un objet pour choisir une action."],
+	["souris", "Clique sur le sol pour te déplacer, et sur un objet pour agir."],
+	["reve", "Ton grand rêve guide ta partie : clique sur « Mon rêve » pour voir les étapes."],
 	["clavier", "Recopie le mot affiché, puis appuie sur la touche Entrée."],
 	["etoile", "Dans une activité, chaque mot réussi fait monter ta compétence."],
 	["cible", "Choisis un objectif pour gagner des pièces et des étoiles."],

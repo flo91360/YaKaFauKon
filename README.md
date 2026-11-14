@@ -35,6 +35,10 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 
 ## Ce que contient le jeu
 
+- **Objectif de vie (« Mon rêve »)** : en début de partie, l'enfant choisit son grand rêve parmi 8
+  (devenir champion, star de la chanson, grand savant, grand inventeur, maître artisan, organiser de
+  grandes fêtes, vivre dans la nature, avoir une belle maison). Le jeu montre les étapes, signale les
+  objectifs qui en rapprochent, et fête le rêve réalisé (100 pièces, 3 étoiles). On peut en changer.
 - **Profils** : plusieurs enfants sur le même PC. Sauvegarde automatique locale (toutes les 20 s et en quittant).
 - **Création du personnage** par onglets : femme ou homme, taille, corpulence, peau, forme du visage,
   joues, nez, bouche, taches de rousseur, yeux (couleur, forme, sourcils, lunettes), 9 coiffures,
@@ -52,7 +56,7 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   Accents et majuscules ignorés, 1 faute admise sur un mot seul, 2 sur plusieurs mots.
   Les lettres bien tapées passent en vert, la première lettre différente en rouge (réglable).
 - **10 compétences** : physique, créativité, charisme, organisation et humour dès le départ ; logique,
-  sociabilité, patience, responsabilité et douceur avec les achats du magasin.
+  sociabilité, patience, responsabilité et douceur avec les achats du magasin ou les missions de certains métiers.
 - **Compétences par champ lexical** : dans une activité (sport, peinture, cuisine, planning, bois,
   miroir, téléphone, invités, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
   Chaque mot réussi fait monter la **barre de la compétence** ; barre pleine = un niveau de plus.
@@ -65,8 +69,9 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   et gagne des pièces et une étoile.
 - **Tutoriel** au premier lancement (on peut le passer et le revoir depuis la pause) et **Guide**
   qui présente toutes les actions possibles avec chaque objet.
-- **Carrières** : organisateur d'événements et artisan, 5 paliers chacune, changement possible
-  à partir du palier 2. Missions régulières avec consigne, choix et liste à taper.
+- **7 carrières** : organisateur d'événements, artisan, sportif, chanteur, scientifique, ingénieur et
+  vie dans la nature. 5 paliers chacune, changement possible à partir du palier 2. Missions régulières
+  (35 en tout) avec consigne, choix et liste à taper.
 - **Accessibilité** : police Lexend, gros texte, pictogrammes, bouton « Écouter » (voix du système),
   sons doux et musique réglables ou coupables.
 - **Réglages** (touche Échap) : volume des sons, de la musique, qualité des graphismes, plein écran.
@@ -82,13 +87,13 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
   nouvelle mesure de la vitesse, suppression du profil.
 - **Récapitulatif** : par séance datée (vitesse moyenne, types d'erreurs, temps de jeu,
   missions, tâches terminées/abandonnées, mots de champ lexical par activité, séries terminées ou
-  arrêtées, objectifs choisis/atteints, achats au magasin, temps dans le rouge) et sur la durée
+  arrêtées, objectifs choisis/atteints, achats au magasin, rêve réalisé ou changé, temps dans le rouge) et sur la durée
   (évolution de la vitesse, persévérance, gestion de vie, compétences), avec un résumé en mots-clés.
   Rien n'est envoyé en ligne.
 
 ## Tests
 
-364 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+521 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
@@ -103,13 +108,13 @@ Release avec la section correspondante de `CHANGELOG.md`.
 
 ## Organisation du code
 
-- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, magasin, sauvegarde, récapitulatif.
+- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, objectif de vie (`dreams.gd`), magasin, sauvegarde, récapitulatif.
 - `scripts/world/` : studio (décor, lumière, caméra, effets), meubles, personnage articulé, formes 3D.
-- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, magasin, guide, tutoriel, pause).
+- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, rêve, magasin, guide, tutoriel, pause).
 - `scripts/screens/` : écrans (joueurs, création, jeu, ergothérapeute).
 - `tools/` : scripts Python qui fabriquent les textures, les pictogrammes, les sons et la musique.
 - Pour ajouter une activité, des mots, une compétence, une mission ou une carrière : `scripts/core/data.gd`
-  (les listes de mots sont dans `LEXIQUE`). Pour un nouvel achat du magasin : `SHOP` dans `data.gd`
+  (les listes de mots sont dans `LEXIQUE`, les carrières dans `CAREERS` et `CAREER_ORDER`, les rêves dans `DREAMS`). Pour un nouvel achat du magasin : `SHOP` dans `data.gd`
   et son décor dans `add_purchase` de `scripts/world/studio.gd`.
 
-Pas encore dans le jeu : objectif de vie, autres carrières, ressources à récolter, relations et famille, plateforme en ligne.
+Pas encore dans le jeu : ressources à récolter, relations et famille (et le rêve « fonder une famille »), plateforme en ligne.

@@ -6,6 +6,7 @@ extends SceneTree
 const Recap = preload("res://scripts/core/recap.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Data = preload("res://scripts/core/data.gd")
+const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
 
 var _fails := 0
 var _count := 0
@@ -40,6 +41,10 @@ func _run() -> void:
 	game.profile["typing"]["level"] = 3
 	check(game.buy("lecture") and game.profile["money"] == 15, "achat au magasin : 40 pièces dépensées")
 	check(not game.buy("chat"), "achat refusé sans assez de pièces")
+	check(game.profile["reve"] == {"id": "", "fete": false, "changements": 0, "realises": []}, "nouveau profil : pas encore de rêve")
+	game.choose_dream("maison")
+	game.choose_dream("artisan")
+	check(game.session["reves_changes"] == 1, "changement de rêve noté dans la séance")
 	game.session["duree_sec"] = 300.0
 	game.session["frappes_ok"] = 10
 	game.session["caracteres"] = 100
@@ -58,6 +63,15 @@ func _run() -> void:
 	check(is_equal_approx(p["needs"]["faim"], 12.0), "les jauges reprennent où l'enfant s'était arrêté")
 	check(p["money"] == 15 and typeof(p["money"]) == TYPE_INT, "argent conservé (entier)")
 	check(p["achats"] == ["lecture"], "achats du magasin conservés")
+	check(p["reve"]["id"] == "artisan" and p["reve"]["changements"] == 1 and typeof(p["reve"]["changements"]) == TYPE_INT, "rêve et nombre de changements conservés")
+	check(Recap.dream_line(p) == "Rêve : devenir maître artisan, 2 étape(s) sur 5 — changé 1 fois en cours de route", "rêve visible pour l'ergo")
+	check(Recap.session_lines(p["sessions"][0]).has("A changé de rêve : 1 fois"), "changement de rêve dans le récapitulatif de la séance")
+	p["career"]["tiers"]["artisan"] = 5
+	var reward: Dictionary = game.claim_dream()
+	check(reward.get("pieces", 0) == 100 and p["money"] == 115 and p["etoiles"] == 3, "rêve réalisé : 100 pièces et 3 étoiles versées")
+	check(game.session["reves_realises"] == ["artisan"] and game.claim_dream().is_empty(), "rêve réalisé noté dans la séance, une seule fois")
+	p["career"]["tiers"]["artisan"] = 2
+	p["money"] = 15
 	check(p["sessions"][0].get("achats", []) == ["lecture"] and int(p["sessions"][0]["argent_depense"]) == 40, "achat noté dans la séance pour l'ergo")
 	check(Recap.session_lines(p["sessions"][0]).any(func(l): return l.begins_with("Achats au magasin : coin lecture")), "achat visible dans le récapitulatif")
 	check(Progression.skill_level(p, "physique") == 2, "compétences conservées")
@@ -107,13 +121,17 @@ func _run() -> void:
 	check(Progression.setting(o, "tolerance") == "large" and Progression.setting(o, "aide_couleur") == "oui", "réglages conservés et complétés")
 	check(o["tuto_fait"] == false and o["etoiles"] == 0 and o["objectif"].is_empty(), "nouveautés prêtes : tutoriel à voir, pas d'objectif")
 	check(o["achats"] == [] and o["skills_xp"].has("douceur"), "version 2.1 : pas encore d'achat, nouvelles compétences à zéro")
+	check(o["reve"]["id"] == "" and o["reve"]["realises"] == [], "version 2.2 : le rêve reste à choisir")
 	check(Recap.session_lines(o["sessions"][0]).size() >= 8 and Recap.keywords(o).size() > 0, "récapitulatif des anciennes séances lisible")
 	check(game.session.has("series_finies") and Recap.session_lines(game.session).size() >= 11, "nouvelles statistiques dans la séance en cours")
 	var screen = load("res://scripts/screens/game_screen.gd").new()
 	root.add_child(screen)
 	await process_frame
 	await process_frame
-	check(screen.character != null and screen.tutorial != null, "le jeu s'ouvre avec l'ancien profil et propose le tutoriel")
+	check(screen.character != null and screen._overlay is DreamPanel and screen.tutorial == null, "le jeu s'ouvre avec l'ancien profil et demande d'abord le rêve")
+	screen._overlay.find_child("Reve_nature", true, false).pressed.emit()
+	await process_frame
+	check(o["reve"]["id"] == "nature" and screen._overlay == null and screen.tutorial != null, "rêve choisi : le tutoriel commence")
 	screen.queue_free()
 	await process_frame
 	game.close_profile()

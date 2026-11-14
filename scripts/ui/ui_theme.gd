@@ -28,6 +28,15 @@ const SKILL_COLORS := {
 	"responsabilite": Color(0.4, 0.45, 0.72), "douceur": Color(0.45, 0.76, 0.86),
 }
 
+## Couleur de chaque carrière (et du rêve qui va avec).
+const CAREER_COLORS := {
+	"organisateur": Color(0.25, 0.68, 0.68), "artisan": Color(0.95, 0.6, 0.35),
+	"sportif": Color(0.93, 0.45, 0.38), "chanteur": Color(0.93, 0.5, 0.68),
+	"scientifique": Color(0.36, 0.56, 0.86), "ingenieur": Color(0.6, 0.48, 0.84),
+	"nature": Color(0.36, 0.72, 0.45), "maison": Color(0.9, 0.66, 0.16),
+}
+const COL_DREAM := Color(0.9, 0.66, 0.16)
+
 
 static func build() -> Theme:
 	var theme := Theme.new()

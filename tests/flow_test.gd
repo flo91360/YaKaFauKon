@@ -7,6 +7,7 @@ const MainScript = preload("res://scripts/main.gd")
 const ProfileScreen = preload("res://scripts/screens/profile_screen.gd")
 const CreateProfileScreen = preload("res://scripts/screens/create_profile_screen.gd")
 const GameScreen = preload("res://scripts/screens/game_screen.gd")
+const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
 const ErgoScreen = preload("res://scripts/screens/ergo_screen.gd")
 
 var _fails := 0
@@ -52,6 +53,21 @@ func _run() -> void:
 	await _frames()
 	check(main._screen is GameScreen, "le jeu démarre avec le nouveau joueur")
 	var id: String = game.profile["id"]
+	var play = main._screen
+	check(play._overlay is DreamPanel and play.paused and play.tutorial == null, "début de partie : choix du rêve avant le tutoriel")
+	play._overlay.find_child("PlusTard", true, false).pressed.emit()
+	await _frames()
+	check(play._overlay == null and game.profile["reve"]["id"] == "" and play.tutorial != null, "« Plus tard » : pas de rêve, le tutoriel commence")
+	play.hud.dream_button.pressed.emit()
+	await _frames()
+	check(play._overlay is DreamPanel, "le bouton « Mon rêve » rouvre le choix")
+	play._overlay.find_child("Reve_chanteur", true, false).pressed.emit()
+	await _frames()
+	check(play._overlay == null and game.profile["reve"]["id"] == "chanteur", "rêve choisi et enregistré")
+	play._open_dream()
+	await _frames()
+	check(play._overlay.find_child("ChangerReve", true, false) != null, "rêve choisi : le panneau montre les étapes")
+	play._close_overlay()
 	main._screen._toggle_pause()
 	check(main._screen.paused, "pause")
 	main._screen.quit_to_profiles.emit()
@@ -77,6 +93,10 @@ func _run() -> void:
 	check(saved.get("settings", {}).get("tolerance", "") == "large", "réglage de l'ergo enregistré sur le disque")
 	ergo._select(index, "recap")
 	check(ergo._content.get_child_count() > 3, "récapitulatif affiché")
+	var dream_shown := false
+	for l in ergo._content.find_children("*", "Label", true, false):
+		dream_shown = dream_shown or l.text.begins_with("Rêve : devenir une star de la chanson")
+	check(dream_shown, "le rêve de l'enfant est dans le récapitulatif")
 	game.delete_profile(id)
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])

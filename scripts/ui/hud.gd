@@ -9,11 +9,13 @@ signal mission_pressed
 signal guide_pressed
 signal objective_pressed
 signal shop_pressed
+signal dream_pressed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 
 const NEED_COLORS := {"faim": Color(0.93, 0.55, 0.3), "sommeil": Color(0.45, 0.5, 0.85), "toilettes": Color(0.3, 0.68, 0.7),
 	"hygiene": Color(0.35, 0.62, 0.9), "social": Color(0.9, 0.5, 0.68)}
@@ -41,6 +43,11 @@ var _obj_bar: ProgressBar
 var _obj_progress: Label
 var _obj_button: Button
 var _obj_reward: Label
+var dream_button: Button
+var _dream_badge: PanelContainer
+var _dream_text: Label
+var _dream_bar: ProgressBar
+var _dream_count: Label
 var _time := 0.0
 var _shown_money := -1.0
 
@@ -113,6 +120,54 @@ func _ready() -> void:
 	_obj_button.focus_mode = Control.FOCUS_NONE
 	_obj_button.pressed.connect(func(): objective_pressed.emit())
 	obj_box.add_child(_obj_button)
+
+	# --- Mon rêve : l'objectif de vie (sous l'objectif en cours) ---
+	dream_button = Button.new()
+	dream_button.focus_mode = Control.FOCUS_NONE
+	dream_button.custom_minimum_size = Vector2(318, 88)
+	dream_button.tooltip_text = "Ton grand rêve : clique pour voir les étapes"
+	dream_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var dream_style := _panel_style(14, 10)
+	for state in ["normal", "pressed", "focus"]:
+		dream_button.add_theme_stylebox_override(state, dream_style)
+	var dream_hover: StyleBoxFlat = dream_style.duplicate()
+	dream_hover.bg_color = Color(1.0, 0.96, 0.84, 0.97)
+	dream_button.add_theme_stylebox_override("hover", dream_hover)
+	dream_button.pressed.connect(func(): dream_pressed.emit())
+	left.add_child(dream_button)
+	var dream_box := VBoxContainer.new()
+	dream_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dream_box.offset_left = 14
+	dream_box.offset_right = -14
+	dream_box.offset_top = 8
+	dream_box.offset_bottom = -10
+	dream_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	dream_box.add_theme_constant_override("separation", 3)
+	dream_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dream_button.add_child(dream_box)
+	var dream_head := HBoxContainer.new()
+	dream_head.add_theme_constant_override("separation", 8)
+	dream_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dream_box.add_child(dream_head)
+	_dream_badge = UiTheme.badge("reve", UiTheme.COL_DREAM, 28)
+	dream_head.add_child(_dream_badge)
+	var dream_title := UiTheme.label("Mon rêve", 17, UiTheme.COL_TEXT.lightened(0.25))
+	dream_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	dream_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dream_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dream_head.add_child(dream_title)
+	_dream_count = UiTheme.label("", 16, UiTheme.COL_TEXT.lightened(0.15))
+	_dream_count.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_dream_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dream_head.add_child(_dream_count)
+	_dream_text = UiTheme.label("", 17)
+	_dream_text.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_dream_text.clip_text = true
+	_dream_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_dream_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dream_box.add_child(_dream_text)
+	_dream_bar = UiTheme.bar(UiTheme.COL_DREAM, 10.0)
+	dream_box.add_child(_dream_bar)
 
 	# --- Pièces, étoiles, heure et boutons (en haut à droite) ---
 	var right := VBoxContainer.new()
@@ -257,6 +312,7 @@ func update_display(profile: Dictionary, status_text: String, action_fraction :=
 	_status_panel.offset_top = -86.0 if action_fraction >= 0.0 else -62.0
 	_action_bar.value = clampf(action_fraction, 0.0, 1.0)
 	_update_objective(profile)
+	_update_dream(profile)
 	# Le bouton du magasin brille quand l'enfant peut s'offrir quelque chose.
 	var can_buy := false
 	for id in Data.SHOP_ORDER:
@@ -288,6 +344,23 @@ func _update_objective(profile: Dictionary) -> void:
 		_obj_button.text = "Choisir un objectif"
 		_obj_button.modulate = Color(1, 1, 1).lerp(Color(1.2, 1.15, 1.0), 0.5 + 0.5 * sin(_time * 3.0))
 		UiTheme.set_bar_color(_obj_bar, UiTheme.COL_CORAL)
+
+
+func _update_dream(profile: Dictionary) -> void:
+	var dream := Dreams.current(profile)
+	var has := dream != ""
+	_dream_bar.visible = has
+	_dream_count.visible = has
+	if not has:
+		_dream_text.text = "Clique ici pour le choisir"
+		dream_button.modulate = Color(1, 1, 1).lerp(Color(1.2, 1.15, 1.0), 0.5 + 0.5 * sin(_time * 3.0))
+		return
+	var done := Dreams.is_done(profile)
+	_dream_text.text = "Réalisé ! Bravo !" if done else Data.DREAMS[dream]["label"]
+	_dream_bar.value = lerpf(_dream_bar.value, Dreams.fraction(profile), 0.15)
+	_dream_count.text = "%d / %d" % [Dreams.steps_done(profile), Dreams.steps(profile).size()]
+	_dream_badge.get_child(0).texture = UiTheme.icon_texture("coupe" if done else "reve")
+	dream_button.modulate = Color.WHITE
 
 
 func set_mission_available(on: bool) -> void:

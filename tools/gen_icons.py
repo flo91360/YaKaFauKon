@@ -355,6 +355,47 @@ def maison(d):
     box(d, 68, 14, 80, 40, 2)
 
 
+@icon
+def marteau(d):  # artisan
+    box(d, 18, 12, 82, 38, 6)
+    box(d, 8, 18, 24, 32, 3)
+    box(d, 43, 34, 57, 94, 5)
+
+
+@icon
+def fiole(d):  # scientifique
+    box(d, 36, 6, 64, 14, 3)
+    box(d, 41, 12, 59, 44, 0)
+    poly(d, [(41, 40), (59, 40), (86, 86), (80, 94), (20, 94), (14, 86)])
+    disc(d, 44, 72, 5, 0); disc(d, 58, 82, 4, 0); disc(d, 56, 62, 3, 0)
+
+
+@icon
+def feuille(d):  # vie dans la nature
+    d.pieslice([P(-10), P(-30), P(90), P(70)], 0, 90, fill=255)
+    d.pieslice([P(10), P(10), P(110), P(110)], 180, 270, fill=255)
+    line(d, [(16, 90), (40, 62), (66, 36)], 5, 0)
+    line(d, [(10, 96), (22, 84)], 6)
+
+
+@icon
+def reve(d):  # étoile filante : le grand rêve
+    star(d, 62, 40, 32)
+    line(d, [(8, 92), (34, 66)], 7)
+    line(d, [(8, 66), (24, 52)], 5)
+    line(d, [(34, 94), (48, 80)], 5)
+
+
+@icon
+def coupe(d):  # rêve réalisé
+    box(d, 28, 8, 72, 16, 3)
+    d.pieslice([P(28), P(-26), P(72), P(58)], 0, 180, fill=255)
+    box(d, 28, 10, 72, 18, 0)
+    arc(d, 26, 26, 14, 90, 270, 6); arc(d, 74, 26, 14, 270, 90, 6)
+    box(d, 45, 54, 55, 76, 0)
+    box(d, 30, 76, 70, 92, 4)
+
+
 def main():
     os.makedirs(DIR, exist_ok=True)
     for name, f in ICONS.items():

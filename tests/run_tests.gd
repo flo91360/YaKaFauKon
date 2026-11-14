@@ -7,6 +7,8 @@ const Progression = preload("res://scripts/core/progression.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
+const Recap = preload("res://scripts/core/recap.gd")
 
 var _fails := 0
 var _count := 0
@@ -23,6 +25,8 @@ func _init() -> void:
 	_test_appearance()
 	_test_objectives()
 	_test_shop()
+	_test_new_careers()
+	_test_dreams()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -326,3 +330,126 @@ func _test_objectives() -> void:
 			seen[o["type"]] = true
 		varied = varied and offers.size() == 3 and seen.size() == 3
 	check(varied, "toujours 3 propositions de types différents")
+
+
+func _test_new_careers() -> void:
+	print("Carrières : les 7 métiers")
+	check(Data.CAREER_ORDER.size() == 7 and Data.CAREERS.size() == 7, "7 carrières")
+	for c in Data.CAREER_ORDER:
+		check(Data.CAREERS.has(c), "carrière %s : dans la liste" % c)
+		var info: Dictionary = Data.CAREERS[c]
+		check(FileAccess.file_exists("res://icons/%s.png" % info["icone"]), "carrière %s : pictogramme présent" % c)
+		var skills_ok := true
+		for s in info["mission_skills"]:
+			skills_ok = skills_ok and Data.SKILLS.has(s)
+		var rising := true
+		var previous := {}
+		for t in info["tiers"]:
+			for s in t["req"]:
+				skills_ok = skills_ok and Data.SKILLS.has(s) and int(t["req"][s]) <= Data.SKILL_MAX and info["mission_skills"].has(s)
+				rising = rising and int(t["req"][s]) > int(previous.get(s, 0))
+			for s in previous:
+				rising = rising and t["req"].has(s)
+			previous = t["req"]
+		check(skills_ok, "carrière %s : compétences connues, entraînées par ses missions" % c)
+		check(rising and info["tiers"][0]["req"].is_empty(), "carrière %s : exigences de plus en plus hautes" % c)
+		check(Data.missions_for(c, 1).size() == 3 and Data.missions_for(c, 2).size() == 4 and Data.missions_for(c, 5).size() == 5, "carrière %s : 3 missions au départ, 5 en tout" % c)
+	var ids := {}
+	var texts_ok := true
+	for m in Data.MISSIONS:
+		ids[m["id"]] = true
+		texts_ok = texts_ok and Data.CAREERS.has(m["career"]) and m["questions"].size() == 2
+		for q in m["questions"]:
+			texts_ok = texts_ok and q["choices"].size() == 3 and q["aide"] != ""
+		for it in m["items"]:
+			texts_ok = texts_ok and it[0].length() < it[1].length() and it[1].length() < it[2].length()
+			for text in it:
+				texts_ok = texts_ok and not text.contains("œ") and text == text.strip_edges()
+	check(ids.size() == Data.MISSIONS.size() and Data.MISSIONS.size() == 35, "35 missions, toutes avec un nom différent")
+	check(texts_ok, "missions : 2 questions à 3 choix, textes de plus en plus longs, sans « œ »")
+	# Une compétence qui ne vient que du travail se voit quand même.
+	var p := _profile()
+	check(not "patience" in Data.visible_skills(p), "sans travail ni achat : la patience n'est pas montrée")
+	Progression.choose_career(p, "nature")
+	check("patience" in Data.visible_skills(p) and "douceur" in Data.visible_skills(p), "vie dans la nature : patience et douceur sont montrées")
+	check(not "patience" in Data.available_skills(p), "mais pas d'objectif dessus tant qu'aucune activité ne l'entraîne")
+	check(Data.skill_help("patience", p).contains("missions de travail") and Data.skill_help("patience", p).contains("terrasse"), "conseil : les missions, et la terrasse au magasin")
+	p["skills_xp"]["physique"] = Data.xp_for_level(2)
+	p["skills_xp"]["patience"] = Data.xp_for_level(1)
+	var promoted := false
+	for i in Data.MISSIONS_PER_TIER:
+		promoted = Progression.complete_mission(p)
+	check(promoted and Progression.current_tier(p) == 2 and Progression.salary(p) == 35, "vie dans la nature : palier 2 après 3 missions")
+	Progression.choose_career(p, "sportif")
+	check("patience" in Data.visible_skills(p), "une compétence déjà commencée reste visible après un changement de travail")
+
+
+func _test_dreams() -> void:
+	print("Objectif de vie (« Mon rêve »)")
+	var p := _profile()
+	p["etoiles"] = 0
+	p["achats"] = []
+	check(not Dreams.has_current(p) and Dreams.steps(p).is_empty() and Dreams.fraction(p) == 0.0, "au départ : pas de rêve")
+	check(Data.DREAM_ORDER.size() == Data.DREAMS.size(), "tous les rêves sont proposés")
+	var careers_covered := {}
+	for d in Data.DREAM_ORDER:
+		var career: String = Data.DREAMS[d]["career"]
+		check(career == "" or Data.CAREERS.has(career), "rêve %s : carrière connue" % d)
+		check(FileAccess.file_exists("res://icons/%s.png" % Data.dream_icon(d)), "rêve %s : pictogramme présent" % d)
+		careers_covered[career] = true
+	check(careers_covered.size() == Data.CAREERS.size() + 1, "un rêve par carrière, plus la maison")
+	check(not Dreams.choose(p, "inconnu") and not Dreams.has_current(p), "rêve inconnu refusé")
+	check(not Dreams.choose(p, "sportif") and Dreams.current(p) == "sportif", "premier choix : ce n'est pas un changement")
+	check(Dreams.steps(p).size() == 5 and Dreams.steps_done(p) == 0, "rêve de métier : 5 étapes")
+	check(Dreams.next_step(p) == "Choisir le travail : Sportif" and Dreams.advice(p).contains("Travail"), "première étape : choisir le travail")
+	# Les objectifs qui rapprochent du rêve sont signalés
+	p["objectifs_finis"] = 2
+	p["objectifs_choisis"] = 2
+	var helping := Objectives.candidates(p).filter(func(o): return o["reve"]).map(func(o): return o["type"])
+	check(helping == ["metier"], "sans travail : l'objectif « choisir un métier » aide le rêve")
+	check(Objectives.candidates(p).filter(func(o): return o["type"] == "metier")[0]["aide"].contains("Sportif"), "l'aide cite le métier du rêve")
+	Progression.choose_career(p, "artisan")
+	check(Dreams.steps_done(p) == 0 and Dreams.advice(p).contains("palier 2"), "autre travail : il faut le palier 2 avant de changer")
+	helping = Objectives.candidates(p).filter(func(o): return o["reve"]).map(func(o): return o["type"])
+	check("missions" in helping and "palier" in helping and not "competence" in helping, "les missions de l'autre travail aident à pouvoir changer")
+	p["career"]["tiers"]["artisan"] = 2
+	Progression.choose_career(p, "sportif")
+	check(Dreams.steps_done(p) == 1 and is_equal_approx(Dreams.fraction(p), 0.2), "travail du rêve choisi : 1 étape sur 5")
+	var skills_help: Array = Objectives.candidates(p).filter(func(o): return o["reve"] and o["type"] == "competence").map(func(o): return o["skill"])
+	check(skills_help == ["physique"], "la compétence demandée au palier suivant aide le rêve")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var always := true
+	for i in 30:
+		var offers := Objectives.offers(p, rng)
+		var kinds := {}
+		for o in offers:
+			kinds[o["type"]] = true
+		always = always and offers.size() == 3 and kinds.size() == 3 and offers.any(func(o): return o["reve"])
+	check(always, "toujours une proposition pour le rêve, et 3 types différents")
+	p["career"]["tiers"]["sportif"] = 4
+	check(Dreams.steps_done(p) == 4 and Dreams.next_step(p) == "Devenir champion" and not Dreams.is_done(p), "palier 4 : il reste à devenir champion")
+	check(Dreams.claim(p).is_empty(), "pas de récompense avant la fin")
+	check(Recap.dream_line(p) == "Rêve : devenir champion, 4 étape(s) sur 5", "ligne du récapitulatif en cours de route")
+	p["career"]["tiers"]["sportif"] = 5
+	check(Dreams.is_done(p) and Dreams.to_celebrate(p) and Dreams.next_step(p) == "" and Dreams.advice(p) == "", "palier 5 : rêve réalisé")
+	var reward := Dreams.claim(p)
+	check(reward.get("pieces", 0) == Data.DREAM_REWARD_PIECES and p["etoiles"] == Data.DREAM_REWARD_STARS, "récompense : pièces et étoiles")
+	check(not Dreams.to_celebrate(p) and Dreams.claim(p).is_empty() and Dreams.achieved(p) == ["sportif"], "le rêve n'est fêté qu'une fois")
+	check(Objectives.candidates(p).filter(func(o): return o["reve"]).is_empty(), "rêve réalisé : plus d'objectif signalé")
+	# Un nouveau rêve après le premier
+	check(not Dreams.choose(p, "maison") and p["reve"]["changements"] == 0, "nouveau rêve après un rêve réalisé : pas compté comme un changement")
+	check(Dreams.steps(p).size() == Data.SHOP_ORDER.size() and Dreams.advice(p).contains("Magasin"), "rêve « maison » : une étape par achat")
+	p["money"] = 45
+	Shop.buy(p, "lecture")
+	check(Dreams.steps_done(p) == 1 and Dreams.next_step(p) == "Acheter : table de jeux", "un achat = une étape")
+	check("achat" in Objectives.candidates(p).filter(func(o): return o["reve"]).map(func(o): return o["type"]), "rêve « maison » : l'objectif d'achat est signalé")
+	check(Dreams.choose(p, "chanteur") and p["reve"]["changements"] == 1, "changer de rêve en cours de route est compté")
+	check(Recap.dream_line(p).contains("déjà réalisé : devenir champion") and Recap.dream_line(p).contains("changé 1 fois"), "récapitulatif : rêve réalisé et changement notés")
+	Dreams.choose(p, "sportif")
+	check(not Dreams.to_celebrate(p) and Dreams.is_done(p), "revenir à un rêve déjà réalisé ne le fête pas deux fois")
+	# Sauvegardes
+	var cleaned := Dreams.clean({"id": "licorne", "changements": 2.0, "realises": ["sportif", "sportif", "x"], "fete": true})
+	check(cleaned == {"id": "", "fete": false, "changements": 2, "realises": ["sportif"]}, "état relu d'une sauvegarde : remis en ordre")
+	check(Dreams.clean(null) == Dreams.new_state() and Dreams.clean({"id": "maison"})["id"] == "maison", "sauvegarde sans rêve : état neuf")
+	check(Recap.session_lines({"reves_realises": ["sportif"], "reves_changes": 1}).filter(func(l): return l.to_lower().contains("rêve")).size() == 2, "séance : rêve réalisé et changement dans le récapitulatif")

@@ -18,7 +18,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 10)
 	UiTheme.header(box, "Mes compétences", func(): closed.emit(), "etoile", UiTheme.COL_PURPLE)
 
-	var available := Data.available_skills(profile)
+	var available := Data.visible_skills(profile)
 	var locked := []
 	for s in Data.SKILLS:
 		if not s in available:
@@ -50,7 +50,7 @@ func _ready() -> void:
 		var names := []
 		for s in locked:
 			names.append(Data.SKILLS[s]["label"].to_lower())
-		var text := "À découvrir avec le magasin : %s." % ", ".join(names)
+		var text := "À découvrir avec le magasin ou un travail : %s." % ", ".join(names)
 		var label := UiTheme.label(text, 19, UiTheme.COL_TEXT.lightened(0.15))
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(label)

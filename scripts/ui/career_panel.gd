@@ -9,6 +9,7 @@ signal mission_requested
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
+const Dreams = preload("res://scripts/core/dreams.gd")
 
 var mission_available := false
 var _box: VBoxContainer
@@ -17,7 +18,8 @@ var _box: VBoxContainer
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	UiTheme.shade(self)
-	_box = UiTheme.centered_panel(self, 900)
+	_box = UiTheme.centered_panel(self, 1180)
+	_box.add_theme_constant_override("separation", 10)
 	var profile: Dictionary = get_node("/root/Game").profile
 	if profile["career"]["current"] == "":
 		_show_choice(profile, false)
@@ -30,8 +32,8 @@ func _clear() -> void:
 		c.queue_free()
 
 
-func _header(text: String) -> void:
-	UiTheme.header(_box, text, func(): closed.emit(), "travail", UiTheme.COL_ORANGE)
+func _header(text: String, icon_name := "travail", color := UiTheme.COL_ORANGE) -> void:
+	UiTheme.header(_box, text, func(): closed.emit(), icon_name, color)
 
 
 func _card() -> VBoxContainer:
@@ -55,29 +57,71 @@ func _show_choice(profile: Dictionary, changing: bool) -> void:
 	_clear()
 	_header("Change de travail" if changing else "Choisis ton travail")
 	if changing:
-		_box.add_child(UiTheme.label("Tu gardes ton palier actuel. Le nouveau travail commence au palier 1 (ou reprend là où tu l'avais laissé). Tes compétences restent.", 20))
-	for c in Data.CAREERS:
+		_box.add_child(UiTheme.label("Tu gardes ton palier actuel. Le nouveau travail commence au palier 1 (ou reprend là où tu l'avais laissé). Tes compétences restent.", 19))
+	var dream_career := _dream_career(profile)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	_box.add_child(grid)
+	for c in Data.CAREER_ORDER:
 		if c == profile["career"]["current"]:
 			continue
-		var info: Dictionary = Data.CAREERS[c]
-		var v := _card()
-		var row := HBoxContainer.new()
-		v.add_child(row)
-		var name_label := UiTheme.label(info["label"], 28)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_label)
-		row.add_child(UiTheme.speak_button(func(): return info["label"] + ". " + info["description"]))
-		v.add_child(UiTheme.label(info["description"], 22))
-		var known: int = profile["career"]["tiers"].get(c, 0)
-		if known > 0:
-			v.add_child(UiTheme.label("Tu étais au palier %d." % known, 20, UiTheme.COL_ACCENT))
-		var choose := UiTheme.button("Choisir ce travail", UiTheme.COL_GOOD)
-		choose.pressed.connect(func(): career_chosen.emit(c))
-		v.add_child(choose)
+		grid.add_child(_career_card(profile, c, c == dream_career))
 	if changing:
 		var back := UiTheme.button("Retour", Color(0.6, 0.62, 0.68))
 		back.pressed.connect(func(): _show_status(profile))
 		_box.add_child(back)
+
+
+## Carrière du rêve en cours ("" si le rêve n'est pas un métier).
+func _dream_career(profile: Dictionary) -> String:
+	var dream := Dreams.current(profile)
+	return Data.DREAMS[dream]["career"] if dream != "" else ""
+
+
+func _career_card(profile: Dictionary, c: String, is_dream: bool) -> Control:
+	var info: Dictionary = Data.CAREERS[c]
+	var color: Color = UiTheme.CAREER_COLORS.get(c, UiTheme.COL_ORANGE)
+	var card := UiTheme.card(Color(1.0, 0.96, 0.82) if is_dream else UiTheme.COL_SOFT, 14)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(560, 0)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	card.add_child(row)
+	row.add_child(UiTheme.badge(info["icone"], color, 50))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 2)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	v.add_child(name_row)
+	var name_label := UiTheme.label(info["label"], 23)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	name_row.add_child(name_label)
+	if is_dream:
+		name_row.add_child(UiTheme.icon("reve", 24, UiTheme.COL_DREAM))
+		var dream_label := UiTheme.label("ton rêve", 17, UiTheme.COL_DREAM.darkened(0.25))
+		dream_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		name_row.add_child(dream_label)
+	var description: String = info["description"]
+	var known: int = profile["career"]["tiers"].get(c, 0)
+	if known > 0:
+		description += " Tu étais au palier %d." % known
+	var text := UiTheme.label(description, 17, UiTheme.COL_TEXT.lightened(0.15))
+	text.custom_minimum_size = Vector2(0, 46)
+	v.add_child(text)
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 4)
+	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(side)
+	var choose := UiTheme.icon_button("coche", "Choisir", UiTheme.COL_GOOD, 19)
+	choose.name = "Choisir_" + c
+	choose.pressed.connect(func(): career_chosen.emit(c))
+	side.add_child(choose)
+	side.add_child(UiTheme.speak_button(func(): return info["label"] + ". " + description))
+	return card
 
 
 func _show_status(profile: Dictionary) -> void:
@@ -86,7 +130,15 @@ func _show_status(profile: Dictionary) -> void:
 	var info: Dictionary = Data.CAREERS[c]
 	var tier := Progression.current_tier(profile)
 	var tier_info: Dictionary = info["tiers"][tier - 1]
-	_header(info["label"])
+	_header(info["label"], info["icone"], UiTheme.CAREER_COLORS.get(c, UiTheme.COL_ORANGE))
+	if c == _dream_career(profile):
+		var dream_row := HBoxContainer.new()
+		dream_row.add_theme_constant_override("separation", 8)
+		_box.add_child(dream_row)
+		dream_row.add_child(UiTheme.icon("reve", 26, UiTheme.COL_DREAM))
+		var dream_label := UiTheme.label("C'est le travail de ton rêve : chaque palier te rapproche de lui.", 20, UiTheme.COL_DREAM.darkened(0.3))
+		dream_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dream_row.add_child(dream_label)
 
 	var v := _card()
 	v.add_child(UiTheme.label("Palier %d sur 5 : %s" % [tier, tier_info["title"]], 26))

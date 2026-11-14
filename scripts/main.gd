@@ -117,9 +117,20 @@ func _start_demo(args: Array) -> void:
 			var Data = load("res://scripts/core/data.gd")
 			var wanted: Array = Data.SHOP_ORDER.duplicate() if a.substr(9) == "tout" else Array(a.substr(9).split(","))
 			_game().profile["achats"] = load("res://scripts/core/shop.gd").clean(wanted)
+		if a.begins_with("--objectifs-finis="):
+			_game().profile["objectifs_finis"] = int(a.substr(18))
+			_game().profile["objectifs_choisis"] = int(a.substr(18))
+		if a.begins_with("--reve="): # ex. --reve=sportif ; --reve= : pas encore choisi
+			_game().profile["reve"]["id"] = a.substr(7)
+		if a.begins_with("--metier="): # ex. --metier=sportif:3 (carrière et palier)
+			var job: PackedStringArray = a.substr(9).split(":")
+			var tier := int(job[1]) if job.size() > 1 else 1
+			_game().profile["career"] = {"current": job[0], "tiers": {job[0]: tier}, "missions": {job[0]: 1}}
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
+	if "--demo-reve" in args:
+		screen._open_dream()
 	if "--demo-competences" in args:
 		var profile: Dictionary = _game().profile
 		profile["skills_xp"]["physique"] = 130.0
@@ -129,9 +140,15 @@ func _start_demo(args: Array) -> void:
 	if "--demo-travail" in args:
 		screen._open_career()
 	if "--demo-mission" in args:
-		screen._on_career_chosen("organisateur")
+		if _game().profile["career"]["current"] == "":
+			screen._on_career_chosen("organisateur")
 		_game().profile["mission_timer"] = 0.0
 		await get_tree().create_timer(0.3).timeout
+		for a in args:
+			if a.begins_with("--mission="): # ex. --mission=robot : cette mission précise
+				for m in load("res://scripts/core/data.gd").MISSIONS:
+					if m["id"] == a.substr(10):
+						screen._mission_state["data"] = m
 		screen._open_mission()
 		screen._mission_panel.state["step"] = "question"
 		screen._mission_panel.refresh()
@@ -187,6 +204,7 @@ func _demo_profiles() -> Array:
 	var p: Dictionary = _game().new_profile_data("Léo", {"skin": 2, "hair": 0, "hair_style": 0, "outfit": 2})
 	p["career"] = {"current": "artisan", "tiers": {"artisan": 2}, "missions": {"artisan": 1}}
 	p["money"] = 95
+	p["reve"] = {"id": "artisan", "fete": false, "changements": 1, "realises": []}
 	p["skills_xp"]["physique"] = 70.0
 	p["skills_xp"]["creativite"] = 25.0
 	p["typing"]["baseline_cps"] = 0.9
