@@ -396,6 +396,26 @@ def coupe(d):  # rêve réalisé
     box(d, 30, 76, 70, 92, 4)
 
 
+@icon
+def buche(d):  # bois récolté
+    box(d, 8, 36, 74, 76, 18)
+    disc(d, 70, 56, 22)
+    arc(d, 70, 56, 14, 0, 360, 4, 0)
+    disc(d, 70, 56, 4, 0)
+    line(d, [(30, 38), (22, 22)], 9)
+    line(d, [(20, 52), (44, 52)], 4, 0)
+    line(d, [(26, 64), (40, 64)], 4, 0)
+
+
+@icon
+def pierre(d):  # pierres récoltées
+    poly(d, [(8, 84), (16, 52), (34, 30), (58, 26), (76, 46), (84, 84)])
+    poly(d, [(62, 84), (68, 62), (82, 54), (94, 66), (96, 84)])
+    line(d, [(34, 30), (42, 52), (30, 66)], 4, 0)
+    line(d, [(42, 52), (58, 60)], 4, 0)
+    line(d, [(62, 84), (68, 62)], 4, 0)
+
+
 def main():
     os.makedirs(DIR, exist_ok=True)
     for name, f in ICONS.items():

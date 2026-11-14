@@ -10,12 +10,15 @@ signal guide_pressed
 signal objective_pressed
 signal shop_pressed
 signal dream_pressed
+signal build_pressed
+signal view_pressed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
+const Build = preload("res://scripts/core/build.gd")
 
 const NEED_COLORS := {"faim": Color(0.93, 0.55, 0.3), "sommeil": Color(0.45, 0.5, 0.85), "toilettes": Color(0.3, 0.68, 0.7),
 	"hygiene": Color(0.35, 0.62, 0.9), "social": Color(0.9, 0.5, 0.68)}
@@ -48,6 +51,10 @@ var _dream_badge: PanelContainer
 var _dream_text: Label
 var _dream_bar: ProgressBar
 var _dream_count: Label
+var garden_box: HBoxContainer # coin du jardin (en bas à droite) : réserve, « Construire », « Jardin »
+var build_button: Button
+var view_button: Button
+var _stock := {} # ressource → Label
 var _time := 0.0
 var _shown_money := -1.0
 
@@ -220,6 +227,64 @@ func _ready() -> void:
 	_mission_button.pressed.connect(func(): mission_pressed.emit())
 	right.add_child(_mission_button)
 
+	# --- Le jardin (en bas à droite) : réserve de ressources, construire, changer de vue ---
+	garden_box = HBoxContainer.new()
+	garden_box.anchor_left = 1.0
+	garden_box.anchor_right = 1.0
+	garden_box.anchor_top = 1.0
+	garden_box.anchor_bottom = 1.0
+	garden_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	garden_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	garden_box.offset_left = -14
+	garden_box.offset_right = -14
+	garden_box.offset_top = -14
+	garden_box.offset_bottom = -14
+	garden_box.add_theme_constant_override("separation", 8)
+	garden_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(garden_box)
+	build_button = Button.new()
+	build_button.name = "Construire"
+	build_button.focus_mode = Control.FOCUS_NONE
+	build_button.custom_minimum_size = Vector2(276, 52)
+	build_button.tooltip_text = "Ta réserve de bois et de pierres : clique pour construire"
+	build_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var build_style := _panel_style(14, 8)
+	for state in ["normal", "pressed", "focus"]:
+		build_button.add_theme_stylebox_override(state, build_style)
+	var build_hover: StyleBoxFlat = build_style.duplicate()
+	build_hover.bg_color = Color(1.0, 0.96, 0.84, 0.97)
+	build_button.add_theme_stylebox_override("hover", build_hover)
+	build_button.pressed.connect(func(): build_pressed.emit())
+	garden_box.add_child(build_button)
+	var build_row := HBoxContainer.new()
+	build_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	build_row.offset_left = 10
+	build_row.offset_right = -10
+	build_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	build_row.add_theme_constant_override("separation", 6)
+	build_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build_button.add_child(build_row)
+	for res in Data.RESOURCE_ORDER:
+		build_row.add_child(UiTheme.badge(Data.RESOURCES[res]["icone"], UiTheme.RESOURCE_COLORS[res], 30))
+		var count := UiTheme.label("0", 21)
+		count.autowrap_mode = TextServer.AUTOWRAP_OFF
+		count.custom_minimum_size = Vector2(26, 0)
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		build_row.add_child(count)
+		_stock[res] = count
+	build_row.add_child(UiTheme.icon("marteau", 22, UiTheme.COL_ORANGE.darkened(0.1)))
+	var build_label := UiTheme.label("Construire", 19)
+	build_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build_row.add_child(build_label)
+	view_button = UiTheme.icon_button("feuille", "Jardin", UiTheme.COL_GOOD, 19)
+	view_button.name = "Vue"
+	view_button.focus_mode = Control.FOCUS_NONE
+	view_button.custom_minimum_size = Vector2(132, 52)
+	view_button.tooltip_text = "Aller voir le jardin : on y récolte du bois et des pierres"
+	view_button.pressed.connect(func(): view_pressed.emit())
+	garden_box.add_child(view_button)
+
 	# --- Ce que fait le personnage (en bas à gauche) ---
 	_status_panel = PanelContainer.new()
 	_status_panel.add_theme_stylebox_override("panel", _panel_style(16, 10))
@@ -320,6 +385,16 @@ func update_display(profile: Dictionary, status_text: String, action_fraction :=
 	_shop_button.modulate = Color(1, 1, 1).lerp(Color(1.3, 1.25, 1.0), 0.5 + 0.5 * sin(_time * 5.0)) if can_buy else Color.WHITE
 	if _mission_button.visible:
 		_mission_button.modulate = Color(1, 1, 1).lerp(Color(1.25, 1.2, 1.0), 0.5 + 0.5 * sin(_time * 5.0))
+	# Le jardin : la réserve, et « Construire » qui brille quand une construction est possible.
+	var can_build := false
+	for id in Data.CONSTRUCTION_ORDER:
+		can_build = can_build or Build.can_build(profile, id)
+	for res in _stock:
+		_stock[res].text = "%d" % Build.stock(profile, res)
+	build_button.modulate = Color(1, 1, 1).lerp(Color(1.25, 1.2, 1.0), 0.5 + 0.5 * sin(_time * 5.0)) if can_build else Color.WHITE
+	# « Jardin » brille tant que l'enfant n'y est jamais allé.
+	var new_garden: bool = not profile.get("jardin_vu", false)
+	view_button.modulate = Color(1, 1, 1).lerp(Color(1.3, 1.25, 1.0), 0.5 + 0.5 * sin(_time * 4.0)) if new_garden else Color.WHITE
 
 
 func _update_objective(profile: Dictionary) -> void:
@@ -361,6 +436,18 @@ func _update_dream(profile: Dictionary) -> void:
 	_dream_count.text = "%d / %d" % [Dreams.steps_done(profile), Dreams.steps(profile).size()]
 	_dream_badge.get_child(0).texture = UiTheme.icon_texture("coupe" if done else "reve")
 	dream_button.modulate = Color.WHITE
+
+
+## Le bouton en bas à droite propose l'autre vue : « Jardin » depuis la maison, « Maison » depuis le jardin.
+func set_view(view: String) -> void:
+	var in_garden := view == "jardin"
+	view_button.text = "Maison" if in_garden else "Jardin"
+	view_button.icon = UiTheme.icon_texture("maison" if in_garden else "feuille")
+	view_button.tooltip_text = "Revenir voir la maison" if in_garden else "Aller voir le jardin : on y récolte du bois et des pierres"
+	var color := UiTheme.COL_ACCENT if in_garden else UiTheme.COL_GOOD
+	view_button.add_theme_stylebox_override("normal", UiTheme._button_box(color))
+	view_button.add_theme_stylebox_override("hover", UiTheme._button_box(color.lightened(0.12)))
+	view_button.add_theme_stylebox_override("pressed", UiTheme._button_box(color.darkened(0.15)))
 
 
 func set_mission_available(on: bool) -> void:

@@ -10,6 +10,8 @@ const Progression = preload("res://scripts/core/progression.gd")
 const Objectives = preload("res://scripts/core/objectives.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Build = preload("res://scripts/core/build.gd")
+const BuildPanel = preload("res://scripts/ui/build_panel.gd")
 
 var _fails := 0
 var _count := 0
@@ -187,6 +189,90 @@ func _run() -> void:
 	check(screen.studio.furniture.size() == base_objects + 5, "les 5 achats sont dans la maison")
 	var bed = screen.studio.get_object("potager")
 	check(bed != null and is_equal_approx(screen.studio.clamp_to_room(Vector3(6.5, 0, -1.5)).x, 6.5), "avec la terrasse : on peut marcher dehors")
+
+	print("Jardin : récolter et construire")
+	check(screen.studio.get_object("bois_jardin") != null and screen.studio.get_object("rochers") != null and screen.studio.get_object("chantier") != null, "le tas de bois, les rochers et le panneau « À construire » sont dans le jardin")
+	check(screen.studio.get_object("banc") == null and not Data.is_available("repos", profile), "au départ : rien de construit")
+	var on_lawn: Vector3 = screen.studio.clamp_to_room(Vector3(7.0, 0, 6.0))
+	check(is_equal_approx(screen.studio.clamp_to_room(Vector3(7.0, 0, 2.0)).x, 7.0) and screen.studio._walkable(Vector2(on_lawn.x, on_lawn.z)) and on_lawn.z < 4.0, "on marche dans la cour, pas sur la pelouse")
+	profile["jardin_vu"] = false
+	check(screen.studio.view == "maison" and screen.hud.view_button.text.contains("Jardin"), "vue de la maison : le bouton propose le jardin")
+	screen.hud.view_button.pressed.emit()
+	check(screen.studio.view == "jardin" and profile["jardin_vu"] and screen.hud.view_button.text.contains("Maison"), "le bouton « Jardin » montre le jardin")
+	screen.hud.view_button.pressed.emit()
+	check(screen.studio.view == "maison", "le bouton « Maison » ramène à la maison")
+	var wood_before := Build.stock(profile, "bois")
+	screen._start_typing(_object(screen, "bois_jardin"), "couper")
+	check(screen.studio.view == "jardin", "choisir le tas de bois montre le jardin")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	check(await _wait_state(screen, "series", 14.0), "le personnage va couper du bois : la série commence")
+	check(screen.character.anim == "chop" and screen.studio.zone_of(screen.character.position) == "jardin", "il coupe du bois dans le jardin")
+	check(not screen.studio.get_object("bois_jardin").get_meta("axe").visible, "il prend la hache du billot")
+	for i in 2:
+		screen.typing._input.text = screen.typing.model_text
+		screen.typing._submit()
+		await _wait(1.3)
+	check(Build.stock(profile, "bois") == wood_before + 2 and game.session["recoltes"].get("bois", 0) == 2, "2 mots réussis : 2 bûches dans la réserve")
+	check(screen.hud.build_button.find_children("*", "Label", true, false).any(func(l): return l.text == str(wood_before + 2)), "la réserve est affichée en bas de l'écran")
+	screen.typing._close({"status": "cancel"})
+	check(Build.stock(profile, "bois") == wood_before + 2 and screen.studio.get_object("bois_jardin").get_meta("axe").visible, "série arrêtée : les bûches sont gardées, la hache est rangée")
+	var rocks = _object(screen, "rochers")
+	screen._object = rocks
+	screen._action_id = "pierres"
+	screen._state = "walking"
+	screen.character.position = rocks.use_point
+	screen._on_arrived()
+	check(screen._state == "series" and screen.character.anim == "pick", "ramasser des pierres : série de mots et animation")
+	while screen._state == "series":
+		screen.typing._input.text = screen.typing.model_text
+		screen.typing._submit()
+		await _wait(1.3)
+	check(Build.stock(profile, "pierre") == Data.WORDS_PER_SERIES and game.session["series_finies"] >= 1, "série finie : %d pierres" % Data.WORDS_PER_SERIES)
+	await _wait_state(screen, "idle", 6.0)
+	# Construire
+	screen._choose_object(_object(screen, "chantier"))
+	check(screen._overlay is BuildPanel and screen.paused, "le panneau « À construire » ouvre l'écran Construire")
+	check(screen._overlay.find_child("Construire_banc", true, false).disabled, "pas assez de bois : bouton « Pas encore »")
+	screen._overlay.built.emit("banc")
+	check(not Build.owns(profile, "banc") and screen._overlay != null, "construction refusée sans les ressources")
+	screen._close_overlay()
+	game.add_resource("bois", 6 - Build.stock(profile, "bois"))
+	screen.hud.build_button.pressed.emit()
+	check(screen._overlay is BuildPanel and not screen._overlay.find_child("Construire_banc", true, false).disabled and screen._overlay.find_child("Construire_fontaine", true, false).disabled, "6 bûches : le banc est possible, pas la fontaine")
+	var before_build: int = screen.studio.furniture.size()
+	screen._overlay.find_child("Construire_banc", true, false).pressed.emit()
+	check(Build.owns(profile, "banc") and Build.stock(profile, "bois") == 0 and screen._overlay == null, "banc construit : 6 bûches dépensées")
+	check(screen.studio.get_object("banc") != null and screen.studio.furniture.size() == before_build + 1 and screen.studio.view == "jardin", "le banc apparaît dans le jardin")
+	check(game.session["constructions"] == ["banc"], "construction comptée pour l'ergo")
+	var bench = _object(screen, "banc")
+	screen._object = bench
+	screen._action_id = "repos"
+	screen._state = "walking"
+	screen.character.position = bench.use_point
+	screen._on_arrived()
+	check(screen._state == "acting" and screen.character.pose == "assis" and screen.character.anim == "sit_rest", "il se repose assis sur le banc")
+	await _wait_state(screen, "idle", 12.0)
+	profile["skills_xp"]["physique"] = 200.0
+	profile["skills_xp"]["creativite"] = 200.0
+	profile["ressources"] = {"bois": 6, "pierre": 18}
+	screen._on_built("fontaine")
+	screen._on_built("barbecue")
+	check(screen.studio.furniture.size() == before_build + 3 and Build.next_item(profile) == "" and Build.stock(profile, "pierre") == 0, "fontaine et barbecue construits : le jardin est complet")
+	screen._open_build()
+	check(screen._overlay.find_child("Construire_barbecue", true, false) == null, "écran Construire : tout est « déjà construit »")
+	screen._overlay.find_child("AllerAuJardin", true, false).pressed.emit()
+	check(screen._overlay == null and screen.studio.view == "jardin", "« Aller au jardin » ferme l'écran et montre le jardin")
+	for pair in [["fontaine", "fontaine", "wash"], ["barbecue", "barbecue", "cook"]]:
+		var built = _object(screen, pair[0])
+		screen._object = built
+		screen._action_id = pair[1]
+		screen._state = "walking"
+		screen.character.position = built.use_point
+		screen._on_arrived()
+		check(screen._state == "acting" and screen.character.anim == pair[2], "activité « %s » : animation" % Data.ACTIONS[pair[1]]["label"])
+		await _wait_state(screen, "idle", 14.0)
+	screen._set_view("maison")
 	var reachable := true
 	for f in screen.studio.furniture:
 		for g in screen.studio.furniture:

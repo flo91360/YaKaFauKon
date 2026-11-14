@@ -9,6 +9,7 @@ const Objectives = preload("res://scripts/core/objectives.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Recap = preload("res://scripts/core/recap.gd")
+const Build = preload("res://scripts/core/build.gd")
 
 var _fails := 0
 var _count := 0
@@ -27,6 +28,7 @@ func _init() -> void:
 	_test_shop()
 	_test_new_careers()
 	_test_dreams()
+	_test_garden()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -453,3 +455,87 @@ func _test_dreams() -> void:
 	check(cleaned == {"id": "", "fete": false, "changements": 2, "realises": ["sportif"]}, "état relu d'une sauvegarde : remis en ordre")
 	check(Dreams.clean(null) == Dreams.new_state() and Dreams.clean({"id": "maison"})["id"] == "maison", "sauvegarde sans rêve : état neuf")
 	check(Recap.session_lines({"reves_realises": ["sportif"], "reves_changes": 1}).filter(func(l): return l.to_lower().contains("rêve")).size() == 2, "séance : rêve réalisé et changement dans le récapitulatif")
+
+
+func _test_garden() -> void:
+	print("Jardin : ressources et constructions")
+	for res in Data.RESOURCE_ORDER:
+		var info: Dictionary = Data.RESOURCES[res]
+		check(Data.ACTIONS.has(info["action"]) and Data.ACTIONS[info["action"]].get("recolte", "") == res, "ressource %s : une action pour la récolter" % res)
+		check(Data.LEXIQUE.has(info["action"]), "ressource %s : la récolte se joue en série de mots" % res)
+	check(Data.RESOURCE_ORDER.size() == Data.RESOURCES.size() and Data.CONSTRUCTION_ORDER.size() == Data.CONSTRUCTIONS.size(), "listes ordonnées complètes")
+	for id in Data.CONSTRUCTION_ORDER:
+		var item: Dictionary = Data.CONSTRUCTIONS[id]
+		var ok: bool = Data.ACTIONS.has(item["action"]) and Data.ACTIONS[item["action"]].get("construction", "") == id and not item["cout"].is_empty()
+		for res in item["cout"]:
+			ok = ok and Data.RESOURCES.has(res) and int(item["cout"][res]) > 0
+		for s in item["competences"]:
+			ok = ok and Data.SKILLS.has(s)
+		check(ok, "construction %s bien formée" % id)
+	check(Data.resource_text("bois", 1) == "1 bûche" and Data.resource_text("bois", 6) == "6 bûches" and Data.resource_text("pierre", 0) == "0 pierre", "accord : 1 bûche, 6 bûches")
+	check(Build.cost_text("barbecue") == "6 bûches et 8 pierres", "coût écrit en clair")
+
+	var p := _profile()
+	check(Build.stock(p, "bois") == 0 and not Build.can_build(p, "banc"), "profil sans réserve : rien à construire")
+	check(not Data.is_available("repos", p) and Data.is_available("couper", p) and Data.is_available("pierres", p), "récolter est possible tout de suite, le banc non")
+	check(Build.add(p, "bois", 4) == 4 and Build.add(p, "bois", -3) == 4, "la réserve ne baisse pas avec une récolte")
+	check(Build.missing_resources(p, "banc") == {"bois": 2} and is_equal_approx(Build.fraction(p, "banc"), 4.0 / 6.0), "il manque 2 bûches pour le banc")
+	check(Build.advice(p, "banc") == "Il te faut encore 2 bûches.", "conseil : ce qu'il manque")
+	check(not Build.build(p, "banc") and Build.stock(p, "bois") == 4, "pas assez de bois : rien n'est dépensé")
+	Build.add(p, "bois", 3)
+	check(Build.can_build(p, "banc") and Build.advice(p, "banc") == "", "assez de bois : le banc est possible")
+	check(Build.build(p, "banc") and Build.stock(p, "bois") == 1 and Build.owns(p, "banc"), "construire dépense les ressources")
+	check(not Build.build(p, "banc") and Build.stock(p, "bois") == 1, "on ne construit pas deux fois")
+	check(Data.is_available("repos", p) and Build.next_item(p) == "fontaine", "le banc ouvre son activité, la fontaine est la suivante")
+	# Compétences demandées
+	Build.add(p, "pierre", 10)
+	check(not Build.can_build(p, "fontaine") and Build.missing_skills(p, "fontaine") == {"physique": 2}, "la fontaine demande le niveau 2 en physique")
+	check(Build.advice(p, "fontaine") == "Il te faut physique au niveau 2.", "conseil : la compétence qui manque")
+	p["skills_xp"]["physique"] = 60.0
+	check(Build.can_build(p, "fontaine") and Build.build(p, "fontaine") and Build.stock(p, "pierre") == 0, "niveau atteint : fontaine construite")
+	check(not Build.build(p, "inconnu"), "construction inconnue refusée")
+	# Sauvegardes abîmées
+	check(Build.clean_stock({"bois": 3.0, "pierre": -2, "or": 9}) == {"bois": 3, "pierre": 0}, "réserve nettoyée")
+	check(Build.clean_stock("x") == {"bois": 0, "pierre": 0}, "réserve illisible remise à zéro")
+	check(Build.clean(["fontaine", "x", "banc", "banc"]) == ["banc", "fontaine"] and Build.clean(null) == [], "constructions nettoyées")
+
+	# Objectifs du jardin
+	var o := _profile()
+	o["objectif"] = {}
+	o["objectifs_finis"] = 0
+	o["objectifs_choisis"] = 0
+	o["etoiles"] = 0
+	var early := Objectives.candidates(o).map(func(c): return c["type"])
+	check(not "recolte" in early and not "construction" in early, "pas d'objectif jardin avant le premier objectif réussi")
+	o["objectifs_finis"] = 1
+	var garden := Objectives.candidates(o).filter(func(c): return c["type"] in ["recolte", "construction"])
+	check(garden.size() == 2 and garden[0]["res"] == "bois" and garden[0]["target"] == 6 and garden[1]["item"] == "banc", "ensuite : récolter du bois (pour le banc) et construire le banc")
+	Objectives.choose(o, garden[0])
+	check(not Objectives.notify(o, "recolte", {"res": "pierre", "amount": 3}), "une autre ressource ne compte pas")
+	Objectives.notify(o, "recolte", {"res": "bois", "amount": 3})
+	check(is_equal_approx(Objectives.fraction(o), 0.5) and Objectives.progress_text(o) == "3 / 6 bûches", "récolte à la moitié")
+	check(Objectives.notify(o, "recolte", {"res": "bois", "amount": 3}) and Objectives.is_done(o), "récolte terminée")
+	Objectives.claim(o)
+	Objectives.choose(o, garden[1])
+	Build.add(o, "bois", 6)
+	check(not Objectives.is_done(o) and is_equal_approx(Objectives.fraction(o), 0.95), "ressources réunies : il reste à construire")
+	Build.build(o, "banc")
+	check(Objectives.is_done(o), "objectif « construire » atteint")
+	Objectives.claim(o)
+	var after := Objectives.candidates(o).filter(func(c): return c["type"] in ["recolte", "construction"])
+	check(after.size() == 2 and after[0]["res"] == "pierre" and after[1]["item"] == "fontaine", "après le banc : des pierres pour la fontaine")
+	o["constructions"] = Data.CONSTRUCTION_ORDER.duplicate()
+	var end := Objectives.candidates(o).filter(func(c): return c["type"] in ["recolte", "construction"])
+	check(end.size() == 2 and end.all(func(c): return c["type"] == "recolte"), "tout est construit : on peut encore récolter")
+	Objectives.choose(o, {"type": "soins", "target": 1, "label": "x", "pieces": 5})
+	check(Objectives.notify(o, "action", {"action": "fontaine"}), "se laver à la fontaine compte comme un soin")
+
+	# Espace de l'adulte
+	var r := _profile()
+	check(Recap.garden_line(r).begins_with("Jardin : 0 bûche et 0 pierre en réserve") and Recap.garden_line(r).ends_with("rien de construit pour l'instant"), "récapitulatif : jardin vide")
+	r["ressources"] = {"bois": 7, "pierre": 3}
+	r["constructions"] = ["banc"]
+	check(Recap.garden_line(r).contains("7 bûches et 3 pierres") and Recap.garden_line(r).ends_with("construit : banc de jardin (1 sur 3)"), "récapitulatif : réserve et constructions")
+	var lines := Recap.session_lines({"recoltes": {"bois": 5, "pierre": 0}, "constructions": ["banc", "x"]})
+	check("Récolte dans le jardin : 5 bûches" in lines and "Construit dans le jardin : banc de jardin" in lines, "séance : récolte et construction dans le récapitulatif")
+	check(Recap.session_lines({}).filter(func(l): return l.contains("jardin")).is_empty(), "séance d'une ancienne version : pas de ligne jardin")

@@ -8,6 +8,9 @@ extends Node
 ##   --achats=lecture,jeux,guitare,terrasse,chat (ou --achats=tout), --pieces=N : maison et
 ##       pièces du profil de démonstration ; --demo-magasin ouvre le magasin,
 ##       --demo-achat=terrasse montre l'instant de l'achat ;
+##   --ressources=bois:6,pierre:3, --constructions=banc,fontaine (ou tout), --vue=jardin :
+##       réserve, constructions et vue du jardin ; --demo-construire ouvre « Construire »,
+##       --demo-construit=banc montre l'instant de la construction ;
 ##   --capture=chemin.png : enregistre une capture d'écran puis quitte
 ##       (--images=N : après N images au lieu de 90).
 
@@ -117,6 +120,13 @@ func _start_demo(args: Array) -> void:
 			var Data = load("res://scripts/core/data.gd")
 			var wanted: Array = Data.SHOP_ORDER.duplicate() if a.substr(9) == "tout" else Array(a.substr(9).split(","))
 			_game().profile["achats"] = load("res://scripts/core/shop.gd").clean(wanted)
+		if a.begins_with("--ressources="): # ex. --ressources=bois:6,pierre:3
+			for part in a.substr(13).split(",", false):
+				_game().profile["ressources"][part.get_slice(":", 0)] = int(part.get_slice(":", 1))
+		if a.begins_with("--constructions="):
+			var D = load("res://scripts/core/data.gd")
+			var built: Array = D.CONSTRUCTION_ORDER.duplicate() if a.substr(16) == "tout" else Array(a.substr(16).split(","))
+			_game().profile["constructions"] = load("res://scripts/core/build.gd").clean(built)
 		if a.begins_with("--objectifs-finis="):
 			_game().profile["objectifs_finis"] = int(a.substr(18))
 			_game().profile["objectifs_choisis"] = int(a.substr(18))
@@ -129,6 +139,19 @@ func _start_demo(args: Array) -> void:
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
+	if "--vue=jardin" in args:
+		screen.studio.set_view("jardin", true)
+		screen.hud.set_view("jardin")
+	if "--demo-construire" in args:
+		screen._open_build()
+	for a in args:
+		if a.begins_with("--demo-construit="): # ex. --demo-construit=banc : la construction vient d'être faite
+			var D = load("res://scripts/core/data.gd")
+			for res in D.CONSTRUCTIONS[a.substr(17)]["cout"]:
+				_game().profile["ressources"][res] = 20
+			for sk in D.CONSTRUCTIONS[a.substr(17)]["competences"]:
+				_game().profile["skills_xp"][sk] = 400.0
+			screen._on_built(a.substr(17))
 	if "--demo-reve" in args:
 		screen._open_dream()
 	if "--demo-competences" in args:
@@ -152,19 +175,23 @@ func _start_demo(args: Array) -> void:
 		screen._open_mission()
 		screen._mission_panel.state["step"] = "question"
 		screen._mission_panel.refresh()
-	if "--demo-serie" in args: # série de mots sur le tapis de course (2 mots déjà réussis)
-		var tapis = screen.studio.get_object("tapis")
-		screen._start_typing(tapis, "sport")
-		screen.typing.force_close()
-		screen._state = "walking"
-		screen.character.position = tapis.use_point
-		screen._on_arrived()
-		for i in 2:
-			screen._on_series_word_ok({"cps": 2.0})
-			screen._series["index"] += 1
-		screen._open_series_word()
-		screen.typing._input.text = "cou"
-		screen.typing._refresh_model()
+	for a in args:
+		# Série de mots, 2 mots déjà réussis : sur le tapis de course, ou
+		# --demo-serie=bois_jardin:couper pour un autre objet.
+		if a == "--demo-serie" or a.begins_with("--demo-serie="):
+			var target: PackedStringArray = (a.get_slice("=", 1) if a.contains("=") else "tapis:sport").split(":")
+			var support = screen.studio.get_object(target[0])
+			screen._start_typing(support, target[1])
+			screen.typing.force_close()
+			screen._state = "walking"
+			screen.character.position = support.use_point
+			screen._on_arrived()
+			for i in 2:
+				screen._on_series_word_ok({"cps": 2.0})
+				screen._series["index"] += 1
+			screen._open_series_word()
+			screen.typing._input.text = screen.typing.model_text.left(3)
+			screen.typing._refresh_model()
 	if "--demo-objectifs" in args:
 		screen._open_objectives()
 	if "--demo-magasin" in args:
@@ -194,6 +221,9 @@ func _start_demo(args: Array) -> void:
 			screen.character.position = f.use_point
 			screen._on_arrived()
 			screen.typing.force_close()
+			if screen.studio.zone_of(f.position) == "jardin":
+				screen.studio.set_view("jardin", true)
+				screen.hud.set_view("jardin")
 	if "--demo-frappe" in args:
 		var f = screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]
 		screen._start_typing(f, "toilettes")

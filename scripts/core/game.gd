@@ -10,6 +10,7 @@ const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
+const Build = preload("res://scripts/core/build.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
@@ -94,6 +95,9 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"mots_tapes": {},
 		"achats": [],
 		"reve": Dreams.new_state(),
+		"ressources": Build.new_stock(),
+		"constructions": [],
+		"jardin_vu": false,
 	}
 
 
@@ -128,6 +132,7 @@ func start_demo() -> void:
 	profile = new_profile_data("Camille", {"skin": 1, "hair": 1, "hair_style": 4, "outfit": 3, "outfit_style": 1, "eye_color": 2, "blush": 1, "mouth": 1})
 	profile["tuto_fait"] = true
 	profile["reve"]["id"] = "artisan"
+	profile["jardin_vu"] = true
 	demo_mode = true
 	start_session()
 
@@ -194,6 +199,9 @@ func _sanitize(data: Dictionary) -> Dictionary:
 	data["tuto_fait"] = bool(data["tuto_fait"])
 	data["achats"] = Shop.clean(data["achats"])
 	data["reve"] = Dreams.clean(data["reve"])
+	data["ressources"] = Build.clean_stock(data["ressources"])
+	data["constructions"] = Build.clean(data["constructions"])
+	data["jardin_vu"] = bool(data["jardin_vu"])
 	for a in data["mots_tapes"]:
 		data["mots_tapes"][a] = int(data["mots_tapes"][a])
 	for c in data["career"]["tiers"]:
@@ -228,6 +236,7 @@ func start_session() -> void:
 		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0,
 		"argent_depense": 0, "achats": [],
 		"reves_changes": 0, "reves_realises": [],
+		"recoltes": {}, "constructions": [],
 	}
 	profile["sessions"].append(session)
 	_autosave_timer = 0.0
@@ -280,6 +289,26 @@ func buy(item: String) -> bool:
 		session["achats"] = []
 	session["achats"].append(item)
 	money_changed.emit(profile["money"])
+	save_profile()
+	return true
+
+
+## Ajoute des ressources récoltées dans le jardin (comptées dans la séance).
+func add_resource(res: String, amount: int = 1) -> void:
+	amount = maxi(amount, 0)
+	Build.add(profile, res, amount)
+	if not session.get("recoltes") is Dictionary:
+		session["recoltes"] = {}
+	session["recoltes"][res] = int(session["recoltes"].get(res, 0)) + amount
+
+
+## Construit dans le jardin avec les ressources du profil. Renvoie false si impossible.
+func build(id: String) -> bool:
+	if not Build.build(profile, id):
+		return false
+	if not session.get("constructions") is Array:
+		session["constructions"] = []
+	session["constructions"].append(id)
 	save_profile()
 	return true
 

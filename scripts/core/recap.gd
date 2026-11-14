@@ -4,6 +4,7 @@ extends RefCounted
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
+const Build = preload("res://scripts/core/build.gd")
 
 const ERROR_LABELS := {
 	"substitution": "lettres remplacées", "oubli": "lettres oubliées", "ajout": "lettres en trop",
@@ -72,8 +73,35 @@ static func session_lines(s: Dictionary) -> Array:
 		lines.append("Rêve réalisé : %s" % ", ".join(labels))
 	if int(s.get("reves_changes", 0)) > 0:
 		lines.append("A changé de rêve : %d fois" % int(s.get("reves_changes", 0)))
+	var gathered: Dictionary = s.get("recoltes", {}) if s.get("recoltes", {}) is Dictionary else {}
+	var harvest := []
+	for res in Data.RESOURCE_ORDER: # séances de la version 2.3
+		if int(gathered.get(res, 0)) > 0:
+			harvest.append(Data.resource_text(res, int(gathered[res])))
+	if not harvest.is_empty():
+		lines.append("Récolte dans le jardin : %s" % ", ".join(harvest))
+	var built: Array = s.get("constructions", []) if s.get("constructions", []) is Array else []
+	var built_names := []
+	for id in built:
+		if Data.CONSTRUCTIONS.has(id):
+			built_names.append(Data.CONSTRUCTIONS[id]["label"].to_lower())
+	if not built_names.is_empty():
+		lines.append("Construit dans le jardin : %s" % ", ".join(built_names))
 	lines.append("Temps avec au moins une jauge dans le rouge : %s" % format_duration(red_any_sec(s)))
 	return lines
+
+
+## Le jardin en une ligne : réserve de ressources et constructions.
+static func garden_line(profile: Dictionary) -> String:
+	var stock := []
+	for res in Data.RESOURCE_ORDER:
+		stock.append(Data.resource_text(res, Build.stock(profile, res)))
+	var names := []
+	for id in Data.constructions(profile):
+		if Data.CONSTRUCTIONS.has(id):
+			names.append(Data.CONSTRUCTIONS[id]["label"].to_lower())
+	var built := "rien de construit pour l'instant" if names.is_empty() else "construit : %s (%d sur %d)" % [", ".join(names), names.size(), Data.CONSTRUCTION_ORDER.size()]
+	return "Jardin : %s en réserve — %s" % [" et ".join(stock), built]
 
 
 ## Où en est l'objectif de vie (« Mon rêve »), en une ligne.

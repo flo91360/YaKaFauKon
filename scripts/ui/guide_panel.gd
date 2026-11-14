@@ -11,14 +11,14 @@ const Hud = preload("res://scripts/ui/hud.gd")
 var objects: Array = []
 
 const HOW := [
-	["souris", "Clique sur le sol pour te déplacer, et sur un objet pour agir."],
+	["souris", "Clique sur le sol pour te déplacer, et sur un objet pour agir. Échap : pause."],
 	["reve", "Ton grand rêve guide ta partie : clique sur « Mon rêve » pour voir les étapes."],
 	["clavier", "Recopie le mot affiché, puis appuie sur la touche Entrée."],
 	["etoile", "Dans une activité, chaque mot réussi fait monter ta compétence."],
 	["cible", "Choisis un objectif pour gagner des pièces et des étoiles."],
 	["travail", "Choisis un métier : les missions de travail rapportent des pièces."],
 	["magasin", "Au magasin, tes pièces achètent de nouveaux objets pour ta maison."],
-	["pause", "La touche Échap met le jeu en pause."],
+	["feuille", "Dans le jardin, récolte du bois et des pierres, puis clique sur « Construire »."],
 ]
 
 
@@ -64,7 +64,7 @@ func _ready() -> void:
 		how.add_child(card)
 
 	# Les objets et leurs actions
-	content.add_child(UiTheme.label("Les objets du studio", 24))
+	content.add_child(UiTheme.label("Les objets de la maison et du jardin", 24))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 12)
@@ -97,6 +97,9 @@ func _object_card(o: Dictionary) -> Control:
 		elif a == "look":
 			text = "Changer de look : coiffure, visage, tenue"
 			line.add_child(UiTheme.badge("perso", UiTheme.COL_ACCENT, 26))
+		elif a == "construire":
+			text = "Construire : un banc, une fontaine, un barbecue, avec ton bois et tes pierres"
+			line.add_child(UiTheme.badge("marteau", UiTheme.COL_ORANGE, 26))
 		else:
 			var action: Dictionary = Data.ACTIONS[a]
 			text = action["label"]
@@ -121,6 +124,8 @@ func _object_card(o: Dictionary) -> Control:
 				text += " (fait baisser : %s)" % ", ".join(minus)
 			if Data.is_series(a):
 				text += ". Série de %d mots." % Data.WORDS_PER_SERIES
+			if action.has("recolte"):
+				text += " Chaque mot réussi rapporte une %s." % Data.RESOURCES[action["recolte"]]["un"]
 		spoken.append(text + ".")
 		var l := UiTheme.label(text, 17)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
