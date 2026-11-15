@@ -138,9 +138,13 @@ func _start_demo(args: Array) -> void:
 			var job: PackedStringArray = a.substr(9).split(":")
 			var tier := int(job[1]) if job.size() > 1 else 1
 			_game().profile["career"] = {"current": job[0], "tiers": {job[0]: tier}, "missions": {job[0]: 1}}
+		if a.begins_with("--famille-etat="): # rencontre, ensemble, bebe ou enfant
+			_demo_family_state(a.substr(15))
 	show_game()
 	await get_tree().process_frame
 	var screen = _screen
+	if "--demo-famille" in args: # le panneau « Ma famille »
+		screen._open_family()
 	if "--vue=jardin" in args:
 		screen.studio.set_view("jardin", true)
 		screen.hud.set_view("jardin")
@@ -226,9 +230,10 @@ func _start_demo(args: Array) -> void:
 			screen.character.position = f.use_point
 			screen._on_arrived()
 			screen.typing.force_close()
-			if screen.studio.zone_of(f.position) == "jardin":
-				screen.studio.set_view("jardin", true)
-				screen.hud.set_view("jardin")
+			var zone: String = screen.studio.zone_of(f.position)
+			if zone != "maison":
+				screen.studio.set_view(zone, true)
+				screen.hud.set_view(zone, screen.studio.has_nursery())
 	if "--demo-frappe" in args:
 		var f = screen.studio.furniture.filter(func(x): return x.object_id == "toilettes")[0]
 		screen._start_typing(f, "toilettes")
@@ -236,6 +241,35 @@ func _start_demo(args: Array) -> void:
 
 ## Scènes de démonstration des graphismes de la famille (version 2.4). Le code de jeu
 ## n'existe pas encore : on pose les personnages à la main pour les contrôler en image.
+## Famille de démonstration (jamais sauvegardée) : où en est l'histoire.
+func _demo_family_state(state: String) -> void:
+	var Family = load("res://scripts/core/family.gd")
+	var p: Dictionary = _game().profile
+	p["famille"] = Family.new_state()
+	p["famille"]["vu"] = true
+	if state == "":
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	p["skills_xp"]["charisme"] = maxf(p["skills_xp"].get("charisme", 0.0), 60.0)
+	Family.meet(p, Family.proposals(rng)[1])
+	p["famille"]["complicite"] = 46
+	if state == "rencontre":
+		return
+	p["famille"]["complicite"] = 80
+	Family.move_in(p)
+	if state == "ensemble":
+		return
+	p["skills_xp"]["organisation"] = maxf(p["skills_xp"].get("organisation", 0.0), float(load("res://scripts/core/data.gd").xp_for_level(2)))
+	Family.have_baby(p, Family.baby_names(rng)[0], rng)
+	if state == "bebe":
+		p["famille"]["enfants"][0]["soins"] = 1
+		return
+	p["famille"]["enfants"][0]["soins"] = 9
+	p["famille"]["enfants"][0]["age"] = "enfant"
+	Family.have_baby(p, Family.baby_names(rng)[3], rng)
+
+
 func _demo_family(screen, scene: String) -> void:
 	var studio = screen.studio
 	var me = screen.character

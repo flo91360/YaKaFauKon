@@ -12,6 +12,7 @@ signal shop_pressed
 signal dream_pressed
 signal build_pressed
 signal view_pressed
+signal family_pressed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
@@ -19,6 +20,7 @@ const Objectives = preload("res://scripts/core/objectives.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Build = preload("res://scripts/core/build.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 const NEED_COLORS := {"faim": Color(0.93, 0.55, 0.3), "sommeil": Color(0.45, 0.5, 0.85), "toilettes": Color(0.3, 0.68, 0.7),
 	"hygiene": Color(0.35, 0.62, 0.9), "social": Color(0.9, 0.5, 0.68)}
@@ -51,6 +53,9 @@ var _dream_badge: PanelContainer
 var _dream_text: Label
 var _dream_bar: ProgressBar
 var _dream_count: Label
+var family_button: Button
+var _family_badge: PanelContainer
+var _family_text: Label
 var garden_box: HBoxContainer # coin du jardin (en bas à droite) : réserve, « Construire », « Jardin »
 var build_button: Button
 var view_button: Button
@@ -175,6 +180,46 @@ func _ready() -> void:
 	dream_box.add_child(_dream_text)
 	_dream_bar = UiTheme.bar(UiTheme.COL_DREAM, 10.0)
 	dream_box.add_child(_dream_bar)
+	# « Ma famille » : rencontrer quelqu'un, vivre ensemble, les enfants.
+	family_button = Button.new()
+	family_button.name = "MaFamille"
+	family_button.focus_mode = Control.FOCUS_NONE
+	family_button.custom_minimum_size = Vector2(318, 62)
+	family_button.tooltip_text = "Rencontrer quelqu'un, vivre ensemble, avoir des enfants ou non"
+	family_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var family_style := _panel_style(14, 8)
+	for state in ["normal", "pressed", "focus"]:
+		family_button.add_theme_stylebox_override(state, family_style)
+	var family_hover: StyleBoxFlat = family_style.duplicate()
+	family_hover.bg_color = Color(1.0, 0.93, 0.95, 0.97)
+	family_button.add_theme_stylebox_override("hover", family_hover)
+	family_button.pressed.connect(func(): family_pressed.emit())
+	left.add_child(family_button)
+	var family_row := HBoxContainer.new()
+	family_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	family_row.offset_left = 12
+	family_row.offset_right = -12
+	family_row.add_theme_constant_override("separation", 8)
+	family_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	family_button.add_child(family_row)
+	_family_badge = UiTheme.badge("coeur", Color(0.93, 0.45, 0.58), 36)
+	family_row.add_child(_family_badge)
+	var family_col := VBoxContainer.new()
+	family_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	family_col.add_theme_constant_override("separation", 0)
+	family_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	family_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	family_row.add_child(family_col)
+	var family_title := UiTheme.label("Ma famille", 16, UiTheme.COL_TEXT.lightened(0.25))
+	family_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	family_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	family_col.add_child(family_title)
+	_family_text = UiTheme.label("", 17)
+	_family_text.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_family_text.clip_text = true
+	_family_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_family_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	family_col.add_child(_family_text)
 
 	# --- Pièces, étoiles, heure et boutons (en haut à droite) ---
 	var right := VBoxContainer.new()
@@ -378,6 +423,7 @@ func update_display(profile: Dictionary, status_text: String, action_fraction :=
 	_action_bar.value = clampf(action_fraction, 0.0, 1.0)
 	_update_objective(profile)
 	_update_dream(profile)
+	_update_family(profile)
 	# Le bouton du magasin brille quand l'enfant peut s'offrir quelque chose.
 	var can_buy := false
 	for id in Data.SHOP_ORDER:
@@ -438,13 +484,40 @@ func _update_dream(profile: Dictionary) -> void:
 	dream_button.modulate = Color.WHITE
 
 
-## Le bouton en bas à droite propose l'autre vue : « Jardin » depuis la maison, « Maison » depuis le jardin.
-func set_view(view: String) -> void:
-	var in_garden := view == "jardin"
-	view_button.text = "Maison" if in_garden else "Jardin"
-	view_button.icon = UiTheme.icon_texture("maison" if in_garden else "feuille")
-	view_button.tooltip_text = "Revenir voir la maison" if in_garden else "Aller voir le jardin : on y récolte du bois et des pierres"
-	var color := UiTheme.COL_ACCENT if in_garden else UiTheme.COL_GOOD
+func _update_family(profile: Dictionary) -> void:
+	_family_text.text = Family.status_text(profile)
+	var icon_name := "coeur"
+	if Family.is_together(profile):
+		icon_name = "famille"
+	elif Family.has_partner(profile):
+		icon_name = "couple"
+	_family_badge.get_child(0).texture = UiTheme.icon_texture(icon_name)
+	family_button.modulate = Color(1, 1, 1).lerp(Color(1.2, 1.08, 1.12), 0.5 + 0.5 * sin(_time * 3.0)) \
+		if Family.has_news(profile) else Color.WHITE
+
+
+## Vue suivante pour le bouton en bas à droite : maison, jardin, puis chambre des enfants.
+static func next_view(view: String, nursery := false) -> String:
+	match view:
+		"maison":
+			return "jardin"
+		"jardin":
+			return "chambre" if nursery else "maison"
+	return "maison"
+
+
+## Le bouton en bas à droite propose la vue suivante (« Jardin » depuis la maison…).
+func set_view(view: String, nursery := false) -> void:
+	var next := next_view(view, nursery)
+	var labels := {"maison": "Maison", "jardin": "Jardin", "chambre": "Chambre"}
+	var icons := {"maison": "maison", "jardin": "feuille", "chambre": "bebe"}
+	var tips := {"maison": "Revenir voir la maison", "jardin": "Aller voir le jardin : on y récolte du bois et des pierres",
+		"chambre": "Aller voir la chambre des enfants"}
+	var colors := {"maison": UiTheme.COL_ACCENT, "jardin": UiTheme.COL_GOOD, "chambre": Color(0.93, 0.45, 0.58)}
+	view_button.text = labels[next]
+	view_button.icon = UiTheme.icon_texture(icons[next])
+	view_button.tooltip_text = tips[next]
+	var color: Color = colors[next]
 	view_button.add_theme_stylebox_override("normal", UiTheme._button_box(color))
 	view_button.add_theme_stylebox_override("hover", UiTheme._button_box(color.lightened(0.12)))
 	view_button.add_theme_stylebox_override("pressed", UiTheme._button_box(color.darkened(0.15)))

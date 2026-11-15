@@ -5,6 +5,7 @@ const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Build = preload("res://scripts/core/build.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 const ERROR_LABELS := {
 	"substitution": "lettres remplacées", "oubli": "lettres oubliées", "ajout": "lettres en trop",
@@ -87,8 +88,16 @@ static func session_lines(s: Dictionary) -> Array:
 			built_names.append(Data.CONSTRUCTIONS[id]["label"].to_lower())
 	if not built_names.is_empty():
 		lines.append("Construit dans le jardin : %s" % ", ".join(built_names))
+	var family: Array = s.get("famille", []) if s.get("famille", []) is Array else []
+	if not family.is_empty(): # séances de la version 2.4
+		lines.append("Famille : %s" % ", ".join(family))
 	lines.append("Temps avec au moins une jauge dans le rouge : %s" % format_duration(red_any_sec(s)))
 	return lines
+
+
+## La famille en une ligne (rencontre, complicité, enfants).
+static func family_line(profile: Dictionary) -> String:
+	return Family.summary(profile)
 
 
 ## Le jardin en une ligne : réserve de ressources et constructions.

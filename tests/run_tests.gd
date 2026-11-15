@@ -10,6 +10,7 @@ const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Recap = preload("res://scripts/core/recap.gd")
 const Build = preload("res://scripts/core/build.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 var _fails := 0
 var _count := 0
@@ -30,6 +31,7 @@ func _init() -> void:
 	_test_dreams()
 	_test_garden()
 	_test_family_graphics()
+	_test_family()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -546,3 +548,73 @@ func _test_family_graphics() -> void:
 	print("Famille : pictogrammes prêts (version 2.4)")
 	for name in ["couple", "famille", "bebe", "biberon", "fleurs", "jouet", "coeur"]:
 		check(FileAccess.file_exists("res://icons/%s.png" % name), "pictogramme de la famille prêt : %s" % name)
+
+
+func _test_family() -> void:
+	print("Famille : rencontrer, vivre ensemble, les enfants")
+	var p := _profile()
+	p["appearance"] = Data.complete_appearance({})
+	p["objectifs_finis"] = 3
+	check(Family.stage(p) == "seul" and not Family.has_partner(p) and Family.children(p).is_empty(), "au départ : seul (le profil est complété tout seul)")
+	check(not Family.can_meet(p) and Family.advice(p).contains("charisme"), "il faut du charisme niveau 1 pour rencontrer quelqu'un")
+	check(not Data.is_available("fleurs", p) and not Data.is_available("bercer", p), "pas d'activité en couple ni de bébé sans famille")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var people := Family.proposals(rng)
+	var names := {}
+	for person in people:
+		names[person["nom"]] = true
+	check(people.size() == 4 and names.size() == 4, "quatre personnes, quatre prénoms différents")
+	check(people.map(func(q): return q["genre"]) == [0, 1, 0, 1] and people.all(func(q): return q["apparence"]["body"] == q["genre"]), "deux femmes et deux hommes : c'est l'enfant qui choisit")
+	check(people.all(func(q): return q["genre"] == 1 or q["apparence"].get("beard", 0) == 0), "pas de barbe pour les femmes")
+	check(not Family.meet(p, people[0]), "rencontre refusée sans charisme")
+	check(not Objectives.candidates(p).any(func(o): return o["type"] == "rencontre"), "pas d'objectif « rencontrer » sans charisme")
+	p["skills_xp"]["charisme"] = float(Data.xp_for_level(1))
+	check(Family.can_meet(p) and Objectives.candidates(p).any(func(o): return o["type"] == "rencontre"), "avec le charisme : objectif « rencontrer quelqu'un »")
+	check(Family.meet(p, people[1]) and Family.partner_name(p) == people[1]["nom"] and Family.complicity(p) == 10, "rencontre : la complicité commence à 10")
+	check(not Family.meet(p, people[2]), "une seule personne à la fois")
+	check(Family.stage(p) == "rencontre" and Data.is_available("fleurs", p) and not Data.is_available("bercer", p), "les moments à deux sont possibles")
+	check(Objectives.candidates(p).any(func(o): return o["type"] == "famille"), "objectif « passer du temps en famille »")
+	check(not Family.can_move_in(p) and not Family.move_in(p), "pas encore assez complices pour vivre ensemble")
+	check(Family.add_complicity(p, 500) == 100, "la complicité ne dépasse pas 100 %")
+	p["famille"]["complicite"] = Data.FAMILY_MOVE_IN
+	check(Family.can_move_in(p) and Family.has_news(p) and Family.advice(p).contains("vivre ensemble"), "très complices : « Ma famille » le signale")
+	check(Family.move_in(p) and Family.is_together(p) and not Family.move_in(p), "ils vivent ensemble")
+	check(Family.status_text(p) == "Avec " + people[1]["nom"], "le cadre « Ma famille » montre le conjoint")
+	check(not Family.can_have_baby(p) and Family.baby_blocker(p).contains("organisation"), "il faut de l'organisation pour accueillir un bébé")
+	Family.decline_children(p)
+	p["famille"]["vu"] = true
+	check(Family.declined(p) and not Family.has_news(p) and Family.advice(p).contains("canapé"), "« pas d'enfant » : un choix respecté")
+	p["skills_xp"]["organisation"] = float(Data.xp_for_level(2))
+	var baby_names := Family.baby_names(rng)
+	check(baby_names.size() == 4 and baby_names.filter(func(c): return c["genre"] == 0).size() == 2, "quatre prénoms : deux filles, deux garçons")
+	var baby := Family.have_baby(p, baby_names[2], rng)
+	check(not baby.is_empty() and baby["nom"] == baby_names[2]["nom"] and baby["age"] == "bebe" and not Family.declined(p), "changement d'avis : le bébé arrive")
+	var parents := [p["appearance"]["skin"], Family.partner(p)["apparence"]["skin"]]
+	check(baby["apparence"]["skin"] in parents, "le bébé a la peau de l'un de ses parents")
+	check(Family.has_baby(p) and Data.is_available("bercer", p) and not Data.is_available("jouer_enfant", p), "on s'occupe du bébé au berceau")
+	check(Family.have_baby(p, baby_names[0], rng).is_empty() and Family.baby_blocker(p).contains("un bébé à la fois"), "un bébé à la fois")
+	for i in Data.FAMILY_BABY_CARES - 1:
+		check(not Family.care_baby(p), "soin %d : le bébé est encore petit" % (i + 1))
+	check(Family.care_baby(p) and Family.has_child(p) and not Family.has_baby(p), "après %d soins, le bébé a grandi" % Data.FAMILY_BABY_CARES)
+	check(Data.is_available("jouer_enfant", p) and Data.is_available("histoire", p), "jouer et raconter une histoire à son enfant")
+	Dreams.choose(p, "famille")
+	check(Dreams.current(p) == "famille" and Dreams.steps_done(p) == 5 and Dreams.is_done(p), "rêve « Fonder une famille » : les 5 étapes faites")
+	check(Recap.family_line(p).contains(Family.partner_name(p)) and Recap.family_line(p).contains(baby["nom"]), "l'adulte voit la famille en une ligne")
+	Family.have_baby(p, baby_names[1], rng)
+	check(Family.children(p).size() == Data.FAMILY_MAX_CHILDREN and Family.baby_blocker(p).contains("complet"), "au plus deux enfants")
+	# Sauvegardes : anciennes versions et fichiers abîmés
+	check(Family.clean(null) == Family.new_state() and Family.clean({"enfants": [{"nom": "Zoé"}]})["enfants"].is_empty(), "sauvegarde abîmée : état vide, pas d'enfant sans couple")
+	var cleaned := Family.clean(p["famille"])
+	check(cleaned["partenaire"]["nom"] == Family.partner_name(p) and cleaned["enfants"].size() == 2 and cleaned["ensemble"], "la famille est relue telle quelle")
+	var messy := Family.clean({"partenaire": {"nom": "Lina", "genre": 9}, "complicite": 900, "ensemble": true, "choix_enfant": "non",
+		"enfants": [{"nom": "A"}, {"nom": "B", "age": "enfant"}, {"nom": "C"}]})
+	check(messy["complicite"] == 100 and messy["partenaire"]["genre"] == 1 and messy["enfants"].size() == 2 and messy["choix_enfant"] == "", "valeurs remises en ordre")
+	var counted := {"type": "famille", "target": 2, "count": 0}
+	p["objectif"] = counted
+	Objectives.notify(p, "action", {"action": "calin"})
+	Objectives.notify(p, "action", {"action": "dormir"})
+	check(int(p["objectif"]["count"]) == 1, "seules les activités en famille comptent pour l'objectif")
+	for id in Data.ACTIONS:
+		if Data.ACTIONS[id].has("famille"):
+			check(Data.ACTIONS[id]["famille"] in Data.FAMILY_ACTIONS and id in Data.FAMILY_ACTIONS[Data.ACTIONS[id]["famille"]], "activité %s : rangée avec la famille" % id)

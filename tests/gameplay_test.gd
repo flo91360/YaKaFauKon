@@ -12,6 +12,8 @@ const Data = preload("res://scripts/core/data.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Build = preload("res://scripts/core/build.gd")
 const BuildPanel = preload("res://scripts/ui/build_panel.gd")
+const FamilyPanel = preload("res://scripts/ui/family_panel.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 var _fails := 0
 var _count := 0
@@ -42,6 +44,25 @@ func _wait_state(screen, state: String, max_seconds: float) -> bool:
 		await create_timer(0.05).timeout
 		t += 0.05
 	return screen._state == state
+
+
+## Tape tous les mots de la série en cours, puis attend la fin.
+func _type_series(screen) -> bool:
+	for i in Data.WORDS_PER_SERIES:
+		screen.typing._input.text = screen.typing.model_text
+		screen.typing._submit()
+		await _wait(1.3)
+	return await _wait_state(screen, "idle", 5.0)
+
+
+## Le personnage arrive à l'objet pour l'action (comme après la frappe).
+func _arrive(screen, id: String, action_id: String) -> void:
+	var target = _object(screen, id)
+	screen._object = target
+	screen._action_id = action_id
+	screen._state = "walking"
+	screen.character.position = target.use_point
+	screen._on_arrived()
 
 
 func _object(screen, id: String):
@@ -282,6 +303,8 @@ func _run() -> void:
 	check(reachable, "un chemin existe entre tous les objets")
 	var covered := true
 	for id in Data.ACTIONS:
+		if Data.ACTIONS[id].has("famille"):
+			continue # les activités de la famille apparaissent avec elle (testées plus bas)
 		var found := false
 		for f in screen.studio.furniture:
 			found = found or id in f.actions
@@ -379,7 +402,7 @@ func _run() -> void:
 	screen._overlay.find_child("ChangerReve", true, false).pressed.emit()
 	await process_frame
 	await process_frame
-	check(screen._overlay.find_child("Reve_sportif", true, false) != null and screen._overlay.find_child("Reve_artisan", true, false).disabled, "les 8 rêves sont proposés, le rêve actuel est marqué")
+	check(screen._overlay.find_child("Reve_sportif", true, false) != null and screen._overlay.find_child("Reve_artisan", true, false).disabled and screen._overlay.find_child("Reve_famille", true, false) != null, "les 9 rêves sont proposés, le rêve actuel est marqué")
 	screen._overlay.find_child("Reve_sportif", true, false).pressed.emit()
 	check(profile["reve"]["id"] == "sportif" and screen._overlay == null and game.session["reves_changes"] == 1, "nouveau rêve choisi, changement compté pour l'ergo")
 	screen._open_objectives()
@@ -481,6 +504,95 @@ func _run() -> void:
 	check(studio.family.is_empty(), "la famille peut quitter la scène")
 	screen._open_guide()
 	check(screen._overlay != null and screen._overlay.objects.size() == studio.furniture.size(), "le guide s'ouvre encore avec les objets de la chambre")
+	screen._close_overlay()
+
+	print("Famille : rencontrer, vivre ensemble, les enfants")
+	profile["famille"] = Family.new_state()
+	profile["settings"]["chrono"] = "jamais"
+	profile["skills_xp"]["charisme"] = 0.0
+	profile["skills_xp"]["organisation"] = 0.0
+	screen._sync_family()
+	var sofa = studio.get_object("canape")
+	check(sofa.actions == ["inviter"] and studio.family.is_empty(), "seul : le canapé sert à inviter des amis")
+	check(screen.hud.family_button.visible and screen.hud._family_text.text == "Rencontrer quelqu'un", "le cadre « Ma famille » est à gauche")
+	screen.hud.family_button.pressed.emit()
+	check(screen._overlay is FamilyPanel and screen.paused and profile["famille"]["vu"], "« Ma famille » ouvre le panneau (jeu en pause)")
+	var people: Array = screen._overlay.people
+	check(people.size() == 4 and people.filter(func(p): return p["genre"] == 0).size() == 2, "deux femmes et deux hommes sont proposés")
+	check(screen._overlay.find_child("Rencontrer_0", true, false).disabled, "il faut du charisme pour rencontrer quelqu'un")
+	profile["skills_xp"]["charisme"] = float(Data.xp_for_level(1))
+	screen._overlay.refresh()
+	await process_frame
+	var meet_button = screen._overlay.find_child("Rencontrer_3", true, false)
+	check(not meet_button.disabled, "avec le charisme : on peut rencontrer quelqu'un")
+	meet_button.pressed.emit()
+	check(Family.partner_name(profile) == people[3]["nom"] and screen._overlay == null, "la personne choisie est rencontrée")
+	check(studio.family.size() == 1 and game.session["famille"].size() == 1, "elle vient dire bonjour ; la rencontre est notée pour l'adulte")
+	check(sofa.actions.has("fleurs") and sofa.actions.has("danser") and sofa.actions.has("calin"), "le canapé propose les moments à deux")
+	await _wait(4.0)
+	check(studio.family.is_empty(), "avant de vivre ensemble, elle repart")
+	_arrive(screen, "canape", "fleurs")
+	check(screen._state == "series" and screen.character.anim == "give" and studio.family.size() == 1 and studio.family[0].anim == "celebrate", "offrir des fleurs : la personne aimée est là, ravie")
+	var complicity := Family.complicity(profile)
+	check(await _type_series(screen), "la série des fleurs se termine")
+	check(Family.complicity(profile) == complicity + Data.WORDS_PER_SERIES * Data.FAMILY_COMPLICITY_PER_WORD, "chaque mot réussi fait monter la complicité")
+	check(studio.family.is_empty(), "après le moment à deux, elle repart")
+	_arrive(screen, "canape", "danser")
+	check(screen.character.anim == "dance" and studio.family[0].anim == "dance", "danser ensemble")
+	screen.typing._close({"status": "cancel"})
+	profile["famille"]["complicite"] = Data.FAMILY_MOVE_IN
+	screen._open_family()
+	var move_button = screen._overlay.find_child("VivreEnsemble", true, false)
+	check(move_button != null and not move_button.disabled, "très complices : on peut vivre ensemble")
+	move_button.pressed.emit()
+	check(Family.is_together(profile) and not studio._bed_single_parts[0].visible, "ils vivent ensemble : le lit devient un grand lit")
+	check(studio.family.size() == 1 and studio.family[0].anim == "sit_read", "le conjoint lit sur le canapé")
+	_arrive(screen, "canape", "calin")
+	check(screen.character.anim == "sit_cuddle" and studio.family[0].anim == "sit_cuddle_r", "câlin sur le canapé")
+	screen.typing._close({"status": "cancel"})
+	_arrive(screen, "lit", "dormir")
+	check(screen._state == "acting" and studio.family[0].pose == "allonge", "le soir, ils dorment tous les deux")
+	screen._leave_object()
+	screen._open_family()
+	check(screen._overlay.find_child("AvoirBebe", true, false).disabled, "il faut de l'organisation pour accueillir un bébé")
+	screen._overlay.find_child("PasDEnfant", true, false).pressed.emit()
+	await process_frame
+	check(Family.declined(profile) and screen._overlay is FamilyPanel and screen._overlay.find_child("PasDEnfant", true, false) == null, "on peut choisir de ne pas avoir d'enfant")
+	check(not Family.has_news(profile), "ce choix est respecté : « Ma famille » ne clignote plus")
+	profile["skills_xp"]["organisation"] = float(Data.xp_for_level(2))
+	screen._overlay.refresh()
+	await process_frame
+	var baby_button = screen._overlay.find_child("AvoirBebe", true, false)
+	check(not baby_button.disabled, "on peut changer d'avis : un bébé est possible")
+	baby_button.pressed.emit()
+	await process_frame
+	var name_button = screen._overlay.find_child("Prenom_1", true, false)
+	check(name_button != null, "on choisit le prénom du bébé")
+	name_button.pressed.emit()
+	var baby: Dictionary = Family.baby(profile)
+	check(not baby.is_empty() and screen._overlay == null and studio.has_nursery() and studio.has_baby(), "le bébé dort dans son berceau, dans la nouvelle chambre")
+	check(studio.view == "chambre" and screen.hud.view_button.text == "Maison", "la caméra montre la chambre des enfants")
+	check(studio.get_object("berceau").actions == ["bercer", "biberon"] and studio.get_object("jouets").actions.is_empty(), "le berceau propose bercer et biberon")
+	_arrive(screen, "berceau", "bercer")
+	check(screen.character.anim == "rock" and not studio.has_baby(), "bercer : le bébé est dans les bras")
+	screen.typing._close({"status": "cancel"})
+	check(studio.has_baby(), "le bébé retourne dans son berceau")
+	baby["soins"] = Data.FAMILY_BABY_CARES - 1
+	_arrive(screen, "berceau", "biberon")
+	check(screen.character.anim == "feed", "donner le biberon")
+	check(await _type_series(screen), "la série du biberon se termine")
+	check(Family.has_child(profile) and not studio.has_baby(), "après les soins, le bébé a grandi")
+	check(studio.family.size() == 2 and studio.family.any(func(m): return m.age == "enfant" and m.anim == "floor_play"), "l'enfant joue dans sa chambre")
+	check(studio.get_object("jouets").actions == ["jouer_enfant"] and studio.get_object("lit_enfant").actions == ["histoire"], "les jouets et le petit lit ont leurs activités")
+	_arrive(screen, "jouets", "jouer_enfant")
+	check(screen.character.anim == "kneel_play", "jouer avec son enfant")
+	screen.typing._close({"status": "cancel"})
+	_arrive(screen, "lit_enfant", "histoire")
+	check(screen.character.anim == "talk" and studio.family.any(func(m): return m.age == "enfant" and m.pose == "allonge"), "raconter une histoire : l'enfant est couché")
+	screen.typing._close({"status": "cancel"})
+	check(game.session["famille"].size() >= 4, "les grands moments sont notés pour l'adulte")
+	screen._on_dream_chosen("famille")
+	check(Dreams.steps_done(profile) == 5 and Dreams.is_done(profile), "le rêve « Fonder une famille » est réalisé")
 	screen._close_overlay()
 
 	print("")

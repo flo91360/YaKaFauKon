@@ -6,6 +6,7 @@ extends SceneTree
 const Recap = preload("res://scripts/core/recap.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Data = preload("res://scripts/core/data.gd")
+const Family = preload("res://scripts/core/family.gd")
 const DreamPanel = preload("res://scripts/ui/dream_panel.gd")
 
 var _fails := 0
@@ -51,6 +52,12 @@ func _run() -> void:
 	game.add_resource("pierre", 4)
 	check(not game.build("fontaine") and game.build("banc") and game.profile["ressources"] == {"bois": 3, "pierre": 4}, "jardin : 9 bûches récoltées, banc construit, 3 bûches restent")
 	game.profile["jardin_vu"] = true
+	check(game.profile["famille"] == Family.new_state(), "nouveau profil : la famille est à découvrir")
+	game.profile["skills_xp"]["charisme"] = float(Data.xp_for_level(1))
+	var someone: Dictionary = Family.proposals()[1]
+	check(game.meet(someone), "rencontre enregistrée")
+	game.profile["famille"]["complicite"] = 64
+	game.profile["famille"]["vu"] = true
 	game.session["duree_sec"] = 300.0
 	game.session["frappes_ok"] = 10
 	game.session["caracteres"] = 100
@@ -84,6 +91,11 @@ func _run() -> void:
 	check(p["sessions"][0].get("recoltes", {}).get("bois", 0) == 9 and p["sessions"][0].get("constructions", []) == ["banc"], "récolte et construction notées dans la séance")
 	check(Recap.session_lines(p["sessions"][0]).has("Récolte dans le jardin : 9 bûches, 4 pierres") and Recap.session_lines(p["sessions"][0]).has("Construit dans le jardin : banc de jardin"), "jardin visible dans le récapitulatif de la séance")
 	check(Recap.garden_line(p).contains("3 bûches et 4 pierres") and Recap.garden_line(p).contains("banc de jardin (1 sur 3)"), "jardin visible pour l'ergo")
+	check(Family.partner_name(p) == someone["nom"] and Family.complicity(p) == 64 and typeof(p["famille"]["complicite"]) == TYPE_INT and p["famille"]["vu"], "famille conservée (conjoint et complicité)")
+	check(Family.partner(p)["apparence"] == Data.complete_appearance(someone["apparence"]), "le conjoint garde son apparence")
+	check(p["sessions"][0].get("famille", []) == ["a rencontré %s" % someone["nom"]], "rencontre notée dans la séance")
+	check(Recap.session_lines(p["sessions"][0]).any(func(l): return l.begins_with("Famille : ") and l.contains(someone["nom"])), "rencontre visible dans le récapitulatif de la séance")
+	check(Recap.family_line(p).contains(someone["nom"]), "famille visible pour l'ergo")
 	check(Progression.skill_level(p, "physique") == 2, "compétences conservées")
 	check(Progression.current_tier(p) == 2, "palier de carrière conservé")
 	check(Progression.setting(p, "chrono") == "souvent", "réglage de l'ergo conservé")
@@ -133,6 +145,7 @@ func _run() -> void:
 	check(o["achats"] == [] and o["skills_xp"].has("douceur"), "version 2.1 : pas encore d'achat, nouvelles compétences à zéro")
 	check(o["reve"]["id"] == "" and o["reve"]["realises"] == [], "version 2.2 : le rêve reste à choisir")
 	check(o["ressources"] == {"bois": 0, "pierre": 0} and o["constructions"] == [] and o["jardin_vu"] == false, "version 2.3 : réserve vide, jardin à découvrir")
+	check(o["famille"] == Family.new_state(), "version 2.4 : la famille est à découvrir")
 	check(Recap.session_lines(o["sessions"][0]).size() >= 8 and Recap.keywords(o).size() > 0, "récapitulatif des anciennes séances lisible")
 	check(game.session.has("series_finies") and Recap.session_lines(game.session).size() >= 11, "nouvelles statistiques dans la séance en cours")
 	var screen = load("res://scripts/screens/game_screen.gd").new()

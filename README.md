@@ -35,9 +35,9 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 
 ## Ce que contient le jeu
 
-- **Objectif de vie (« Mon rêve »)** : en début de partie, l'enfant choisit son grand rêve parmi 8
+- **Objectif de vie (« Mon rêve »)** : en début de partie, l'enfant choisit son grand rêve parmi 9
   (devenir champion, star de la chanson, grand savant, grand inventeur, maître artisan, organiser de
-  grandes fêtes, vivre dans la nature, avoir une belle maison). Le jeu montre les étapes, signale les
+  grandes fêtes, vivre dans la nature, avoir une belle maison, fonder une famille). Le jeu montre les étapes, signale les
   objectifs qui en rapprochent, et fête le rêve réalisé (100 pièces, 3 étoiles). On peut en changer.
 - **Profils** : plusieurs enfants sur le même PC. Sauvegarde automatique locale (toutes les 20 s et en quittant).
 - **Création du personnage** par onglets : femme ou homme, taille, corpulence, peau, forme du visage,
@@ -52,6 +52,11 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   jardin, l'enfant coupe du bois et ramasse des pierres (un mot réussi = une bûche ou une pierre), puis
   construit dans la cour un banc (se reposer), une fontaine (se laver) et un barbecue (manger avec un ami).
   L'écran « Construire » montre sa réserve et ce qu'il lui manque (ressources, niveaux de compétence).
+- **Ma famille** (cadre à gauche, jamais obligatoire) : rencontrer quelqu'un (une femme ou un homme,
+  l'enfant choisit ; charisme niveau 1), faire monter la complicité sur le canapé (fleurs, danse, câlin),
+  vivre ensemble (grand lit, le conjoint reste à la maison), puis avoir des enfants ou non (organisation
+  niveau 2, choix modifiable). Le bébé a son berceau dans une chambre d'enfant (bercer, biberon) ; après
+  4 soins, il grandit (jouer, raconter une histoire). Deux enfants au plus.
 - **Personnage animé** : il marche, court, dort, mange, cuisine, se brosse les dents, se douche,
   téléphone, reçoit des amis, peint, parle au miroir, bricole, écrit, lit, joue à un jeu de société,
   joue de la guitare, arrose le potager, caresse le chat, coupe du bois, ramasse des pierres… La caméra se rapproche pendant l'activité.
@@ -62,7 +67,7 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **10 compétences** : physique, créativité, charisme, organisation et humour dès le départ ; logique,
   sociabilité, patience, responsabilité et douceur avec les achats du magasin ou les missions de certains métiers.
 - **Compétences par champ lexical** : dans une activité (sport, peinture, cuisine, planning, bois,
-  miroir, téléphone, invités, bois et pierres du jardin, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
+  miroir, téléphone, invités, bois et pierres du jardin, moments en famille, puis lecture, jeu de société, guitare, jardinage, chat), l'enfant tape une **série de 5 mots** du champ lexical de l'activité.
   Chaque mot réussi fait monter la **barre de la compétence** ; barre pleine = un niveau de plus.
   Les mots s'adaptent au niveau de texte de l'enfant (courts, moyens, longs). Bouton « Arrêter » :
   les points déjà gagnés sont gardés.
@@ -91,13 +96,13 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
   nouvelle mesure de la vitesse, suppression du profil.
 - **Récapitulatif** : par séance datée (vitesse moyenne, types d'erreurs, temps de jeu,
   missions, tâches terminées/abandonnées, mots de champ lexical par activité, séries terminées ou
-  arrêtées, objectifs choisis/atteints, achats au magasin, récoltes et constructions du jardin, rêve réalisé ou changé, temps dans le rouge) et sur la durée
+  arrêtées, objectifs choisis/atteints, achats au magasin, récoltes et constructions du jardin, grands moments de la famille, rêve réalisé ou changé, temps dans le rouge) et sur la durée
   (évolution de la vitesse, persévérance, gestion de vie, compétences), avec un résumé en mots-clés.
   Rien n'est envoyé en ligne.
 
 ## Tests
 
-656 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+805 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
@@ -112,9 +117,9 @@ Release avec la section correspondante de `CHANGELOG.md`.
 
 ## Organisation du code
 
-- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, objectif de vie (`dreams.gd`), magasin, jardin (`build.gd`), sauvegarde, récapitulatif.
+- `scripts/core/` : données (`data.gd`), frappe tolérante, progression, objectifs, objectif de vie (`dreams.gd`), magasin, jardin (`build.gd`), famille (`family.gd`), sauvegarde, récapitulatif.
 - `scripts/world/` : studio (décor, lumière, caméra, effets), meubles, personnage articulé, formes 3D.
-- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, rêve, magasin, construire, guide, tutoriel, pause).
+- `scripts/ui/` : thème, interface de jeu, panneaux (frappe, compétences, travail, mission, objectifs, rêve, famille, magasin, construire, guide, tutoriel, pause), portraits 3D (`portrait.gd`).
 - `scripts/screens/` : écrans (joueurs, création, jeu, ergothérapeute).
 - `tools/` : scripts Python qui fabriquent les textures, les pictogrammes, les sons et la musique.
 - Pour ajouter une activité, des mots, une compétence, une mission ou une carrière : `scripts/core/data.gd`
@@ -123,12 +128,10 @@ Release avec la section correspondante de `CHANGELOG.md`.
   `CONSTRUCTIONS` dans `data.gd` et son décor dans `add_construction` de `studio.gd` ; pour une nouvelle
   ressource : `RESOURCES`, une action avec `recolte` et son objet dans `_build_yard`.
 
-Graphismes de la famille déjà prêts (version 2.4, le code de jeu reste à écrire, rien n'apparaît encore) :
-personnage enfant (`build(apparence, "enfant")`), bébé, ourson, cœurs ; 12 gestes dans `character.gd`
-(`FAMILY_ANIMS` : câlin, bouquet, danse, main dans la main, blottis sur le canapé, bercer, biberon, doudou,
-jouer par terre, à genoux) ; dans `studio.gd` : `set_double_bed`, `add_nursery` (chambre des enfants avec
-berceau, petit lit et jouets, vue « chambre »), `set_baby`, `add_family_member`, `duo`, `side_by_side`,
-`hearts` ; pictogrammes `couple`, `famille`, `bebe`, `biberon`, `fleurs`, `jouet`. Aperçu : `--famille=…`
-(voir `scripts/main.gd`).
+Famille : les règles sont dans `scripts/core/family.gd` (réglages `FAMILY_…` dans `data.gd`), le panneau
+dans `scripts/ui/family_panel.gd`, la mise en scène dans `_sync_family` et `_place_family` de
+`scripts/screens/game_screen.gd`. Décor et gestes : `add_nursery`, `set_double_bed`, `duo`, `hearts`… dans
+`studio.gd`, `FAMILY_ANIMS` dans `character.gd`. Aperçus : `--famille=…`, `--famille-etat=rencontre|ensemble|bebe|enfant`
+et `--demo-famille` (voir `scripts/main.gd`).
 
-Pas encore dans le jeu : relations et famille (et le rêve « fonder une famille »), plateforme en ligne.
+Pas encore dans le jeu : plateforme en ligne.

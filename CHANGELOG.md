@@ -10,6 +10,34 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.0] - 2026-11-15
+
+### Ajouté
+
+- **Ma famille** : un nouveau cadre à gauche de l'écran. L'enfant peut rencontrer
+  quelqu'un (il faut le niveau 1 en charisme) : le jeu propose deux femmes et deux
+  hommes, chacun avec ses goûts, et c'est l'enfant qui choisit. Ce n'est jamais
+  obligatoire.
+- **Complicité** : sur le canapé, offrir des fleurs, danser ou faire un câlin
+  (séries de 5 mots). Chaque mot réussi fait monter la complicité ; à 60 %, le
+  couple peut vivre ensemble. Le lit devient un grand lit et le conjoint reste à
+  la maison (il lit sur le canapé, dort à côté le soir).
+- **Enfants, ou pas** : avoir un bébé ou non est un choix, et « Pas d'enfant »
+  peut changer plus tard. Il faut le niveau 2 en organisation. L'enfant choisit
+  le prénom ; une chambre d'enfant apparaît devant la maison. On berce le bébé
+  et on lui donne le biberon au berceau ; après 4 soins, il grandit et joue dans
+  sa chambre (jouer avec lui, lui raconter une histoire). Deux enfants au plus.
+- **Nouveau rêve « Fonder une famille »** (9 rêves en tout), et deux nouveaux
+  objectifs : rencontrer quelqu'un, passer du temps en famille.
+- Le bouton en bas à droite passe de la maison au jardin, puis à la chambre des
+  enfants quand elle existe.
+
+### Pour l'adulte
+
+- Le récapitulatif montre la famille en une ligne, et chaque séance note les
+  grands moments (rencontre, vie à deux, naissance, bébé qui grandit, choix de
+  ne pas avoir d'enfant).
+
 ## [2.3.0] - 2026-11-14
 
 ### Ajouté

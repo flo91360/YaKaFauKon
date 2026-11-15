@@ -60,7 +60,9 @@ static func active_skills() -> Array:
 # anim = animation du personnage pendant l'action ;
 # achat = l'action demande un achat du magasin (voir SHOP) ;
 # construction = l'action demande une construction du jardin (voir CONSTRUCTIONS) ;
-# recolte = chaque mot réussi de la série rapporte une ressource (voir RESOURCES).
+# recolte = chaque mot réussi de la série rapporte une ressource (voir RESOURCES) ;
+# famille = l'action demande quelqu'un dans la vie de l'enfant ("couple"), un bébé
+# ("bebe") ou un enfant qui a grandi ("enfant") : voir family.gd.
 # Les actions qui donnent de la compétence se jouent en « série de mots » : après le
 # mot de départ, l'enfant tape WORDS_PER_SERIES mots du champ lexical (voir LEXIQUE).
 const ACTIONS := {
@@ -112,6 +114,21 @@ const ACTIONS := {
 		"needs": {"hygiene": 40.0}, "skills": {}, "verbe": "se lave à la fontaine", "construction": "fontaine"},
 	"barbecue": {"anim": "cook", "label": "Faire un barbecue", "texts": ["barbecue", "le barbecue", "faire un barbecue"], "minutes": 45,
 		"needs": {"faim": 65.0, "social": 30.0}, "skills": {}, "verbe": "fait un barbecue avec un ami", "construction": "barbecue"},
+	# Famille : en couple (sur le canapé), avec le bébé (berceau) et avec l'enfant (chambre)
+	"fleurs": {"anim": "give", "label": "Offrir des fleurs", "texts": ["fleurs", "des fleurs", "offrir des fleurs"], "minutes": 20,
+		"needs": {"social": 30.0}, "skills": {"douceur": 8.0, "charisme": 6.0}, "verbe": "offre des fleurs", "famille": "couple"},
+	"danser": {"anim": "dance", "label": "Danser ensemble", "texts": ["danse", "une danse", "danser ensemble"], "minutes": 30,
+		"needs": {"social": 35.0, "sommeil": -5.0}, "skills": {"humour": 8.0, "physique": 6.0}, "verbe": "danse", "famille": "couple"},
+	"calin": {"anim": "sit_cuddle", "label": "Faire un câlin", "texts": ["câlin", "un câlin", "faire un câlin"], "minutes": 20,
+		"needs": {"social": 40.0}, "skills": {"douceur": 10.0}, "verbe": "fait un câlin", "famille": "couple"},
+	"bercer": {"anim": "rock", "label": "Bercer le bébé", "texts": ["bébé", "le bébé", "bercer le bébé"], "minutes": 20,
+		"needs": {"social": 15.0}, "skills": {"douceur": 10.0, "patience": 8.0}, "verbe": "berce le bébé", "famille": "bebe"},
+	"biberon": {"anim": "feed", "label": "Donner le biberon", "texts": ["biberon", "le biberon", "donner le biberon"], "minutes": 20,
+		"needs": {}, "skills": {"responsabilite": 10.0, "organisation": 6.0}, "verbe": "donne le biberon", "famille": "bebe"},
+	"jouer_enfant": {"anim": "kneel_play", "label": "Jouer avec ton enfant", "texts": ["jouets", "les jouets", "jouer avec les jouets"], "minutes": 40,
+		"needs": {"social": 35.0}, "skills": {"responsabilite": 8.0, "creativite": 8.0}, "verbe": "joue avec son enfant", "famille": "enfant"},
+	"histoire": {"anim": "talk", "label": "Raconter une histoire", "texts": ["histoire", "une histoire", "raconter une histoire"], "minutes": 20,
+		"needs": {"social": 20.0}, "skills": {"douceur": 8.0, "logique": 6.0}, "verbe": "raconte une histoire", "famille": "enfant"},
 }
 
 const WORDS_PER_SERIES := 5
@@ -194,6 +211,41 @@ const LEXIQUE := {
 		["pierre", "roc", "sable", "dur", "gris", "mur", "tas", "lourd", "sol", "galet"],
 		["caillou", "rocher", "gravier", "porter", "pioche", "solide", "falaise", "ardoise", "granit", "marbre"],
 		["carrière", "soulever", "construire", "montagne", "minéral", "transporter", "fondation", "maçonnerie", "escalader"],
+	],
+	"fleurs": [
+		["rose", "fleur", "tige", "joli", "vase", "lys", "bleu", "rouge", "odeur", "merci"],
+		["bouquet", "tulipe", "offrir", "parfum", "cadeau", "jardin", "sourire", "pétale", "couleur", "gentil"],
+		["marguerite", "coquelicot", "tournesol", "surprise", "délicate", "attention", "magnifique", "jonquille", "compliment"],
+	],
+	"danser": [
+		["pas", "valse", "saut", "tour", "rock", "bal", "son", "pied", "main", "joie"],
+		["danser", "musique", "rythme", "tourner", "sauter", "ensemble", "chanson", "piste", "salsa", "bouger"],
+		["chorégraphie", "tourbillon", "danseuse", "mouvement", "équilibre", "applaudir", "enchaîner", "spectacle", "entraînant"],
+	],
+	"calin": [
+		["câlin", "doux", "bras", "chaud", "joue", "bisou", "rire", "calme", "nous", "joie"],
+		["serrer", "confiance", "gentil", "ensemble", "partager", "plaid", "coussin", "sourire", "écouter", "rassurer"],
+		["tendresse", "réconfort", "amoureux", "complicité", "affection", "bienveillance", "attentionné", "chaleureux", "se blottir"],
+	],
+	"bercer": [
+		["bébé", "dodo", "lit", "nuit", "doux", "lune", "bras", "chut", "ange", "berce"],
+		["bercer", "berceau", "câliner", "chanson", "sommeil", "tétine", "doudou", "couverture", "bâiller", "fragile"],
+		["berceuse", "nourrisson", "endormir", "murmurer", "tendrement", "silence", "pyjama", "veilleuse", "paisible"],
+	],
+	"biberon": [
+		["lait", "eau", "faim", "boire", "miam", "repas", "goût", "bavoir", "rot", "chaud"],
+		["biberon", "tétine", "tiède", "couche", "laver", "nourrir", "cuillère", "compote", "purée", "goûter"],
+		["stériliser", "température", "responsable", "pédiatre", "rassasié", "préparer", "doucement", "vitamines", "grandir vite"],
+	],
+	"jouer_enfant": [
+		["jeu", "balle", "cube", "tour", "rire", "ours", "toupie", "train", "pâte", "bulle"],
+		["jouets", "ballon", "poupée", "puzzle", "peluche", "construire", "cacher", "coucou", "empiler", "dessin"],
+		["imaginer", "cache-cache", "marionnette", "déguisement", "pâte à modeler", "toboggan", "trottinette", "partager", "amusement"],
+	],
+	"histoire": [
+		["conte", "roi", "fée", "loup", "ours", "page", "livre", "nuit", "fin", "lune"],
+		["histoire", "princesse", "château", "dragon", "sorcière", "forêt", "chapitre", "raconter", "pirate", "trésor"],
+		["il était une fois", "personnage", "imaginaire", "aventure", "chevalier", "merveilleux", "enchanté", "licorne", "bonne nuit"],
 	],
 }
 
@@ -315,7 +367,27 @@ static func is_available(action_id: String, profile: Dictionary) -> bool:
 	if item != "" and not item in purchases(profile):
 		return false
 	var built: String = ACTIONS[action_id].get("construction", "")
-	return built == "" or built in constructions(profile)
+	if built != "" and not built in constructions(profile):
+		return false
+	return family_allows(ACTIONS[action_id].get("famille", ""), profile)
+
+
+## La famille permet-elle l'action ? "couple" : quelqu'un dans la vie de l'enfant ;
+## "bebe" : un bébé ; "enfant" : un enfant qui a grandi (voir family.gd).
+static func family_allows(need: String, profile: Dictionary) -> bool:
+	if need == "":
+		return true
+	var fam = profile.get("famille", {})
+	if not fam is Dictionary:
+		return false
+	match need:
+		"couple":
+			return fam.get("partenaire", {}) is Dictionary and not fam.get("partenaire", {}).is_empty()
+		"bebe", "enfant":
+			for child in fam.get("enfants", []):
+				if child is Dictionary and child.get("age", "") == need:
+					return true
+	return false
 
 
 ## Compétences que l'enfant peut entraîner avec ce qu'il possède (dans l'ordre de SKILLS).
@@ -496,15 +568,40 @@ const DREAMS := {
 	"ingenieur": {"label": "Devenir un grand inventeur", "description": "Imaginer et construire des machines.", "career": "ingenieur"},
 	"nature": {"label": "Vivre dans la nature", "description": "Prendre soin des plantes et des animaux.", "career": "nature"},
 	"maison": {"label": "Avoir une belle maison", "description": "Acheter tout ce qu'il y a au magasin.", "career": ""},
+	"famille": {"label": "Fonder une famille", "description": "Rencontrer quelqu'un, vivre ensemble et avoir un enfant.", "career": ""},
 }
-const DREAM_ORDER := ["organisateur", "artisan", "sportif", "chanteur", "scientifique", "ingenieur", "nature", "maison"]
+const DREAM_ORDER := ["organisateur", "artisan", "sportif", "chanteur", "scientifique", "ingenieur", "nature", "maison", "famille"]
 const DREAM_REWARD_PIECES := 100
 const DREAM_REWARD_STARS := 3
 
 
 static func dream_icon(dream: String) -> String:
+	if dream == "famille":
+		return "famille"
 	var career: String = DREAMS[dream]["career"]
 	return CAREERS[career]["icone"] if career != "" else "maison"
+
+
+# --- Relations et famille (voir family.gd) ---------------------------------------
+# L'enfant rencontre quelqu'un (une femme ou un homme, il choisit), monte la
+# complicité avec les activités en couple, vit ensemble, puis choisit d'avoir des
+# enfants ou non. Le bébé grandit après quelques soins.
+const FAMILY_NAMES := {
+	0: ["Léa", "Chloé", "Inès", "Jade", "Sarah", "Emma", "Nora", "Lina", "Maya", "Zoé"],
+	1: ["Hugo", "Nathan", "Adam", "Malik", "Lucas", "Tom", "Yanis", "Noé", "Sacha", "Ilyes"],
+}
+const CHILD_NAMES := {
+	0: ["Alice", "Lou", "Mila", "Rose", "Nina", "Iris", "Anna", "Léna", "Jeanne", "Lila"],
+	1: ["Léo", "Gabriel", "Jules", "Arthur", "Louis", "Paul", "Nino", "Timéo", "Eliott", "Rayan"],
+}
+const FAMILY_LIKES := ["la musique", "les animaux", "la cuisine", "le sport", "les livres", "les jeux de société", "la nature", "le dessin", "la danse", "les voyages"]
+const FAMILY_MEET_SKILLS := {"charisme": 1} # pour rencontrer quelqu'un
+const FAMILY_BABY_SKILLS := {"organisation": 2} # pour accueillir un bébé
+const FAMILY_MOVE_IN := 60 # complicité (sur 100) pour vivre ensemble
+const FAMILY_COMPLICITY_PER_WORD := 4 # chaque mot réussi d'une activité en couple
+const FAMILY_BABY_CARES := 4 # séries de soins (bercer, biberon) avant que le bébé grandisse
+const FAMILY_MAX_CHILDREN := 2
+const FAMILY_ACTIONS := {"couple": ["fleurs", "danser", "calin"], "bebe": ["bercer", "biberon"], "enfant": ["jouer_enfant", "histoire"]}
 
 
 # --- Missions -----------------------------------------------------------------

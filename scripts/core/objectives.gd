@@ -8,6 +8,7 @@ const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Build = preload("res://scripts/core/build.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 const CARE_ACTIONS := ["dormir", "manger", "toilettes", "douche", "dents", "repos", "fontaine", "barbecue"]
 const OFFER_COUNT := 3
@@ -92,6 +93,19 @@ static func candidates(profile: Dictionary) -> Array:
 			result.append({"type": "construction", "item": to_build, "target": 1,
 				"label": "Construire : %s" % Data.CONSTRUCTIONS[to_build]["label"].to_lower(),
 				"aide": build_help, "pieces": 25, "icone": "marteau"})
+	# Famille : rencontrer quelqu'un, puis passer du temps ensemble
+	if done >= 2 and Family.can_meet(profile):
+		result.append({"type": "rencontre", "target": 1, "label": "Rencontrer quelqu'un",
+			"aide": "Clique sur « Ma famille », à gauche de l'écran, et choisis la personne qui te plaît.",
+			"pieces": 20, "icone": "couple"})
+	if Family.has_partner(profile):
+		var family_help := "Clique sur le canapé pour passer du temps avec %s." % Family.partner_name(profile)
+		if Family.has_baby(profile):
+			family_help = "Clique sur le canapé, ou sur le berceau pour t'occuper de %s." % Family.baby(profile)["nom"]
+		elif Family.has_child(profile):
+			family_help = "Clique sur le canapé, ou sur les jouets pour jouer avec %s." % Family.grown(profile)[0]["nom"]
+		result.append({"type": "famille", "target": 2, "label": "Passer du temps en famille : 2 activités",
+			"aide": family_help, "pieces": 20, "icone": "famille"})
 	# Travail
 	if career == "":
 		if done >= 1:
@@ -233,6 +247,9 @@ static func notify(profile: Dictionary, event: String, data: Dictionary = {}) ->
 		"recolte":
 			if event == "recolte" and data.get("res", "") == o["res"]:
 				o["count"] += data.get("amount", 1)
+		"famille":
+			if event == "action" and Data.ACTIONS.has(data.get("action", "")) and Data.ACTIONS[data["action"]].has("famille"):
+				o["count"] += 1
 	return is_done(profile)
 
 
@@ -251,6 +268,8 @@ static func is_done(profile: Dictionary) -> bool:
 			return Shop.owns(profile, o["item"])
 		"construction":
 			return Build.owns(profile, o["item"])
+		"rencontre":
+			return Family.has_partner(profile)
 	return o["count"] >= o["target"]
 
 
@@ -272,7 +291,7 @@ static func fraction(profile: Dictionary) -> float:
 				return 0.0
 			var missions: float = minf(profile["career"]["missions"].get(c, 0), Data.MISSIONS_PER_TIER)
 			return clampf(missions / (Data.MISSIONS_PER_TIER + 1.0), 0.0, 0.95)
-		"metier":
+		"metier", "rencontre":
 			return 0.0
 		"achat": # les pièces sont réunies : il reste à aller au magasin
 			return clampf(float(profile["money"]) / float(o["target"]), 0.0, 0.95)
@@ -307,6 +326,8 @@ static func progress_text(profile: Dictionary) -> String:
 			return "%d / %s" % [int(o["count"]), Data.resource_text(o["res"], int(o["target"]))]
 		"construction":
 			return "%d %%" % int(fraction(profile) * 100.0)
+		"famille":
+			return "%d / %d activités" % [int(o["count"]), int(o["target"])]
 	return ""
 
 
