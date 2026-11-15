@@ -11,6 +11,7 @@ const Progression = preload("res://scripts/core/progression.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Build = preload("res://scripts/core/build.gd")
+const Family = preload("res://scripts/core/family.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
@@ -98,6 +99,7 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"ressources": Build.new_stock(),
 		"constructions": [],
 		"jardin_vu": false,
+		"famille": Family.new_state(),
 	}
 
 
@@ -133,6 +135,7 @@ func start_demo() -> void:
 	profile["tuto_fait"] = true
 	profile["reve"]["id"] = "artisan"
 	profile["jardin_vu"] = true
+	profile["famille"]["vu"] = true
 	demo_mode = true
 	start_session()
 
@@ -202,6 +205,7 @@ func _sanitize(data: Dictionary) -> Dictionary:
 	data["ressources"] = Build.clean_stock(data["ressources"])
 	data["constructions"] = Build.clean(data["constructions"])
 	data["jardin_vu"] = bool(data["jardin_vu"])
+	data["famille"] = Family.clean(data["famille"])
 	for a in data["mots_tapes"]:
 		data["mots_tapes"][a] = int(data["mots_tapes"][a])
 	for c in data["career"]["tiers"]:
@@ -236,7 +240,7 @@ func start_session() -> void:
 		"objectifs_choisis": 0, "objectifs_finis": 0, "objectifs_abandonnes": 0,
 		"argent_depense": 0, "achats": [],
 		"reves_changes": 0, "reves_realises": [],
-		"recoltes": {}, "constructions": [],
+		"recoltes": {}, "constructions": [], "famille": [],
 	}
 	profile["sessions"].append(session)
 	_autosave_timer = 0.0
@@ -311,6 +315,58 @@ func build(id: String) -> bool:
 	session["constructions"].append(id)
 	save_profile()
 	return true
+
+
+# --- Famille ------------------------------------------------------------------------------
+
+## Note un moment de la famille dans la séance (pour l'ergothérapeute).
+func _family_event(text: String) -> void:
+	if not session.get("famille") is Array:
+		session["famille"] = []
+	session["famille"].append(text)
+
+
+## Rencontre la personne choisie. Renvoie false si ce n'est pas possible.
+func meet(person: Dictionary) -> bool:
+	if not Family.meet(profile, person):
+		return false
+	_family_event("a rencontré %s" % Family.partner_name(profile))
+	save_profile()
+	return true
+
+
+func move_in() -> bool:
+	if not Family.move_in(profile):
+		return false
+	_family_event("vit avec %s" % Family.partner_name(profile))
+	save_profile()
+	return true
+
+
+## Le bébé arrive : renvoie son état ({} si ce n'est pas possible).
+func have_baby(child: Dictionary) -> Dictionary:
+	var baby := Family.have_baby(profile, child)
+	if baby.is_empty():
+		return baby
+	_family_event("naissance de %s" % baby["nom"])
+	save_profile()
+	return baby
+
+
+func decline_children() -> void:
+	Family.decline_children(profile)
+	_family_event("choisit de ne pas avoir d'enfant pour l'instant")
+	save_profile()
+
+
+## Un soin au bébé (série terminée). Renvoie true s'il vient de grandir.
+func care_baby() -> bool:
+	var name: String = Family.baby(profile).get("nom", "")
+	var grew := Family.care_baby(profile)
+	if grew:
+		_family_event("%s a grandi" % name)
+	save_profile()
+	return grew
 
 
 ## Choisit l'objectif de vie (« Mon rêve »). Un changement en cours de route est

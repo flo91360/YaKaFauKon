@@ -25,10 +25,13 @@ const BuildPanel = preload("res://scripts/ui/build_panel.gd")
 const Build = preload("res://scripts/core/build.gd")
 const PausePanel = preload("res://scripts/ui/pause_panel.gd")
 const Tutorial = preload("res://scripts/ui/tutorial.gd")
+const FamilyPanel = preload("res://scripts/ui/family_panel.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 const SLEEP_TIME_FACTOR := 24.0 # pendant le sommeil, le temps passe 24 fois plus vite
 const SLEEP_OTHER_NEEDS := 0.25 # les autres besoins baissent moins vite en dormant
 const DREAM_PARTY_DELAY := 3.0 # secondes de calme avant de fêter le rêve réalisé
+const COUPLE_SPOT := Vector3(0.4, 0, 1.3) # sur le tapis, devant le canapé : fleurs, danse
 
 var studio
 var character
@@ -73,6 +76,7 @@ func _ready() -> void:
 	character.position = Vector3(0.4, 0, 0.8)
 	character.face(Vector3(5, 0, 6))
 	character.arrived.connect(_on_arrived)
+	_sync_family()
 
 	ui = CanvasLayer.new()
 	add_child(ui)
@@ -88,6 +92,7 @@ func _ready() -> void:
 	hud.dream_pressed.connect(_open_dream)
 	hud.build_pressed.connect(_open_build)
 	hud.view_pressed.connect(_toggle_view)
+	hud.family_pressed.connect(_open_family)
 	typing = TypingPanel.new()
 	ui.add_child(typing)
 	typing.validated.connect(_on_typing_validated)
@@ -116,6 +121,8 @@ func _welcome() -> void:
 		hud.toast("Bonjour %s ! Clique sur un objet pour agir." % profile["name"], UiTheme.COL_ACCENT, 5.0)
 		if not profile.get("jardin_vu", false):
 			hud.toast("Nouveau : le jardin ! Clique sur « Jardin », en bas à droite.", UiTheme.COL_GOOD.darkened(0.1), 8.0, "feuille")
+		elif not profile["famille"]["vu"]:
+			hud.toast("Nouveau : la famille ! Clique sur « Ma famille », à gauche.", FamilyPanel.COL_FAMILY.darkened(0.1), 8.0, "couple")
 
 
 func _game():
@@ -157,6 +164,7 @@ func _process(delta: float) -> void:
 		fraction = _action_done_minutes / float(Data.ACTIONS[_action_id]["minutes"])
 	hud.update_display(profile, "" if typing.is_open() else _status_text(), fraction)
 	hud.dream_button.visible = not typing.is_open() # le panneau de frappe a besoin de la place
+	hud.family_button.visible = not typing.is_open() and tutorial == null
 	hud.garden_box.visible = not typing.is_open() and tutorial == null
 	# La caméra suit le personnage quand il passe de la maison au jardin (ou revient).
 	var zone: String = studio.zone_of(character.position)
@@ -251,6 +259,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _choose_object(f) -> void:
+	if f.actions.is_empty(): # chambre des enfants : le berceau attend un bébé, les jouets un enfant
+		hud.toast("Rien à faire ici pour l'instant.", UiTheme.COL_GREY, 3.0)
+		return
 	if f.actions.size() == 1:
 		if f.actions[0] == "construire":
 			_open_build()
@@ -412,6 +423,7 @@ func _on_arrived() -> void:
 	_action_done_minutes = 0.0
 	character.start_acting(_object.pose, _object.pose_point, _object.face_point, Data.ACTIONS[_action_id]["anim"])
 	studio.start_activity(_object, _action_id)
+	_place_family(_action_id)
 	studio.focus_on(character.position * Vector3(1, 0, 1), 0.15)
 
 
@@ -453,6 +465,7 @@ func _leave_object() -> void:
 	if _object != null:
 		character.position = _object.use_point
 	_object = null
+	_sync_family() # chacun retourne à sa place
 
 
 func _interrupt_action() -> void:
@@ -490,6 +503,7 @@ func _start_series() -> void:
 	_state = "series"
 	character.start_acting(_object.pose, _object.pose_point, _object.face_point, Data.ACTIONS[_action_id]["anim"])
 	studio.start_activity(_object, _action_id)
+	_place_family(_action_id) # la famille prend part à l'activité (et place le personnage)
 	studio.focus_on(character.position * Vector3(1, 0, 1))
 	_series = {"action": _action_id, "index": 0, "results": [],
 		"words": Data.series_words(_action_id, Progression.text_level(profile), Data.WORDS_PER_SERIES)}
@@ -534,6 +548,11 @@ func _on_series_word_ok(result: Dictionary) -> void:
 	game.session["mots_par_activite"][action_id] = int(game.session["mots_par_activite"].get(action_id, 0)) + 1
 	profile["mots_tapes"][action_id] = int(profile["mots_tapes"].get(action_id, 0)) + 1
 	Objectives.notify(profile, "mot", {"action": action_id})
+	if action.get("famille", "") == "couple": # un mot réussi = un peu plus de complicité
+		var was_ready := Family.can_move_in(profile)
+		Family.add_complicity(profile, Data.FAMILY_COMPLICITY_PER_WORD)
+		if Family.can_move_in(profile) and not was_ready:
+			hud.toast("Vous êtes très complices ! Clique sur « Ma famille » pour vivre ensemble.", FamilyPanel.COL_FAMILY.darkened(0.1), 6.0, "coeur")
 	if action.has("recolte"): # un mot réussi = une bûche ou une pierre
 		game.add_resource(action["recolte"], 1)
 		_series["recolte"] = int(_series.get("recolte", 0)) + 1
@@ -584,10 +603,20 @@ func _finish_series() -> void:
 		hud.toast("Série terminée : %d mots sur %d ! + %s" % [ok_count, _series["words"].size(), Data.SKILLS[Data.main_skill(action_id)]["label"]],
 			UiTheme.COL_GOOD, 4.0, "etoile")
 	game.play_sound("bravo")
+	var grown_name := ""
+	if action.get("famille", "") == "bebe" and ok_count > 0:
+		var baby_name: String = Family.baby(game.profile).get("nom", "")
+		if game.care_baby():
+			grown_name = baby_name
+	elif action.has("famille"):
+		game.save_profile()
 	var where: Vector3 = _object.use_point if _object != null else character.position
 	_leave_object()
 	studio.burst(where)
 	character.play_once("celebrate", 1.6)
+	if grown_name != "":
+		hud.toast("%s a grandi ! Clique sur les jouets pour jouer ensemble." % grown_name, FamilyPanel.COL_FAMILY.darkened(0.1), 7.0, "jouet")
+		studio.hearts(studio.get_object("jouets").position + Vector3(0, 1.4, 0), 6, 3.0)
 	_tutorial_event("series_end")
 
 
@@ -599,6 +628,162 @@ func _stop_series() -> void:
 	hud.toast("Série arrêtée. Tes mots réussis sont gardés !", UiTheme.COL_GREY, 3.0)
 	_leave_object()
 	_tutorial_event("series_end")
+
+
+# --- Famille : rencontrer quelqu'un, vivre ensemble, les enfants -------------------------------
+
+## Met la maison à jour (lit double, chambre des enfants, actions des objets)
+## et remet chaque membre de la famille à sa place.
+func _sync_family() -> void:
+	var profile: Dictionary = _game().profile
+	studio.set_double_bed(Family.is_together(profile))
+	var sofa = studio.get_object("canape")
+	sofa.actions = ["inviter"] + (Data.FAMILY_ACTIONS["couple"] if Family.has_partner(profile) else [])
+	if not Family.children(profile).is_empty():
+		studio.add_nursery()
+	if studio.has_nursery():
+		var baby := Family.baby(profile)
+		if baby.is_empty():
+			studio.set_baby(false)
+		elif not studio.has_baby():
+			studio.set_baby(true, Data.SKIN_COLORS[int(baby["apparence"].get("skin", 0)) % Data.SKIN_COLORS.size()])
+		studio.get_object("berceau").actions = Data.FAMILY_ACTIONS["bebe"] if not baby.is_empty() else []
+		var kid := ["jouer_enfant"] if Family.has_child(profile) else []
+		studio.get_object("jouets").actions = kid
+		studio.get_object("lit_enfant").actions = ["histoire"] if Family.has_child(profile) else []
+	_place_family()
+
+
+## Place la famille. Au repos (`action_id` vide) : le conjoint lit sur le canapé,
+## les enfants jouent dans leur chambre. Pendant une activité, chacun y prend part.
+func _place_family(action_id := "") -> void:
+	var profile: Dictionary = _game().profile
+	studio.clear_family()
+	var kind: String = Data.ACTIONS[action_id].get("famille", "") if action_id != "" else ""
+	var partner: Node3D = null
+	# Avant de vivre ensemble, le conjoint vient seulement pour les moments à deux.
+	if Family.has_partner(profile) and (Family.is_together(profile) or kind == "couple"):
+		partner = studio.add_family_member(Family.partner(profile)["apparence"])
+	var kids: Array = []
+	if studio.has_nursery():
+		for k in Family.grown(profile):
+			kids.append(studio.add_family_member(k["apparence"], "enfant"))
+	var sofa = studio.get_object("canape")
+	var partner_placed := false
+	match action_id:
+		"fleurs":
+			studio.duo(character, partner, COUPLE_SPOT, "give", "celebrate", 0.95)
+			studio._fx.append(studio.hearts(COUPLE_SPOT + Vector3(0, 1.9, 0), 5))
+			partner_placed = true
+		"danser":
+			studio.duo(character, partner, COUPLE_SPOT, "dance", "dance", 0.9)
+			studio._fx.append(studio.hearts(COUPLE_SPOT + Vector3(0, 2.0, 0), 3))
+			partner_placed = true
+		"calin":
+			var seats: Array = sofa.get_meta("guest_points")
+			character.start_acting("assis", sofa.pose_point, sofa.face_point, "sit_cuddle")
+			partner.start_acting("assis", (sofa.pose_point as Vector3).lerp(seats[0], 0.62), sofa.face_point, "sit_cuddle_r")
+			studio._fx.append(studio.hearts(sofa.position + Vector3(0, 1.7, -0.2), 4))
+			partner_placed = true
+		"dormir":
+			var bed = studio.get_object("lit")
+			if partner != null:
+				partner.start_acting("allonge", bed.get_meta("partner_point"), bed.get_meta("partner_face"), "sleep")
+				partner_placed = true
+			if not kids.is_empty(): # l'aîné dort dans son petit lit
+				var small_bed = studio.get_object("lit_enfant")
+				kids[0].start_acting("allonge", small_bed.pose_point, small_bed.face_point, "sleep")
+				kids.remove_at(0)
+		"bercer", "biberon": # le bébé quitte le berceau : il est dans les bras
+			var crib = studio.get_object("berceau")
+			studio.set_baby(false)
+			character.start_acting("debout", crib.use_point, crib.use_point + Vector3(1, 0, 0.9), Data.ACTIONS[action_id]["anim"])
+			studio._fx.append(studio.hearts(crib.use_point + Vector3(0.2, 1.9, 0.2), 3))
+		"jouer_enfant":
+			var toys = studio.get_object("jouets")
+			character.start_acting("debout", toys.get_meta("adult_point"), toys.position, "kneel_play")
+		"histoire": # l'aîné est couché, le personnage lui raconte une histoire
+			var small_bed = studio.get_object("lit_enfant")
+			if not kids.is_empty():
+				kids[0].start_acting("allonge", small_bed.pose_point, small_bed.face_point, "sleep")
+				kids.remove_at(0)
+			character.start_acting("debout", small_bed.use_point, small_bed.pose_point, "talk")
+	if partner != null and not partner_placed:
+		var seat: Vector3 = sofa.get_meta("guest_points")[1]
+		partner.start_acting("assis", seat, sofa.face_point + Vector3(0.8, 0, 0), "sit_read")
+	if not kids.is_empty() and studio.has_nursery():
+		var toys = studio.get_object("jouets")
+		var spots := [[toys.get_meta("kid_point"), "floor_play"], [toys.position + Vector3(0.95, 0, -0.35), "cuddle_toy"]]
+		for i in kids.size():
+			kids[i].start_acting("debout", spots[i % 2][0], toys.position, spots[i % 2][1])
+
+
+func _open_family() -> void:
+	if typing.is_open() or _pause_menu != null:
+		return
+	_game().profile["famille"]["vu"] = true
+	var panel := FamilyPanel.new()
+	panel.met.connect(_on_family_met)
+	panel.moved_in.connect(_on_moved_in)
+	panel.baby_chosen.connect(_on_baby_chosen)
+	panel.declined.connect(func():
+		_game().decline_children()
+		hud.toast("D'accord, pas d'enfant pour l'instant. Tu pourras changer d'avis quand tu veux.", UiTheme.COL_ACCENT, 5.0)
+		panel.refresh())
+	_open_overlay(panel)
+
+
+## La rencontre : la personne choisie arrive et dit bonjour, des cœurs s'envolent.
+func _on_family_met(person: Dictionary) -> void:
+	var game = _game()
+	if not game.meet(person):
+		return
+	_close_overlay()
+	_interrupt_action()
+	game.play_sound("bravo")
+	hud.toast("Tu as rencontré %s ! Clique sur le canapé pour passer du temps ensemble." % person["nom"], FamilyPanel.COL_FAMILY.darkened(0.1), 7.0, "couple")
+	_set_view("maison")
+	_sync_family()
+	var visitor: Node3D = studio.add_family_member(person["apparence"])
+	studio.duo(character, visitor, COUPLE_SPOT, "wave", "wave", 1.1)
+	studio.hearts(COUPLE_SPOT + Vector3(0, 1.9, 0), 6, 3.0)
+	var end := create_tween()
+	end.tween_interval(3.5)
+	end.tween_callback(func():
+		if _state == "idle":
+			character.stop()
+			_sync_family())
+
+
+func _on_moved_in() -> void:
+	var game = _game()
+	if not game.move_in():
+		return
+	_close_overlay()
+	game.play_sound("bravo")
+	hud.toast("%s vient vivre avec toi ! Le lit est maintenant un grand lit." % Family.partner_name(game.profile), FamilyPanel.COL_FAMILY.darkened(0.1), 7.0, "famille")
+	_set_view("maison")
+	_sync_family()
+	studio.hearts(studio.get_object("canape").position + Vector3(0, 1.7, -0.2), 6, 3.0)
+
+
+func _on_baby_chosen(child: Dictionary) -> void:
+	var game = _game()
+	var first: bool = not studio.has_nursery()
+	var baby: Dictionary = game.have_baby(child)
+	if baby.is_empty():
+		return
+	_close_overlay()
+	_interrupt_action()
+	if first:
+		studio.add_nursery(true)
+	_sync_family()
+	game.play_sound("bravo")
+	hud.toast("Bienvenue %s ! Clique sur le berceau pour bercer le bébé ou lui donner le biberon." % baby["nom"], FamilyPanel.COL_FAMILY.darkened(0.1), 8.0, "bebe")
+	_set_view("chambre")
+	var crib = studio.get_object("berceau")
+	studio.hearts(crib.position + Vector3(0, 1.3, 0), 8, 3.5)
+	studio.burst(crib.position)
 
 
 # --- Objectifs ---------------------------------------------------------------------------
@@ -748,7 +933,7 @@ func _set_view(view: String) -> void:
 	if studio.view == view:
 		return
 	studio.set_view(view)
-	hud.set_view(view)
+	hud.set_view(view, studio.has_nursery())
 	var profile: Dictionary = _game().profile
 	if view == "jardin" and not profile.get("jardin_vu", false):
 		profile["jardin_vu"] = true
@@ -759,7 +944,7 @@ func _toggle_view() -> void:
 	if typing.is_open() or _overlay != null or _pause_menu != null:
 		return
 	_game().play_sound("clic")
-	_set_view("maison" if studio.view == "jardin" else "jardin")
+	_set_view(hud.next_view(studio.view, studio.has_nursery()))
 
 
 func _open_build() -> void:

@@ -64,8 +64,8 @@ func _show_choice() -> void:
 	var intro := "Ton rêve guide toute ta partie. Tu avances étape par étape, et tu pourras en changer."
 	_box.add_child(UiTheme.label(intro, 19, UiTheme.COL_TEXT.lightened(0.2)))
 	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 12)
+	grid.columns = 5 # 9 rêves : deux rangées tiennent dans l'écran
+	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 12)
 	_box.add_child(grid)
 	for d in Data.DREAM_ORDER:
@@ -78,18 +78,18 @@ func _dream_card(dream: String, is_current: bool) -> Control:
 	var done: bool = dream in Dreams.achieved(_profile)
 	var card := UiTheme.card(Color(1.0, 0.96, 0.82) if is_current else UiTheme.COL_SOFT, 14)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(272, 0)
+	card.custom_minimum_size = Vector2(212, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	card.add_child(v)
-	v.add_child(UiTheme.badge("coupe" if done else Data.dream_icon(dream), UiTheme.COL_GOLD if done else color, 56))
-	var label := UiTheme.label(info["label"], 20)
+	v.add_child(UiTheme.badge("coupe" if done else Data.dream_icon(dream), UiTheme.COL_GOLD if done else color, 48))
+	var label := UiTheme.label(info["label"], 19)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.custom_minimum_size = Vector2(0, 54)
 	v.add_child(label)
 	var text: String = "Rêve déjà réalisé. Bravo !" if done else info["description"]
-	var description := UiTheme.label(text, 16, UiTheme.COL_TEXT.lightened(0.25))
+	var description := UiTheme.label(text, 15, UiTheme.COL_TEXT.lightened(0.25))
 	description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	description.custom_minimum_size = Vector2(0, 46)
 	v.add_child(description)

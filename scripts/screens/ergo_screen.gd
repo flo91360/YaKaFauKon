@@ -145,6 +145,7 @@ func _show_recap(p: Dictionary) -> void:
 			bought.append(Data.SHOP[id]["label"].to_lower())
 	_line("Maison : " + (", ".join(bought) if not bought.is_empty() else "aucun achat au magasin pour l'instant"))
 	_line(Recap.garden_line(p))
+	_line(Recap.family_line(p))
 	_line(Recap.dream_line(p))
 	var career: String = p["career"]["current"]
 	if career != "":

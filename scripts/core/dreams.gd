@@ -7,6 +7,7 @@ extends RefCounted
 
 const Data = preload("res://scripts/core/data.gd")
 const Shop = preload("res://scripts/core/shop.gd")
+const Family = preload("res://scripts/core/family.gd")
 
 
 static func new_state() -> Dictionary:
@@ -73,6 +74,8 @@ static func steps(profile: Dictionary, dream: String = "") -> Array:
 	var result := []
 	if dream == "":
 		return result
+	if dream == "famille":
+		return Family.dream_steps(profile)
 	var career: String = Data.DREAMS[dream]["career"]
 	if career == "":
 		for item in Data.SHOP_ORDER:
@@ -121,6 +124,8 @@ static func advice(profile: Dictionary) -> String:
 	var dream := current(profile)
 	if dream == "" or is_done(profile):
 		return ""
+	if dream == "famille":
+		return Family.advice(profile)
 	var career: String = Data.DREAMS[dream]["career"]
 	if career == "":
 		return "Gagne des pièces avec les objectifs et le travail, puis clique sur « Magasin »."
@@ -155,6 +160,11 @@ static func helps(profile: Dictionary, offer: Dictionary) -> bool:
 	var dream := current(profile)
 	if dream == "" or is_done(profile):
 		return false
+	if dream == "famille":
+		if offer["type"] in ["rencontre", "famille"]:
+			return true
+		var need: Dictionary = Data.FAMILY_MEET_SKILLS if not Family.has_partner(profile) else Data.FAMILY_BABY_SKILLS
+		return offer["type"] == "competence" and need.has(offer.get("skill", "")) and int(offer["target"]) <= int(need[offer["skill"]])
 	var career: String = Data.DREAMS[dream]["career"]
 	if career == "":
 		return offer["type"] in ["achat", "argent"]

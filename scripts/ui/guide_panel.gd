@@ -19,6 +19,7 @@ const HOW := [
 	["travail", "Choisis un métier : les missions de travail rapportent des pièces."],
 	["magasin", "Au magasin, tes pièces achètent de nouveaux objets pour ta maison."],
 	["feuille", "Dans le jardin, récolte du bois et des pierres, puis clique sur « Construire »."],
+	["couple", "« Ma famille » : rencontre quelqu'un, vivez ensemble, puis avez des enfants ou non."],
 ]
 
 
