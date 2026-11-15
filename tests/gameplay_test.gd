@@ -414,6 +414,75 @@ func _run() -> void:
 	await _wait(4.0)
 	check(screen._overlay == null, "le rêve n'est fêté qu'une fois")
 
+	print("Graphismes de la famille (version 2.4, sans le code de jeu)")
+	var studio = screen.studio
+	var Character = load("res://scripts/world/character.gd")
+	var objects_before: int = studio.furniture.size()
+	check(not studio.has_nursery() and studio.get_object("berceau") == null and studio.family.is_empty(), "rien de la famille n'apparaît tant que le jeu ne le demande pas")
+	studio.set_view("chambre")
+	check(studio.view == "maison" and studio.zone_of(Vector3(-2.5, 0, 5.5)) == "maison", "sans chambre des enfants : pas de vue « chambre »")
+	check(studio.clamp_to_room(Vector3(-2.5, 0, 5.5)).z < 4.0, "sans chambre des enfants : on reste dans la maison")
+	# Personnages
+	var kid = studio.add_family_member({"body": 1, "beard": 2, "height": 2}, "enfant", Vector3(1.0, 0, 1.0))
+	var partner = studio.add_family_member({"body": 0, "height": 2}, "adulte", Vector3(1.6, 0, 1.0))
+	check(kid.age == "enfant" and partner.age == "adulte" and studio.family.size() == 2, "un conjoint et un enfant rejoignent la maison")
+	check(is_equal_approx(kid._scale, partner._scale * Character.CHILD_SCALE) and kid._joints["head"].scale.x > 1.1, "l'enfant est plus petit, avec une grosse tête")
+	var all_new := true
+	var rest: Dictionary = partner._pose_for("idle", 0.4)
+	for anim in Character.FAMILY_ANIMS:
+		var pose: Dictionary = partner._pose_for(anim, 0.4)
+		all_new = all_new and not pose.is_empty() and pose != rest
+	check(all_new and Character.FAMILY_ANIMS.size() == 12, "les 12 gestes de la famille ont leur animation")
+	partner.play("give")
+	check(partner._props["bouquet"].visible and not partner._props["bebe"].visible, "offrir des fleurs : le bouquet apparaît dans la main")
+	partner.play("feed")
+	check(partner._props["bebe"].visible and partner._props["biberon"].visible and not partner._props["bouquet"].visible, "biberon : le bébé est dans les bras")
+	kid.play("cuddle_toy")
+	check(kid._props["doudou"].visible, "l'enfant serre son doudou")
+	studio.duo(screen.character, partner, Vector3(0.4, 0, 1.3), "hug")
+	check(screen.character.anim == "hug" and partner.anim == "hug" and is_equal_approx(screen.character.position.distance_to(partner.position), 0.62), "câlin : les deux personnages sont face à face")
+	studio.side_by_side(screen.character, partner, Vector3(0.4, 0, 1.3), Vector3(1.0, 0, 2.1))
+	check(screen.character.anim == "hold_r" and partner.anim == "hold_l", "main dans la main, côte à côte")
+	var love = studio.hearts(Vector3(0.4, 1.9, 1.3), 5, 0.5)
+	check(love is CPUParticles3D and love.amount == 5 and love.mesh.get_faces().size() > 100, "des cœurs s'envolent")
+	# Lit pour deux
+	var big_bed = studio.get_object("lit")
+	check(studio._bed_single_parts[0].visible and not studio._bed_double_parts[0].visible, "au départ : un seul oreiller")
+	studio.set_double_bed(true)
+	check(not studio._bed_single_parts[0].visible and studio._bed_double_parts[0].visible and big_bed.pose_point.x < -4.2 and big_bed.get_meta("partner_point").x > -3.8, "lit pour deux : deux oreillers et deux places")
+	studio.set_double_bed(false)
+	check(is_equal_approx(big_bed.pose_point.x, -4.0) and studio._bed_single_parts[0].visible, "retour au lit pour un")
+	# Chambre des enfants
+	studio.add_nursery()
+	studio.add_nursery()
+	check(studio.has_nursery() and studio.furniture.size() == objects_before + 3, "la chambre des enfants ajoute berceau, petit lit et jouets (une seule fois)")
+	check(studio.get_object("berceau").actions.is_empty() and studio.get_object("lit_enfant").pose == "allonge" and studio.get_object("jouets").has_meta("kid_point"), "les trois objets attendent leurs actions")
+	check(not studio._flowerbed.visible, "le massif de fleurs laisse la place à la chambre")
+	check(studio.zone_of(Vector3(-2.5, 0, 5.5)) == "chambre" and is_equal_approx(studio.clamp_to_room(Vector3(-2.5, 0, 5.5)).z, 5.5) and studio.clamp_to_room(Vector3(-2.5, 0, 9.0)).z < 7.3, "on marche dans la chambre, pas au-delà")
+	var to_room := true
+	for id in ["berceau", "lit_enfant", "jouets"]:
+		var target = studio.get_object(id)
+		for from in [big_bed, studio.get_object("canape"), studio.get_object("cuisine")]:
+			var path: Array = studio.compute_path(from.use_point, target.use_point, target)
+			to_room = to_room and path[-1] == target.use_point
+			for i in path.size():
+				var a: Vector3 = from.use_point if i == 0 else path[i - 1]
+				to_room = to_room and studio._segment_clear(Vector2(a.x, a.z), Vector2(path[i].x, path[i].z), target)
+	check(to_room, "un chemin mène de la maison à chaque objet de la chambre")
+	studio.set_view("chambre")
+	check(studio.view == "chambre", "la caméra a une vue « chambre »")
+	studio.set_view("maison")
+	check(not studio.has_baby(), "le berceau est vide au départ")
+	studio.set_baby(true)
+	check(studio.has_baby() and studio.get_object("berceau").get_children().has(studio._crib_baby), "le bébé dort dans le berceau")
+	studio.set_baby(false)
+	check(not studio.has_baby(), "on peut retirer le bébé du berceau")
+	studio.clear_family()
+	check(studio.family.is_empty(), "la famille peut quitter la scène")
+	screen._open_guide()
+	check(screen._overlay != null and screen._overlay.objects.size() == studio.furniture.size(), "le guide s'ouvre encore avec les objets de la chambre")
+	screen._close_overlay()
+
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)

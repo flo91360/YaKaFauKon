@@ -11,6 +11,8 @@ extends Node
 ##   --ressources=bois:6,pierre:3, --constructions=banc,fontaine (ou tout), --vue=jardin :
 ##       réserve, constructions et vue du jardin ; --demo-construire ouvre « Construire »,
 ##       --demo-construit=banc montre l'instant de la construction ;
+##   --famille=rencontre|calin|danse|main|canape|nuit|bebe|enfants|portrait : graphismes de la
+##       famille (version 2.4), sans le code de jeu : une scène posée dans la maison ;
 ##   --capture=chemin.png : enregistre une capture d'écran puis quitte
 ##       (--images=N : après N images au lieu de 90).
 
@@ -145,6 +147,9 @@ func _start_demo(args: Array) -> void:
 	if "--demo-construire" in args:
 		screen._open_build()
 	for a in args:
+		if a.begins_with("--famille="):
+			_demo_family(screen, a.substr(10))
+	for a in args:
 		if a.begins_with("--demo-construit="): # ex. --demo-construit=banc : la construction vient d'être faite
 			var D = load("res://scripts/core/data.gd")
 			for res in D.CONSTRUCTIONS[a.substr(17)]["cout"]:
@@ -229,6 +234,84 @@ func _start_demo(args: Array) -> void:
 		screen._start_typing(f, "toilettes")
 
 
+## Scènes de démonstration des graphismes de la famille (version 2.4). Le code de jeu
+## n'existe pas encore : on pose les personnages à la main pour les contrôler en image.
+func _demo_family(screen, scene: String) -> void:
+	var studio = screen.studio
+	var me = screen.character
+	var partner_look := {"body": 0, "skin": 3, "hair": 5, "hair_style": 4, "outfit": 5, "outfit_style": 1, "bottom": 2, "height": 2}
+	var kid_look := {"body": 1, "skin": 1, "hair": 5, "hair_style": 1, "outfit": 6, "outfit_style": 0, "bottom": 1}
+	var kid2_look := {"body": 0, "skin": 2, "hair": 2, "hair_style": 5, "outfit": 3, "outfit_style": 3, "bottom": 3}
+	var partner = studio.add_family_member(partner_look)
+	var middle := Vector3(0.4, 0, 1.3)
+	match scene:
+		"rencontre": # le personnage offre des fleurs
+			studio.duo(me, partner, middle, "give", "celebrate", 0.95)
+			studio.hearts(middle + Vector3(0, 1.9, 0), 5)
+		"calin":
+			studio.duo(me, partner, middle, "hug", "hug", 0.5)
+			studio.hearts(middle + Vector3(0, 1.9, 0), 6)
+		"danse":
+			studio.duo(me, partner, middle, "dance", "dance", 0.9)
+		"main":
+			studio.side_by_side(me, partner, middle, middle + Vector3(0.6, 0, 0.8))
+		"canape":
+			var sofa = studio.get_object("canape")
+			var seats: Array = sofa.get_meta("guest_points")
+			me.start_acting("assis", sofa.pose_point, sofa.face_point, "sit_cuddle")
+			partner.start_acting("assis", (sofa.pose_point as Vector3).lerp(seats[0], 0.62), sofa.face_point, "sit_cuddle_r")
+			studio.hearts(sofa.position + Vector3(0, 1.7, -0.2), 3)
+		"nuit":
+			studio.set_double_bed(true)
+			var bed = studio.get_object("lit")
+			me.start_acting("allonge", bed.pose_point, bed.face_point, "sleep")
+			partner.start_acting("allonge", bed.get_meta("partner_point"), bed.get_meta("partner_face"), "sleep")
+		"bebe":
+			studio.set_double_bed(true)
+			studio.add_nursery()
+			studio.set_baby(false)
+			var crib = studio.get_object("berceau")
+			me.start_acting("debout", crib.use_point, crib.use_point + Vector3(1, 0, 0.9), "rock")
+			partner.start_acting("debout", crib.use_point + Vector3(0.75, 0, 0.5), crib.use_point, "hold_l")
+			studio.hearts(crib.use_point + Vector3(0.2, 1.9, 0.2), 4)
+		"biberon":
+			studio.add_nursery()
+			var crib = studio.get_object("berceau")
+			me.start_acting("debout", crib.use_point, crib.use_point + Vector3(1, 0, 0.9), "feed")
+			partner.start_acting("debout", crib.use_point + Vector3(1.6, 0, 1.6), crib.use_point, "wave")
+		"enfants":
+			studio.set_double_bed(true)
+			studio.add_nursery()
+			studio.set_baby(true)
+			var toys = studio.get_object("jouets")
+			var kid = studio.add_family_member(kid_look, "enfant")
+			kid.start_acting("debout", toys.get_meta("kid_point"), toys.position, "floor_play")
+			me.start_acting("debout", toys.get_meta("adult_point"), toys.position, "kneel_play")
+			var kid2 = studio.add_family_member(kid2_look, "enfant")
+			kid2.start_acting("debout", toys.position + Vector3(0.95, 0, -0.35), toys.position, "cuddle_toy")
+			var crib = studio.get_object("berceau")
+			partner.start_acting("debout", crib.use_point, crib.position, "wave")
+		"dodo": # l'enfant dort dans son lit, le bébé dans le berceau
+			studio.add_nursery()
+			studio.set_baby(true)
+			var small_bed = studio.get_object("lit_enfant")
+			var kid = studio.add_family_member(kid_look, "enfant")
+			kid.start_acting("allonge", small_bed.pose_point, small_bed.face_point, "sleep")
+			me.start_acting("debout", small_bed.use_point, small_bed.position, "wave")
+			partner.start_acting("debout", studio.get_object("berceau").use_point, studio.get_object("berceau").position, "idle")
+		_: # portrait de famille dans le salon
+			var kid = studio.add_family_member(kid_look, "enfant")
+			var kid2 = studio.add_family_member(kid2_look, "enfant")
+			var look := middle + Vector3(0.6, 0, 0.8)
+			studio.side_by_side(me, partner, middle, look, 1.5)
+			kid.start_acting("debout", middle + Vector3(0.28, 0, 0.36), look + Vector3(0.28, 0, 0.36), "wave")
+			kid2.start_acting("debout", middle + Vector3(-0.12, 0, 0.62), look + Vector3(-0.12, 0, 0.62), "cuddle_toy")
+	if studio.has_nursery():
+		studio.set_view("chambre", true)
+	if "--zoom" in OS.get_cmdline_user_args(): # vue rapprochée de la scène
+		studio.focus_on(me.position * Vector3(1, 0, 1), 0.15)
+
+
 ## Profils fictifs (jamais sauvegardés) pour montrer l'espace ergothérapeute.
 func _demo_profiles() -> Array:
 	var p: Dictionary = _game().new_profile_data("Léo", {"skin": 2, "hair": 0, "hair_style": 0, "outfit": 2})
@@ -306,7 +389,9 @@ func _show_gallery(args: Array) -> void:
 	for i in n:
 		var c = Character.new()
 		root.add_child(c)
-		c.build(Data.random_appearance(rng))
+		var kid: bool = (anims[i] as String).ends_with("@enfant") # ex. --galerie=idle,floor_play@enfant
+		anims[i] = (anims[i] as String).trim_suffix("@enfant")
+		c.build(Data.random_appearance(rng), "enfant" if kid else "adulte")
 		c.position = Vector3((i - (n - 1) / 2.0) * (0.75 if zoom else 1.25), 0, 0)
 		c.rotation_degrees.y = 180.0 - 18.0 * signf(c.position.x) * minf(absf(c.position.x), 1.0)
 		if "--profil" in args: # vus de côté (ils regardent vers la gauche)

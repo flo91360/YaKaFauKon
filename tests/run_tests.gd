@@ -29,6 +29,7 @@ func _init() -> void:
 	_test_new_careers()
 	_test_dreams()
 	_test_garden()
+	_test_family_graphics()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -539,3 +540,9 @@ func _test_garden() -> void:
 	var lines := Recap.session_lines({"recoltes": {"bois": 5, "pierre": 0}, "constructions": ["banc", "x"]})
 	check("Récolte dans le jardin : 5 bûches" in lines and "Construit dans le jardin : banc de jardin" in lines, "séance : récolte et construction dans le récapitulatif")
 	check(Recap.session_lines({}).filter(func(l): return l.contains("jardin")).is_empty(), "séance d'une ancienne version : pas de ligne jardin")
+
+
+func _test_family_graphics() -> void:
+	print("Famille : pictogrammes prêts (version 2.4)")
+	for name in ["couple", "famille", "bebe", "biberon", "fleurs", "jouet", "coeur"]:
+		check(FileAccess.file_exists("res://icons/%s.png" % name), "pictogramme de la famille prêt : %s" % name)

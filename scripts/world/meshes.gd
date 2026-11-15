@@ -404,3 +404,95 @@ static func guitar(parent: Node3D, s := 1.0) -> Array:
 	list.append(add(parent, rounded_box(Vector3(0.05, 0.5, 0.03) * s, 0.01 * s), neck, Vector3(0, 0.74, 0.02) * s))
 	list.append(add(parent, rounded_box(Vector3(0.075, 0.13, 0.03) * s, 0.012 * s), neck, Vector3(0, 1.03, 0.012) * s))
 	return list
+
+
+# --- Famille (version 2.4) : cœur, bébé emmailloté, ourson --------------------------------------
+
+## Un cœur en relief (pointe vers le bas, face vers +Z), large de `size`.
+static func heart(size := 0.2, depth := 0.06) -> ArrayMesh:
+	var outline := PackedVector2Array()
+	var count := 28
+	for i in count:
+		var a := TAU * i / count
+		var x := 16.0 * pow(sin(a), 3.0)
+		var y := 13.0 * cos(a) - 5.0 * cos(2.0 * a) - 2.0 * cos(3.0 * a) - cos(4.0 * a)
+		outline.append(Vector2(x, y + 2.5) * size / 32.0)
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	var tris := Geometry2D.triangulate_polygon(outline)
+	for side in [1.0, -1.0]: # les deux faces
+		var z: float = side * depth / 2.0
+		var first := verts.size()
+		for p in outline:
+			verts.append(Vector3(p.x, p.y, z))
+			normals.append(Vector3(0, 0, side))
+			uvs.append(Vector2(0.5, 0.5))
+		for k in range(0, tris.size(), 3):
+			var a := first + tris[k]
+			var b := first + tris[k + 1]
+			var c := first + tris[k + 2]
+			var front: bool = (verts[b] - verts[a]).cross(verts[c] - verts[a]).z * side > 0.0
+			indices.append_array([a, c, b] if front else [a, b, c])
+	for i in count: # la tranche
+		var p0: Vector2 = outline[i]
+		var p1: Vector2 = outline[(i + 1) % count]
+		var edge := (p1 - p0).normalized()
+		var n := Vector3(-edge.y, edge.x, 0) # le contour tourne dans le sens des aiguilles : l'extérieur est à gauche
+		var first := verts.size()
+		for p in [p0, p1]:
+			for z in [depth / 2.0, -depth / 2.0]:
+				verts.append(Vector3(p.x, p.y, z))
+				normals.append(n)
+				uvs.append(Vector2(0.5, 0.5))
+		var want := n
+		var got := (verts[first + 1] - verts[first]).cross(verts[first + 2] - verts[first])
+		if got.dot(want) < 0.0:
+			indices.append_array([first, first + 1, first + 2, first + 2, first + 1, first + 3])
+		else:
+			indices.append_array([first, first + 2, first + 1, first + 2, first + 3, first + 1])
+	return _array_mesh(verts, normals, uvs, indices)
+
+
+## Un bébé emmailloté, couché sur le dos le long de l'axe X (tête vers +X, visage
+## vers +Y). Sert dans le berceau et dans les bras d'un parent. Long d'environ 0,5 m.
+static func baby(parent: Node3D, skin: Color, blanket: Color, s := 1.0) -> Node3D:
+	var b := Node3D.new()
+	b.scale = Vector3.ONE * s
+	parent.add_child(b)
+	var m_skin := mat(skin, 0.75)
+	var m_blanket := mat(blanket, 0.95)
+	add(b, capsule(0.095, 0.36), m_blanket, Vector3(-0.07, 0, 0), Vector3(0, 0, 90), Vector3(1, 1, 0.95)) # corps emmailloté
+	add(b, sphere(0.075, 8), m_blanket, Vector3(-0.24, 0, 0), Vector3.ZERO, Vector3(1.0, 0.9, 0.9)) # pieds
+	add(b, cylinder(0.098, 0.05), mat(blanket.lightened(0.35), 0.95), Vector3(0.05, 0.004, 0), Vector3(0, 0, 90), Vector3(1, 1, 0.97)) # revers
+	add(b, sphere(0.105, 12), m_skin, Vector3(0.18, 0.02, 0)) # tête
+	add(b, sphere(0.108, 12), mat(blanket.lightened(0.2), 0.95), Vector3(0.2, 0.012, 0), Vector3(0, 0, -20), Vector3(0.82, 0.96, 1.0)) # bonnet
+	add(b, sphere(0.028, 6), mat(blanket.lightened(0.45), 0.9), Vector3(0.3, 0.02, 0)) # pompon
+	var dark := mat(Color(0.2, 0.2, 0.26), 0.4)
+	for side in [-1.0, 1.0]: # yeux fermés et joues
+		add(b, capsule(0.006, 0.034), dark, Vector3(0.165, 0.118, side * 0.04), Vector3(90, 0, 0))
+		add(b, sphere(0.02, 6), mat(Color(0.98, 0.62, 0.62), 0.8), Vector3(0.135, 0.1, side * 0.06), Vector3.ZERO, Vector3(1, 0.4, 1))
+	add(b, sphere(0.012, 6), mat(Color(0.86, 0.42, 0.42), 0.6), Vector3(0.125, 0.118, 0), Vector3.ZERO, Vector3(1, 0.6, 1.6)) # bouche
+	return b
+
+
+## Un ourson en peluche assis (face vers +Z), haut d'environ 0,3 m × s.
+static func teddy(parent: Node3D, color: Color, s := 1.0) -> Node3D:
+	var t := Node3D.new()
+	t.scale = Vector3.ONE * s
+	parent.add_child(t)
+	var fur := mat(color, 0.95)
+	var pale := mat(color.lightened(0.45), 0.95)
+	add(t, sphere(0.085, 10), fur, Vector3(0, 0.09, 0), Vector3.ZERO, Vector3(1, 1.1, 0.9)) # corps
+	add(t, sphere(0.05, 8), pale, Vector3(0, 0.085, 0.055), Vector3.ZERO, Vector3(1, 1.1, 0.5)) # ventre
+	add(t, sphere(0.07, 10), fur, Vector3(0, 0.225, 0)) # tête
+	add(t, sphere(0.032, 8), pale, Vector3(0, 0.21, 0.058), Vector3.ZERO, Vector3(1.1, 0.85, 0.8)) # museau
+	add(t, sphere(0.011, 6), mat(Color(0.2, 0.17, 0.17), 0.4), Vector3(0, 0.218, 0.084))
+	for side in [-1.0, 1.0]:
+		add(t, sphere(0.028, 8), fur, Vector3(side * 0.052, 0.285, 0), Vector3.ZERO, Vector3(1, 1, 0.6)) # oreilles
+		add(t, sphere(0.009, 6), mat(Color(0.2, 0.17, 0.17), 0.4), Vector3(side * 0.026, 0.245, 0.062)) # yeux
+		add(t, capsule(0.028, 0.11), fur, Vector3(side * 0.09, 0.12, 0.02), Vector3(0, 0, side * 38.0)) # bras
+		add(t, capsule(0.033, 0.12), fur, Vector3(side * 0.055, 0.03, 0.07), Vector3(90, side * -18.0, 0)) # jambes
+		add(t, sphere(0.022, 6), pale, Vector3(side * 0.07, 0.03, 0.128), Vector3.ZERO, Vector3(1, 1, 0.4))
+	return t

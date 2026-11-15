@@ -9,7 +9,8 @@ const Data = preload("res://scripts/core/data.gd")
 const ROOM_MIN := Vector2(-5.0, -4.0) # (x, z)
 const ROOM_MAX := Vector2(5.0, 4.0)
 const WAYPOINTS := [Vector2(0.4, -0.6), Vector2(-2.6, -1.2), Vector2(2.6, -1.4), Vector2(-2.4, 1.6), Vector2(2.6, 1.8), Vector2(0.4, 1.6),
-	Vector2(4.7, 2.25), Vector2(6.2, 2.2), Vector2(8.6, 2.2), Vector2(10.0, 2.25), Vector2(5.8, 0.3)] # sortie vers la cour, cour, passage vers la terrasse
+	Vector2(4.7, 2.25), Vector2(6.2, 2.2), Vector2(8.6, 2.2), Vector2(10.0, 2.25), Vector2(5.8, 0.3), # sortie vers la cour, cour, passage vers la terrasse
+	Vector2(-1.45, 3.4), Vector2(-1.45, 4.8), Vector2(-2.6, 5.2)] # passage vers la chambre des enfants, chambre
 const GROUND_Y := -0.3
 ## Terrasse (achat du magasin) : plancher en bois à droite de la pièce.
 const TERRACE_MIN := Vector2(5.0, -3.2)
@@ -17,6 +18,9 @@ const TERRACE_MAX := Vector2(7.25, 0.2)
 # La cour pavée du jardin (au niveau de la maison) : on y récolte et on y construit.
 const PATIO_MIN := Vector2(5.0, 0.2)
 const PATIO_MAX := Vector2(11.4, 3.3)
+## Chambre des enfants (famille, version 2.4) : pièce ajoutée devant la maison, à gauche.
+const NURSERY_MIN := Vector2(-5.0, 4.0)
+const NURSERY_MAX := Vector2(-0.6, 7.3)
 ## Calques de lumière : la pièce (calque 1, par défaut pour tout ce qui est ajouté,
 ## personnage compris) n'est éclairée que par `inside_light` et les lampes ;
 ## le jardin (calque 2) par le soleil. Ainsi aucune ombre de soleil ne bouge dans la maison.
@@ -31,6 +35,7 @@ const CAM_HOME := Vector3(8.0, 9.4, 10.6)
 const CAM_LOOK := Vector3(-0.15, 0.35, -0.25)
 const CAM_FOCUS_DISTANCE := 8.6
 const VIEW_SHIFT := Vector3(8.3, 0, 1.7) # la vue « jardin » est la même, décalée vers la cour
+const NURSERY_SHIFT := Vector3(-2.3, 0, 5.3) # la vue « chambre », décalée vers la chambre des enfants
 
 const C_WOOD := Color(0.80, 0.60, 0.42)
 const C_WOOD_LIGHT := Color(0.90, 0.74, 0.54)
@@ -78,7 +83,15 @@ var _purchased := {} # achats du magasin déjà construits : identifiant → tru
 var _terrace := false
 var _hidden: Array = [] # objets cachés pendant une activité (la guitare sur son pied)
 var _built := {} # constructions du jardin déjà posées : identifiant → true
-var view := "maison" # ce que montre la caméra au repos : "maison" ou "jardin"
+var view := "maison" # ce que montre la caméra au repos : "maison", "jardin" ou "chambre"
+## Famille (version 2.4) : conjoint et enfants présents dans la maison (personnages).
+var family: Array = []
+var _nursery := false
+var _flowerbed: Furniture # massif devant la maison : il laisse la place à la chambre des enfants
+var _bed_double := false
+var _bed_single_parts: Array = []
+var _bed_double_parts: Array = []
+var _crib_baby: Node3D
 
 
 func _ready() -> void:
@@ -378,17 +391,19 @@ func _build_garden() -> void:
 		_bush(Vector3(b[0], GROUND_Y, b[1]), b[2])
 	# Massif de fleurs devant la maison
 	var soil := M.mat(Color(0.45, 0.33, 0.26), 0.95)
-	d.box(Vector3(6.4, 0.14, 0.62), soil, Vector3(-1.8, GROUND_Y + 0.05, 4.62), 0.06)
+	_flowerbed = _deco()
+	var fb := _flowerbed
+	fb.box(Vector3(6.4, 0.14, 0.62), soil, Vector3(-1.8, GROUND_Y + 0.05, 4.62), 0.06)
 	var petals := [C_CORAL, C_MUSTARD, Color(0.98, 0.96, 0.92), Color(0.74, 0.56, 0.9)]
 	for i in 26:
 		var x := -4.8 + i * 0.24 + _rng.randf_range(-0.05, 0.05)
 		var z := 4.62 + _rng.randf_range(-0.17, 0.17)
 		var h := _rng.randf_range(0.16, 0.3)
-		d.cyl(0.012, h, C_LEAF, Vector3(x, GROUND_Y + 0.1 + h / 2.0, z))
-		d.ball(0.055, M.mat(petals[i % petals.size()], 0.7), Vector3(x, GROUND_Y + 0.12 + h, z), Vector3(1, 0.7, 1))
-		d.ball(0.02, C_MUSTARD.darkened(0.1), Vector3(x, GROUND_Y + 0.15 + h, z))
+		fb.cyl(0.012, h, C_LEAF, Vector3(x, GROUND_Y + 0.1 + h / 2.0, z))
+		fb.ball(0.055, M.mat(petals[i % petals.size()], 0.7), Vector3(x, GROUND_Y + 0.12 + h, z), Vector3(1, 0.7, 1))
+		fb.ball(0.02, C_MUSTARD.darkened(0.1), Vector3(x, GROUND_Y + 0.15 + h, z))
 		if i % 2 == 0:
-			d.ball(0.07, C_LEAF_LIGHT, Vector3(x + 0.06, GROUND_Y + 0.14, z + 0.05), Vector3(1.2, 0.5, 0.8))
+			fb.ball(0.07, C_LEAF_LIGHT, Vector3(x + 0.06, GROUND_Y + 0.14, z + 0.05), Vector3(1.2, 0.5, 0.8))
 	# Dalles de pierre qui mènent à la maison
 	var stone := M.tex_mat("crepi", Color(0.8, 0.79, 0.77), 1.2, "crepi_n", 0.9, 1.2)
 	for i in 6:
@@ -537,7 +552,14 @@ func _build_bed() -> void:
 	bed.box(Vector3(1.5, 0.24, 2.24), M.tex_mat("tissu", Color(0.98, 0.97, 0.95), 3.0, _fabric_n, 0.9, 0.4), Vector3(0, 0.5, 0.0), 0.09) # matelas
 	bed.box(Vector3(1.56, 0.12, 1.5), M.tex_mat("couette", Color.WHITE, 1.1, _fabric_n, 0.9, 0.5), Vector3(0, 0.63, 0.36), 0.055) # couette
 	bed.box(Vector3(1.56, 0.1, 0.34), M.mat(Color(0.98, 0.97, 0.94), 0.9), Vector3(0, 0.655, -0.42), 0.045) # revers du drap
-	bed.box(Vector3(0.74, 0.16, 0.44), M.tex_mat("tissu", Color(0.99, 0.98, 0.96), 4.0, _fabric_n, 0.9, 0.5), Vector3(0, 0.69, -0.84), 0.075) # oreiller
+	var pillow_mat := M.tex_mat("tissu", Color(0.99, 0.98, 0.96), 4.0, _fabric_n, 0.9, 0.5)
+	_bed_single_parts = [bed.box(Vector3(0.74, 0.16, 0.44), pillow_mat, Vector3(0, 0.69, -0.84), 0.075)] # oreiller
+	# Lit à deux (famille, version 2.4) : deux oreillers et un coussin, cachés tant que l'enfant vit seul.
+	_bed_double_parts = [bed.box(Vector3(0.64, 0.16, 0.42), pillow_mat, Vector3(-0.38, 0.69, -0.84), 0.075),
+		bed.box(Vector3(0.64, 0.16, 0.42), M.tex_mat("tissu", Color(0.86, 0.92, 0.97), 4.0, _fabric_n, 0.9, 0.5), Vector3(0.38, 0.69, -0.84), 0.075),
+		bed.box(Vector3(0.3, 0.12, 0.28), M.tex_mat("tissu", C_MUSTARD, 4.0, _fabric_n, 0.9, 0.6), Vector3(0, 0.73, -0.62), 0.055, Vector3(0, 45, 0))]
+	for part in _bed_double_parts:
+		part.visible = false
 	bed.box(Vector3(1.6, 0.07, 0.42), M.tex_mat("tissu", C_CORAL, 3.0, _fabric_n, 0.9, 0.7), Vector3(0, 0.7, 0.86), 0.03) # plaid
 	bed.pose = "allonge"
 	bed.pose_point = Vector3(-4.0, 0.7, -1.82)
@@ -1089,6 +1111,286 @@ func _build_barbecue() -> void:
 	b.set_meta("guest_point", Vector3(8.0, 0, 1.85))
 
 
+# --- Famille (version 2.4) : graphismes prêts, le code de jeu reste à écrire ---------------------
+# Rien de cette partie n'apparaît tant que le jeu ne l'appelle pas : lit à deux,
+# chambre des enfants, bébé dans le berceau, membres de la famille, cœurs.
+
+## Lit pour deux : deux oreillers. Le personnage dort à gauche (`pose_point`), son
+## conjoint à droite (meta "partner_point").
+func set_double_bed(on: bool) -> void:
+	_bed_double = on
+	for part in _bed_single_parts:
+		part.visible = not on
+	for part in _bed_double_parts:
+		part.visible = on
+	var bed := get_object("lit")
+	bed.pose_point = Vector3(-4.38 if on else -4.0, 0.7, -1.82)
+	bed.set_meta("partner_point", Vector3(-3.62, 0.7, -1.82))
+	bed.set_meta("partner_face", Vector3(-3.62, 0, -5.0))
+
+
+func has_nursery() -> bool:
+	return _nursery
+
+
+## Ajoute la chambre des enfants devant la maison (berceau, petit lit, coin jouets).
+## Sans effet si elle existe déjà. Les trois objets n'ont pas encore d'action.
+func add_nursery(animate := false) -> void:
+	if _nursery:
+		return
+	var first := get_child_count()
+	_build_nursery()
+	if animate:
+		for i in range(first, get_child_count()):
+			_pop_in(get_child(i))
+	apply_quality(quality)
+	_apply_lamps()
+
+
+func _build_nursery() -> void:
+	_nursery = true
+	if _flowerbed != null:
+		_flowerbed.visible = false
+	var size := NURSERY_MAX - NURSERY_MIN
+	var cx := (NURSERY_MIN.x + NURSERY_MAX.x) / 2.0
+	var cz := (NURSERY_MIN.y + NURSERY_MAX.y) / 2.0
+	var body := StaticBody3D.new()
+	body.add_to_group("floor")
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(size.x, 0.2, size.y)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position = Vector3(cx, -0.1, cz)
+	body.add_child(col)
+	add_child(body)
+
+	var d := _deco()
+	# Dalle et parquet, dans le prolongement de la maison
+	d.box(Vector3(size.x + 0.3, 0.3, size.y + 0.15), Color(0.83, 0.79, 0.73), Vector3(cx - 0.15, -0.15, cz + 0.075), 0.02)
+	d.box(Vector3(size.x, 0.04, size.y), M.tex_mat("parquet", Color(0.99, 0.95, 0.88), 0.4, "parquet_n", 0.5, 0.8), Vector3(cx, -0.018, cz), 0.008)
+	d.box(Vector3(size.x, 0.022, 0.08), _wood_dark, Vector3(cx, 0.001, NURSERY_MIN.y), 0.008) # seuil
+	# Mur de gauche : papier peint bleu clair, soubassement jaune doux
+	var wall := M.tex_mat("papier_peint", Color(0.84, 0.92, 0.98), 0.6, "crepi_n", 0.92, 0.35)
+	var wainscot := M.mat(Color(0.98, 0.87, 0.62), 0.7)
+	var trim := M.mat(C_WHITE, 0.6)
+	d.box(Vector3(0.3, 2.8, size.y + 0.15), wall, Vector3(-5.15, 1.4, cz + 0.075), 0.01)
+	d.box(Vector3(0.04, 0.95, size.y), wainscot, Vector3(-4.99, 0.475, cz), 0.008)
+	d.box(Vector3(0.07, 0.07, size.y), trim, Vector3(-4.98, 0.98, cz), 0.015)
+	d.box(Vector3(0.05, 0.12, size.y), trim, Vector3(-4.985, 0.06, cz), 0.012)
+	d.box(Vector3(0.42, 0.09, size.y + 0.27), M.mat(Color(0.9, 0.84, 0.75), 0.8), Vector3(-5.15, 2.84, cz + 0.075), 0.03)
+	# Guirlande de fanions
+	var flags := [C_CORAL, C_MUSTARD, C_TEAL, Color(0.74, 0.56, 0.9), C_BLUE]
+	var rope: Array = []
+	for i in 13:
+		var k := i / 12.0
+		rope.append(Vector3(-4.96, 2.5 - sin(k * PI) * 0.2, NURSERY_MIN.y + 0.25 + k * (size.y - 0.5)))
+	d.tube(rope, 0.008, M.mat(C_WOOD_DARK, 0.8))
+	for i in 11:
+		var at: Vector3 = (rope[i + 1] as Vector3).lerp(rope[i], 0.5) if i < 12 else rope[i]
+		var flag := M.add(d, M.cylinder(0.105, 0.012, -1.0, 3), M.mat(flags[i % flags.size()], 0.85), at + Vector3(0.012, -0.075, 0), Vector3(180, 0, 90))
+		flag.scale = Vector3(1.25, 1, 1)
+	# Pois de couleur sur le mur
+	for dot in [[1.75, 4.5, 0.09, 1], [2.05, 5.35, 0.06, 3], [1.55, 5.75, 0.07, 2], [2.1, 6.75, 0.08, 0], [1.3, 7.0, 0.05, 4]]:
+		d.cyl(dot[2], 0.012, M.mat((flags[dot[3]] as Color).lightened(0.35), 0.9), Vector3(-4.985, dot[0], dot[1]), Vector3(0, 0, 90))
+	_framed(d, "tableau_paysage", Vector3(-4.975, 1.62, 6.45), Vector2(0.56, 0.42), 90.0)
+	# Veilleuse en forme de lune au-dessus du berceau
+	var glow := M.glowing(Color(1.0, 0.93, 0.62), 0.25)
+	d.cyl(0.17, 0.05, glow, Vector3(-4.95, 1.72, 4.82), Vector3(0, 0, 90))
+	d.cyl(0.14, 0.06, wall, Vector3(-4.945, 1.77, 4.9), Vector3(0, 0, 90)) # le croissant
+	_add_lamp(Vector3(-4.5, 1.7, 4.85), 1.3, 4.5, glow, false, Color(1.0, 0.86, 0.6))
+
+	_build_crib()
+	_build_child_bed()
+	_build_toys()
+
+
+## Berceau contre le mur, avec son mobile. Le bébé n'apparaît qu'avec set_baby().
+func _build_crib() -> void:
+	var crib := _add_object("berceau", "Berceau", [], Vector3(-4.42, 0, 4.85), Vector3(0.82, 1.0, 1.32), Vector3(-3.6, 0, 4.85))
+	var white := M.mat(Color(0.97, 0.96, 0.93), 0.6)
+	for x in [-0.37, 0.37]:
+		for z in [-0.61, 0.61]:
+			crib.cyl(0.035, 0.92, white, Vector3(x, 0.46, z))
+			crib.ball(0.045, white, Vector3(x, 0.93, z))
+		crib.box(Vector3(0.045, 0.045, 1.22), white, Vector3(x, 0.88, 0), 0.02)
+		crib.box(Vector3(0.045, 0.045, 1.22), white, Vector3(x, 0.44, 0), 0.02)
+		for k in 8:
+			crib.cyl(0.013, 0.42, white, Vector3(x, 0.66, -0.49 + k * 0.14))
+	for z in [-0.61, 0.61]:
+		crib.box(Vector3(0.74, 0.56, 0.04), white, Vector3(0, 0.64, z), 0.02)
+		M.add(crib, M.heart(0.16, 0.02), M.mat(C_CORAL.lightened(0.25), 0.8), Vector3(0, 0.7, z + signf(z) * 0.024))
+	crib.box(Vector3(0.72, 0.07, 1.2), white, Vector3(0, 0.42, 0), 0.02)
+	crib.box(Vector3(0.66, 0.1, 1.14), M.tex_mat("tissu", Color(0.99, 0.98, 0.96), 3.0, _fabric_n, 0.9, 0.4), Vector3(0, 0.5, 0), 0.04) # matelas
+	crib.box(Vector3(0.64, 0.05, 0.62), M.tex_mat("tissu", Color(0.74, 0.86, 0.95), 3.0, _fabric_n, 0.9, 0.6), Vector3(0, 0.565, 0.24), 0.022) # couverture
+	# Mobile : une potence, un anneau et quatre petites formes qui tournent doucement
+	crib.cyl(0.016, 0.72, white, Vector3(-0.37, 1.28, -0.61))
+	crib.cyl(0.016, 0.42, white, Vector3(-0.19, 1.64, -0.43), Vector3(90, 45, 0))
+	var mobile := Node3D.new()
+	mobile.position = Vector3(-0.04, 1.6, -0.28)
+	crib.add_child(mobile)
+	M.add(mobile, M.cylinder(0.006, 0.08), white, Vector3(0, 0.0, 0))
+	M.add(mobile, M.torus(0.15, 0.01), white, Vector3(0, -0.05, 0))
+	var shapes := [C_MUSTARD, C_CORAL, C_TEAL, Color(0.74, 0.56, 0.9)]
+	for k in 4:
+		var a := k * TAU / 4.0
+		var at := Vector3(cos(a) * 0.15, -0.05, sin(a) * 0.15)
+		M.add(mobile, M.cylinder(0.003, 0.16), white, at + Vector3(0, -0.08, 0))
+		if k % 2 == 0:
+			M.add(mobile, M.sphere(0.04, 8), M.mat(shapes[k], 0.7), at + Vector3(0, -0.19, 0))
+		else:
+			M.add(mobile, M.heart(0.09, 0.03), M.mat(shapes[k], 0.7), at + Vector3(0, -0.19, 0), Vector3(0, 40, 0))
+	crib.set_meta("mobile", mobile)
+	crib.set_meta("baby_point", Vector3(0, 0.62, -0.1))
+	_sway.append({"node": mobile, "speed": 0.9, "phase": 0.0, "amp": 0.07})
+
+
+## Montre ou cache le bébé dans le berceau (peau et couverture au choix).
+func set_baby(on: bool, skin := Color(0.98, 0.86, 0.74), blanket := Color(0.99, 0.9, 0.62)) -> void:
+	if _crib_baby != null:
+		_crib_baby.queue_free()
+		_crib_baby = null
+	var crib := get_object("berceau")
+	if not on or crib == null:
+		return
+	_crib_baby = M.baby(crib, skin, blanket)
+	_crib_baby.position = crib.get_meta("baby_point")
+	_crib_baby.rotation_degrees.y = 90.0 # la tête vers le mur du fond
+
+
+func has_baby() -> bool:
+	return _crib_baby != null
+
+
+## Petit lit d'enfant : l'enfant s'y allonge (pose_point), la tête vers le berceau.
+func _build_child_bed() -> void:
+	var bed := _add_object("lit_enfant", "Lit d'enfant", [], Vector3(-4.42, 0, 6.42), Vector3(0.95, 0.6, 1.62), Vector3(-3.62, 0, 6.42))
+	var paint := M.mat(Color(0.56, 0.72, 0.86), 0.6)
+	for x in [-0.42, 0.42]:
+		for z in [-0.75, 0.75]:
+			bed.cyl(0.045, 0.16, paint, Vector3(x, 0.08, z))
+	bed.box(Vector3(0.95, 0.16, 1.62), paint, Vector3(0, 0.22, 0), 0.05)
+	bed.box(Vector3(0.97, 0.72, 0.09), paint, Vector3(0, 0.46, -0.78), 0.07) # tête de lit
+	M.add(bed, M.heart(0.26, 0.02), M.mat(Color(0.97, 0.96, 0.93), 0.7), Vector3(0, 0.6, -0.73))
+	bed.box(Vector3(0.97, 0.34, 0.08), paint, Vector3(0, 0.3, 0.78), 0.05) # pied de lit
+	bed.box(Vector3(0.86, 0.16, 1.48), M.tex_mat("tissu", Color(0.98, 0.97, 0.95), 3.0, _fabric_n, 0.9, 0.4), Vector3(0, 0.34, 0), 0.06) # matelas
+	bed.box(Vector3(0.9, 0.09, 0.98), M.tex_mat("tissu", C_MUSTARD.lightened(0.15), 3.0, _fabric_n, 0.9, 0.6), Vector3(0, 0.43, 0.24), 0.04) # couette
+	bed.box(Vector3(0.9, 0.08, 0.2), M.mat(Color(0.98, 0.97, 0.94), 0.9), Vector3(0, 0.44, -0.3), 0.035) # revers du drap
+	bed.box(Vector3(0.52, 0.12, 0.32), M.tex_mat("tissu", Color(0.99, 0.98, 0.96), 4.0, _fabric_n, 0.9, 0.5), Vector3(0, 0.46, -0.52), 0.055) # oreiller
+	for star in [[-0.22, 0.02], [0.18, 0.3], [-0.05, 0.56], [0.26, -0.08]]: # étoiles sur la couette
+		bed.ball(0.05, M.mat(Color(0.99, 0.98, 0.94), 0.8), Vector3(star[0], 0.476, 0.24 + star[1]), Vector3(1, 0.12, 1))
+	bed.pose = "allonge"
+	bed.pose_point = Vector3(-4.42, 0.48, 6.92)
+	bed.face_point = Vector3(-4.42, 0, 0.0)
+
+
+## Coin jouets : tapis rond, tour de cubes, ballon, ourson, anneaux et coffre.
+## L'enfant s'assoit par terre (meta "kid_point", animation "floor_play"), un parent
+## s'agenouille à côté (meta "adult_point", animation "kneel_play").
+func _build_toys() -> void:
+	var c := Vector3(-2.35, 0, 5.95)
+	var toys := _add_object("jouets", "Jouets", [], c, Vector3(0.62, 0.55, 0.62), Vector3(-2.35, 0, 5.12))
+	var rug := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(2.3, 2.3)
+	rug.mesh = plane
+	rug.material_override = M.uv_mat("tapis", Color(0.86, 0.95, 1.0), 0.95, true)
+	rug.position = Vector3(0, 0.012, 0)
+	rug.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	toys.add_child(rug)
+	# Tour de cubes
+	var cube_colors := [C_CORAL, C_MUSTARD, C_TEAL, C_BLUE, Color(0.74, 0.56, 0.9)]
+	for k in 3:
+		toys.box(Vector3.ONE * 0.17, M.mat(cube_colors[k], 0.7), Vector3(0.02 * k - 0.02, 0.085 + k * 0.17, -0.02 * k), 0.025, Vector3(0, k * 17.0, 0))
+	toys.box(Vector3.ONE * 0.17, M.mat(cube_colors[3], 0.7), Vector3(0.26, 0.085, 0.14), 0.025, Vector3(0, 30, 0))
+	toys.box(Vector3.ONE * 0.17, M.mat(cube_colors[4], 0.7), Vector3(-0.2, 0.085, 0.24), 0.025, Vector3(0, -20, 0))
+	# Anneaux à empiler
+	toys.cyl(0.02, 0.26, M.mat(C_WHITE, 0.6), Vector3(0.1, 0.13, -0.22))
+	for k in 4:
+		toys.ring(0.085 - k * 0.014, 0.03, M.mat(cube_colors[(k + 1) % cube_colors.size()], 0.6), Vector3(0.1, 0.035 + k * 0.055, -0.22), Vector3.ZERO)
+	# Ballon et ourson autour, sur le tapis
+	var d := _deco()
+	d.ball(0.14, M.mat(C_CORAL, 0.5), c + Vector3(0.72, 0.14, 0.5))
+	d.ring(0.1, 0.022, M.mat(C_WHITE, 0.5), c + Vector3(0.72, 0.14, 0.5), Vector3(30, 0, 20))
+	var bear := M.teddy(d, Color(0.72, 0.52, 0.36), 1.6)
+	bear.position = c + Vector3(-0.62, 0.0, 0.62)
+	bear.rotation_degrees.y = 55.0
+	# Coffre à jouets ouvert, dans le coin
+	var chest := c + Vector3(1.1, 0, 0.98)
+	d.box(Vector3(0.82, 0.42, 0.5), M.mat(C_TEAL, 0.7), chest + Vector3(0, 0.21, 0), 0.05)
+	d.box(Vector3(0.74, 0.04, 0.42), M.mat(C_DARK, 0.9), chest + Vector3(0, 0.41, 0), 0.01)
+	d.box(Vector3(0.84, 0.06, 0.5), M.mat(C_TEAL.darkened(0.1), 0.7), chest + Vector3(0, 0.62, -0.27), 0.025, Vector3(-72, 0, 0)) # couvercle
+	d.ball(0.11, M.mat(C_MUSTARD, 0.5), chest + Vector3(-0.2, 0.47, 0.02))
+	d.box(Vector3.ONE * 0.15, M.mat(Color(0.74, 0.56, 0.9), 0.7), chest + Vector3(0.14, 0.47, 0.04), 0.02, Vector3(20, 30, 0))
+	d.cyl(0.02, 0.34, M.mat(C_CORAL, 0.6), chest + Vector3(0.27, 0.54, -0.08), Vector3(0, 0, -24))
+	M.add(d, M.heart(0.16, 0.02), M.mat(C_WHITE, 0.7), chest + Vector3(0, 0.22, 0.256))
+	toys.set_meta("kid_point", c + Vector3(-0.62, 0, -0.1))
+	toys.set_meta("adult_point", c + Vector3(0.05, 0, -0.82))
+
+
+## Ajoute un membre de la famille (conjoint : "adulte" ; enfant : "enfant") et renvoie
+## son personnage. Le jeu le place et l'anime comme le personnage principal.
+func add_family_member(appearance: Dictionary, age := "adulte", at := Vector3.ZERO) -> Node3D:
+	var member: Node3D = load("res://scripts/world/character.gd").new()
+	add_child(member)
+	member.build(appearance, age)
+	member.position = at
+	family.append(member)
+	return member
+
+
+func remove_family_member(member: Node3D) -> void:
+	family.erase(member)
+	if is_instance_valid(member):
+		member.queue_free()
+
+
+func clear_family() -> void:
+	for member in family.duplicate():
+		remove_family_member(member)
+
+
+## Place deux personnages face à face autour d'un point et lance leur geste
+## (câlin, bouquet offert, danse…). `side` = axe sur lequel ils se placent.
+func duo(a: Node3D, b: Node3D, center: Vector3, anim_a: String, anim_b := "", gap := 0.62, side := Vector3(1, 0, -0.35)) -> void:
+	var axis := Vector3(side.x, 0, side.z).normalized()
+	var point_a := Vector3(center.x, 0, center.z) - axis * gap / 2.0
+	var point_b := Vector3(center.x, 0, center.z) + axis * gap / 2.0
+	a.start_acting("debout", point_a, point_b, anim_a)
+	b.start_acting("debout", point_b, point_a, anim_b if anim_b != "" else anim_a)
+
+
+## Place deux personnages côte à côte, main dans la main, tournés vers `look`.
+func side_by_side(a: Node3D, b: Node3D, center: Vector3, look: Vector3, gap := 0.74) -> void:
+	var forward := Vector3(look.x - center.x, 0, look.z - center.z).normalized()
+	var right := forward.cross(Vector3.UP)
+	var point_a := Vector3(center.x, 0, center.z) - right * gap / 2.0
+	var point_b := Vector3(center.x, 0, center.z) + right * gap / 2.0
+	a.start_acting("debout", point_a, point_a + forward, "hold_r")
+	b.start_acting("debout", point_b, point_b + forward, "hold_l")
+
+
+## Des cœurs qui montent (rencontre, câlin, naissance). Ils s'arrêtent tout seuls
+## si `seconds` > 0 ; sinon l'appelant garde le nœud et le libère.
+func hearts(pos: Vector3, amount := 6, seconds := 0.0, color := Color(0.98, 0.45, 0.58)) -> CPUParticles3D:
+	var p := _particles(pos, color, amount, 1.9, Vector3.UP, 28.0, 0.42, Vector3(0, 0.2, 0), 0.03, true)
+	var mesh := M.heart(0.17, 0.04)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mesh.surface_set_material(0, mat)
+	p.mesh = mesh
+	p.local_coords = true
+	p.rotation.y = atan2(CAM_HOME.x - CAM_LOOK.x, CAM_HOME.z - CAM_LOOK.z) # face à la caméra
+	if seconds > 0.0:
+		get_tree().create_timer(seconds).timeout.connect(func():
+			if is_instance_valid(p):
+				p.emitting = false)
+		get_tree().create_timer(seconds + 2.2).timeout.connect(func():
+			if is_instance_valid(p):
+				p.queue_free())
+	return p
+
+
 # --- Achats du magasin (la maison s'agrandit) ---------------------------------------------
 
 ## Construit les achats déjà faits (au chargement de la partie).
@@ -1454,10 +1756,14 @@ func _walkable(p: Vector2) -> bool:
 		return true
 	if p.x <= PATIO_MAX.x + 0.01 and p.y >= PATIO_MIN.y - 0.01 and p.y <= PATIO_MAX.y + 0.01:
 		return true
+	if _nursery and p.x >= NURSERY_MIN.x - 0.01 and p.x <= NURSERY_MAX.x + 0.01 and p.y >= ROOM_MAX.y - 0.01 and p.y <= NURSERY_MAX.y + 0.01:
+		return true
 	return _terrace and p.x <= TERRACE_MAX.x + 0.01 and p.y >= TERRACE_MIN.y - 0.01 and p.y <= TERRACE_MAX.y + 0.01
 
 
 func clamp_to_room(p: Vector3) -> Vector3:
+	if _nursery and p.z > ROOM_MAX.y - 0.4 and p.x >= NURSERY_MIN.x and p.x < NURSERY_MAX.x:
+		return Vector3(clampf(p.x, NURSERY_MIN.x + 0.4, NURSERY_MAX.x - 0.35), 0, minf(p.z, NURSERY_MAX.y - 0.35))
 	if _terrace and p.x > ROOM_MAX.x - 0.4 and p.z > TERRACE_MIN.y and p.z < TERRACE_MAX.y:
 		return Vector3(minf(p.x, TERRACE_MAX.x - 0.35), 0, clampf(p.z, TERRACE_MIN.y + 0.35, TERRACE_MAX.y - 0.35))
 	if p.x > ROOM_MAX.x - 0.4 and p.z >= PATIO_MIN.y and p.z < PATIO_MAX.y:
@@ -1495,22 +1801,29 @@ func unfocus() -> void:
 ## Change ce que montre la caméra au repos : "maison" ou "jardin".
 ## `instant` : sans glissement (au chargement, pour les tests).
 func set_view(new_view: String, instant := false) -> void:
-	view = "jardin" if new_view == "jardin" else "maison"
+	view = new_view if new_view == "jardin" or (new_view == "chambre" and _nursery) else "maison"
 	if instant:
-		var shift := VIEW_SHIFT if view == "jardin" else Vector3.ZERO
+		var shift := _view_shift()
 		_cam_pos = CAM_HOME + shift
 		_cam_look = CAM_LOOK + shift
 		camera.position = _cam_pos
 		camera.look_at(_cam_look, Vector3.UP)
 
 
-## Où se trouve ce point : dans la "maison" ou dans le "jardin" (cour, terrasse, pelouse) ?
+func _view_shift() -> Vector3:
+	return {"jardin": VIEW_SHIFT, "chambre": NURSERY_SHIFT}.get(view, Vector3.ZERO)
+
+
+## Où se trouve ce point : dans la "maison", dans le "jardin" (cour, terrasse, pelouse)
+## ou dans la "chambre" des enfants (quand elle existe) ?
 func zone_of(point: Vector3) -> String:
+	if _nursery and point.z > ROOM_MAX.y + 0.15 and point.x < NURSERY_MAX.x + 0.2:
+		return "chambre"
 	return "jardin" if point.x > ROOM_MAX.x + 0.15 else "maison"
 
 
 func _move_camera(delta: float) -> void:
-	var shift := VIEW_SHIFT if view == "jardin" else Vector3.ZERO
+	var shift := _view_shift()
 	var want_pos := CAM_HOME + shift
 	var want_look := CAM_LOOK + shift
 	if _cam_focus != null:
