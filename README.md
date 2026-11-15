@@ -97,7 +97,7 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
 
 ## Tests
 
-623 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+656 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
@@ -122,5 +122,13 @@ Release avec la section correspondante de `CHANGELOG.md`.
   et son décor dans `add_purchase` de `scripts/world/studio.gd`. Pour une nouvelle construction du jardin :
   `CONSTRUCTIONS` dans `data.gd` et son décor dans `add_construction` de `studio.gd` ; pour une nouvelle
   ressource : `RESOURCES`, une action avec `recolte` et son objet dans `_build_yard`.
+
+Graphismes de la famille déjà prêts (version 2.4, le code de jeu reste à écrire, rien n'apparaît encore) :
+personnage enfant (`build(apparence, "enfant")`), bébé, ourson, cœurs ; 12 gestes dans `character.gd`
+(`FAMILY_ANIMS` : câlin, bouquet, danse, main dans la main, blottis sur le canapé, bercer, biberon, doudou,
+jouer par terre, à genoux) ; dans `studio.gd` : `set_double_bed`, `add_nursery` (chambre des enfants avec
+berceau, petit lit et jouets, vue « chambre »), `set_baby`, `add_family_member`, `duo`, `side_by_side`,
+`hearts` ; pictogrammes `couple`, `famille`, `bebe`, `biberon`, `fleurs`, `jouet`. Aperçu : `--famille=…`
+(voir `scripts/main.gd`).
 
 Pas encore dans le jeu : relations et famille (et le rêve « fonder une famille »), plateforme en ligne.

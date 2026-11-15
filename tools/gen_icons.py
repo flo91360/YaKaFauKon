@@ -416,6 +416,71 @@ def pierre(d):  # pierres récoltées
     line(d, [(62, 84), (68, 62)], 4, 0)
 
 
+@icon
+def couple(d):  # deux personnes et un cœur
+    disc(d, 28, 44, 14); oval(d, 6, 62, 50, 112)
+    disc(d, 72, 44, 14); oval(d, 50, 62, 94, 112)
+    box(d, 0, 92, 100, 112, 0, 0)
+    line(d, [(50, 66), (50, 92)], 4, 0)
+    heart(d, 50, 16, 11)
+
+
+@icon
+def famille(d):  # deux adultes et un enfant
+    disc(d, 24, 26, 14); oval(d, 2, 44, 46, 110)
+    disc(d, 76, 26, 14); oval(d, 54, 44, 98, 110)
+    disc(d, 50, 54, 15, 0)
+    oval(d, 30, 68, 70, 116, 0)
+    disc(d, 50, 54, 11); oval(d, 34, 70, 66, 112)
+    box(d, 0, 92, 100, 116, 0, 0)
+
+
+@icon
+def bebe(d):  # visage de bébé avec une mèche et une tétine
+    disc(d, 50, 54, 36)
+    disc(d, 14, 56, 9); disc(d, 86, 56, 9)
+    line(d, [(50, 20), (56, 8), (46, 10)], 6)
+    disc(d, 36, 48, 5, 0); disc(d, 64, 48, 5, 0)
+    disc(d, 50, 68, 12, 0)
+    disc(d, 50, 68, 6)
+
+
+@icon
+def biberon(d):
+    box(d, 30, 40, 70, 94, 10)
+    box(d, 26, 28, 74, 42, 5)
+    oval(d, 40, 6, 60, 32)
+    line(d, [(42, 56), (58, 56)], 4, 0)
+    line(d, [(42, 68), (58, 68)], 4, 0)
+    line(d, [(42, 80), (58, 80)], 4, 0)
+
+
+@icon
+def fleurs(d):  # bouquet dans son papier
+    poly(d, [(26, 48), (74, 48), (55, 98), (45, 98)])
+    line(d, [(39, 78), (61, 78)], 4, 0)
+    for x, y in [(50, 22), (28, 36), (72, 36)]:
+        for k in range(5):
+            a = math.radians(-90 + k * 72)
+            disc(d, x + math.cos(a) * 9, y + math.sin(a) * 9, 9, 0)
+    for x, y in [(50, 22), (28, 36), (72, 36)]:
+        for k in range(5):
+            a = math.radians(-90 + k * 72)
+            disc(d, x + math.cos(a) * 9, y + math.sin(a) * 9, 7.5)
+        disc(d, x, y, 5, 0)
+
+
+@icon
+def jouet(d):  # ourson
+    disc(d, 26, 24, 14); disc(d, 74, 24, 14)
+    disc(d, 26, 24, 6, 0); disc(d, 74, 24, 6, 0)
+    disc(d, 50, 52, 36)
+    disc(d, 36, 44, 5, 0); disc(d, 64, 44, 5, 0)
+    oval(d, 36, 54, 64, 78, 0)
+    oval(d, 39, 57, 61, 75)
+    disc(d, 50, 62, 5, 0)
+
+
 def main():
     os.makedirs(DIR, exist_ok=True)
     for name, f in ICONS.items():

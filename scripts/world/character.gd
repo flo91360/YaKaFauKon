@@ -7,6 +7,10 @@ signal arrived
 const Data = preload("res://scripts/core/data.gd")
 const M = preload("res://scripts/world/meshes.gd")
 const WALK_SPEED := 2.3 # mètres par seconde
+const CHILD_SCALE := 0.62 # taille d'un enfant par rapport à un adulte
+const CHILD_HEAD := 1.24
+## Gestes de la famille (version 2.4), prêts pour le code de jeu : voir _pose_for.
+const FAMILY_ANIMS := ["hug", "give", "dance", "rock", "feed", "cuddle_toy", "hold_l", "hold_r", "floor_play", "kneel_play", "sit_cuddle", "sit_cuddle_r"]
 
 const HIP_H := 0.72
 const TORSO_H := 0.5
@@ -16,6 +20,7 @@ const THIGH := 0.34
 const SHIN := 0.31
 
 var state := "idle" # idle / walk / act
+var age := "adulte" # adulte / enfant (plus petit, avec une grosse tête)
 var pose := "debout" # debout / assis / allonge / course
 var anim := "idle"
 var talking := false
@@ -41,7 +46,9 @@ var _one_shot_left := 0.0
 
 # --- Construction -----------------------------------------------------------------------
 
-func build(appearance: Dictionary) -> void:
+## `new_age` = "enfant" : même personnage en plus petit (famille, version 2.4).
+func build(appearance: Dictionary, new_age := "adulte") -> void:
+	age = "enfant" if new_age == "enfant" else "adulte"
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -54,6 +61,10 @@ func build(appearance: Dictionary) -> void:
 	var a := _appearance
 	var male: bool = a["body"] == 1
 	_scale = Data.HEIGHT_SCALES[a["height"]]
+	if age == "enfant":
+		_scale *= CHILD_SCALE
+		a = a.duplicate()
+		a["beard"] = 0
 	var b: float = Data.BUILD_FACTORS[a["build"]]
 	var limb := 0.92 + 0.45 * (b - 1.0)
 	var skin: Color = Data.SKIN_COLORS[a["skin"]]
@@ -136,6 +147,9 @@ func build(appearance: Dictionary) -> void:
 	neck.add_child(head)
 	_joints["head"] = head
 	_build_head(head, a, skin, hair)
+	if age == "enfant": # un enfant a la tête plus grosse par rapport au corps
+		head.scale = Vector3.ONE * CHILD_HEAD
+		head.position.y += 0.035
 	_build_props(top)
 	_set_pose_transform()
 	_apply_pose(_pose_for(anim, 0.0), 1.0)
@@ -397,6 +411,43 @@ func _build_props(top: Color) -> void:
 		g.rotation_degrees = Vector3(0, 180, -62)
 		p.add_child(g)
 		M.guitar(g, 0.85))
+	# --- Famille (version 2.4) ---
+	# Bouquet offert à quelqu'un : tenu droit dans la main tendue.
+	_props["bouquet"] = _prop(hand_r, func(p):
+		var b := Node3D.new()
+		b.position = Vector3(0, -0.02, -0.03)
+		b.rotation_degrees = Vector3(-78, 0, 0)
+		p.add_child(b)
+		M.add(b, M.cylinder(0.02, 0.2, 0.075), M.mat(Color(0.98, 0.95, 0.88), 0.9), Vector3(0, 0.08, 0)) # papier
+		M.add(b, M.torus(0.026, 0.012), M.mat(Color(0.93, 0.52, 0.44), 0.6), Vector3(0, 0.03, 0)) # ruban
+		var petals := [Color(0.93, 0.52, 0.44), Color(0.95, 0.74, 0.32), Color(0.99, 0.97, 0.93), Color(0.78, 0.6, 0.9), Color(0.98, 0.66, 0.74)]
+		for k in 7:
+			var a := k * TAU / 6.0
+			var r := 0.0 if k == 6 else 0.055
+			var at := Vector3(cos(a) * r, 0.21 + (0.03 if k == 6 else 0.0), sin(a) * r)
+			M.add(b, M.sphere(0.036, 8), M.mat(petals[k % petals.size()], 0.7), at, Vector3.ZERO, Vector3(1, 0.75, 1))
+			M.add(b, M.sphere(0.014, 6), M.mat(Color(0.95, 0.74, 0.32).darkened(0.1), 0.7), at + Vector3(0, 0.022, 0))
+		for k in 4:
+			var a := k * TAU / 4.0 + 0.6
+			M.add(b, M.sphere(0.035, 6), M.mat(Color(0.36, 0.64, 0.38), 0.8), Vector3(cos(a) * 0.075, 0.165, sin(a) * 0.075), Vector3.ZERO, Vector3(1, 0.35, 0.7)))
+	# Bébé emmailloté dans les bras (tête vers le bras gauche, un peu relevée).
+	_props["bebe"] = _prop(_joints["spine"], func(p):
+		var b := M.baby(p, Data.SKIN_COLORS[_appearance["skin"]], Color(0.74, 0.86, 0.95))
+		b.position = Vector3(-0.02, 0.2, -0.235)
+		b.rotation_degrees = Vector3(-25, 180, -14))
+	_props["biberon"] = _prop(hand_r, func(p):
+		var b := Node3D.new()
+		b.position = Vector3(0, -0.02, -0.03)
+		b.rotation_degrees = Vector3(-60, 0, 0)
+		p.add_child(b)
+		M.add(b, M.cylinder(0.03, 0.1), M.glass(Color(0.98, 0.98, 0.95), 0.75), Vector3(0, 0.03, 0))
+		M.add(b, M.cylinder(0.032, 0.022), M.mat(Color(0.42, 0.56, 0.82), 0.5), Vector3(0, 0.09, 0))
+		M.add(b, M.sphere(0.016, 6), M.mat(Color(0.95, 0.84, 0.7), 0.6), Vector3(0, 0.112, 0), Vector3.ZERO, Vector3(1, 1.5, 1)))
+	# Doudou de l'enfant, serré contre lui.
+	_props["doudou"] = _prop(_joints["spine"], func(p):
+		var t := M.teddy(p, Color(0.72, 0.52, 0.36), 1.25)
+		t.position = Vector3(0.03, 0.1, -0.2)
+		t.rotation_degrees = Vector3(8, 180, 6))
 	_props["serviette"] = _prop(hand_r, func(p):
 		M.add(p, M.rounded_box(Vector3(0.2, 0.26, 0.04), 0.02), M.mat(top.lightened(0.5), 0.95), Vector3(0, -0.06, -0.05)))
 
@@ -453,14 +504,15 @@ func play_once(anim_name: String, seconds := 1.4) -> void:
 
 func _set_anim(anim_name: String) -> void:
 	anim = anim_name
-	talking = anim_name in ["talk", "sit_phone", "sit_chat", "sit_play", "guitar"]
+	talking = anim_name in ["talk", "sit_phone", "sit_chat", "sit_play", "guitar", "kneel_play"]
 	_show_props(anim_name)
 
 
 func _show_props(anim_name: String) -> void:
 	var wanted: Array = {"paint": ["pinceau", "palette"], "hammer": ["marteau"], "sit_phone": ["telephone"], "brush": ["brosse"],
 		"eat": ["cuillere", "bol"], "cook": ["cuillere"], "sit_write": ["stylo"], "sit_read": ["livre"],
-		"guitar": ["guitare"], "garden": ["arrosoir"], "chop": ["hache"], "pick": ["caillou"]}.get(anim_name, [])
+		"guitar": ["guitare"], "garden": ["arrosoir"], "chop": ["hache"], "pick": ["caillou"],
+		"give": ["bouquet"], "rock": ["bebe"], "feed": ["bebe", "biberon"], "cuddle_toy": ["doudou"]}.get(anim_name, [])
 	for key in _props:
 		_props[key].visible = key in wanted
 
@@ -574,7 +626,7 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 			p["el_r"] = Vector3(8, 0, 0)
 			p["neck"] = Vector3(0, 0, 4)
 			p["offset"] = Vector3(0, 0, -breathe * 0.006)
-		"sit", "sit_type", "sit_write", "sit_phone", "sit_chat", "sit_read", "sit_play", "sit_rest":
+		"sit", "sit_type", "sit_write", "sit_phone", "sit_chat", "sit_read", "sit_play", "sit_rest", "sit_cuddle", "sit_cuddle_r":
 			p["hp_l"] = Vector3(86, 0, -5)
 			p["hp_r"] = Vector3(86, 0, 5)
 			p["kn_l"] = Vector3(-86, 0, 0)
@@ -629,6 +681,14 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 					p["neck"] = Vector3(-6, sin(t * 0.45) * 26.0, sin(t * 0.3) * 4.0)
 					p["kn_l"] = Vector3(-70, 0, 0)
 					p["kn_r"] = Vector3(-78, 0, 0)
+				"sit_cuddle", "sit_cuddle_r": # blottis l'un contre l'autre sur le canapé (penché à gauche, ou à droite pour _r)
+					var lean := 1.0 if anim_name == "sit_cuddle" else -1.0
+					p["spine"] = Vector3(-3.0 + breathe * 0.8, 0, lean * 11.0)
+					p["neck"] = Vector3(4, 0, lean * (15.0 + sin(t * 0.7) * 2.0))
+					p["sh_l"] = Vector3(22, 0, -8.0 + (20.0 if lean > 0.0 else 0.0))
+					p["sh_r"] = Vector3(22, 0, 8.0 - (20.0 if lean < 0.0 else 0.0))
+					p["el_l"] = Vector3(46, 0, 0)
+					p["el_r"] = Vector3(46, 0, 0)
 				"sit_read":
 					p["sh_l"] = Vector3(46, 0, 6)
 					p["sh_r"] = Vector3(46, 0, -6)
@@ -748,6 +808,104 @@ func _pose_for(anim_name: String, t: float) -> Dictionary:
 			p["sh_l"] = Vector3(46, 0, -8)
 			p["el_l"] = Vector3(64, 0, 0)
 			p["neck"] = Vector3(-4, sin(t * 0.8) * 6.0, sin(t * 0.6) * 4.0)
+			p["offset"] = Vector3(0, -0.5, 0)
+		# --- Famille (version 2.4) ---
+		"hug": # câlin : les bras entourent l'autre, la tête se penche
+			var sway := sin(t * 1.3)
+			p["sh_l"] = Vector3(66.0 + breathe * 1.5, 0, 26)
+			p["sh_r"] = Vector3(72.0 + breathe * 1.5, 0, -26)
+			p["el_l"] = Vector3(46, 0, 0)
+			p["el_r"] = Vector3(40, 0, 0)
+			p["spine"] = Vector3(9, 0, sway * 2.5)
+			p["neck"] = Vector3(6, 0, 12.0 + sway * 2.0)
+			p["offset"] = Vector3(0, 0, -0.03)
+		"give": # il tend un bouquet, l'autre main dans le dos
+			var shy := sin(t * 2.2)
+			p["sh_r"] = Vector3(74.0 + shy * 3.0, 0, 2)
+			p["el_r"] = Vector3(14.0 + shy * 3.0, 0, 0)
+			p["sh_l"] = Vector3(-24, 0, 12)
+			p["el_l"] = Vector3(38, 0, 0)
+			p["spine"] = Vector3(5, 0, 0)
+			p["neck"] = Vector3(-4, 0, 7.0 + shy * 3.0)
+			p["offset"] = Vector3(0, absf(shy) * 0.012, 0)
+		"dance": # il se balance d'un pied sur l'autre, les bras en l'air
+			var d := t * 5.2
+			var side := sin(d)
+			p["hp_l"] = Vector3(maxf(side, 0.0) * 20.0, 0, -6.0 - side * 5.0)
+			p["hp_r"] = Vector3(maxf(-side, 0.0) * 20.0, 0, 6.0 - side * 5.0)
+			p["kn_l"] = Vector3(-maxf(side, 0.0) * 34.0, 0, 0)
+			p["kn_r"] = Vector3(-maxf(-side, 0.0) * 34.0, 0, 0)
+			p["sh_l"] = Vector3(40.0 + cos(d) * 14.0, 0, -62.0 + side * 22.0)
+			p["sh_r"] = Vector3(40.0 - cos(d) * 14.0, 0, 62.0 + side * 22.0)
+			p["el_l"] = Vector3(78.0 + side * 12.0, 0, 0)
+			p["el_r"] = Vector3(78.0 - side * 12.0, 0, 0)
+			p["spine"] = Vector3(2, side * 10.0, side * 6.0)
+			p["neck"] = Vector3(-4, -side * 6.0, -side * 5.0)
+			p["offset"] = Vector3(side * 0.05, absf(cos(d)) * 0.045, 0)
+		"rock", "feed": # le bébé dans les bras : il le berce, ou lui donne le biberon
+			var sway := sin(t * 1.7)
+			p["sh_l"] = Vector3(34, 0, 16)
+			p["el_l"] = Vector3(98, 0, 0)
+			p["sh_r"] = Vector3(40, 0, -22)
+			p["el_r"] = Vector3(92, 0, 0)
+			p["neck"] = Vector3(20, -10, 4)
+			if anim_name == "rock":
+				p["spine"] = Vector3(3, sway * 13.0, sway * 3.0)
+				p["hp_l"] = Vector3(0, 0, -5.0 - sway * 2.0)
+				p["hp_r"] = Vector3(0, 0, 5.0 - sway * 2.0)
+				p["offset"] = Vector3(sway * 0.03, 0, 0)
+			else:
+				p["sh_r"] = Vector3(52.0 + sin(t * 1.1) * 2.0, 0, -34)
+				p["el_r"] = Vector3(112, 0, 0)
+				p["spine"] = Vector3(4.0 + breathe, 0, 0)
+		"cuddle_toy": # l'enfant serre son doudou contre lui
+			var sway := sin(t * 1.5)
+			p["sh_l"] = Vector3(38, 0, 22)
+			p["sh_r"] = Vector3(38, 0, -22)
+			p["el_l"] = Vector3(104, 0, 0)
+			p["el_r"] = Vector3(104, 0, 0)
+			p["spine"] = Vector3(2, sway * 9.0, sway * 3.0)
+			p["neck"] = Vector3(10, 0, sway * 6.0)
+		"hold_l", "hold_r": # main dans la main, côte à côte (la main gauche ou la droite tendue vers l'autre)
+			var swing := sin(t * 1.4) * 3.0
+			p["sh_l"] = Vector3(4, 0, -7)
+			p["sh_r"] = Vector3(4, 0, 7)
+			p["el_l"] = Vector3(12, 0, 0)
+			p["el_r"] = Vector3(12, 0, 0)
+			if anim_name == "hold_l":
+				p["sh_l"] = Vector3(6.0 + swing, 0, -30)
+				p["el_l"] = Vector3(4, 0, 0)
+				p["neck"] = Vector3(0, 22.0 + sin(t * 0.6) * 8.0, 3)
+			else:
+				p["sh_r"] = Vector3(6.0 + swing, 0, 30)
+				p["el_r"] = Vector3(4, 0, 0)
+				p["neck"] = Vector3(0, -22.0 - sin(t * 0.6) * 8.0, -3)
+			p["spine"] = Vector3(breathe * 0.8, 0, 0)
+		"floor_play": # assis par terre, les jambes devant : il empile des cubes
+			var reach := sin(t * 2.6)
+			p["hp_l"] = Vector3(82, 0, -24)
+			p["hp_r"] = Vector3(82, 0, 24)
+			p["kn_l"] = Vector3(-8, 0, 0)
+			p["kn_r"] = Vector3(-8, 0, 0)
+			p["spine"] = Vector3(16.0 + maxf(reach, 0.0) * 6.0, reach * 6.0, 0)
+			p["sh_l"] = Vector3(50.0 + reach * 16.0, 0, 6)
+			p["sh_r"] = Vector3(50.0 - reach * 16.0, 0, -6)
+			p["el_l"] = Vector3(34.0 - reach * 14.0, 0, 0)
+			p["el_r"] = Vector3(34.0 + reach * 14.0, 0, 0)
+			p["neck"] = Vector3(10, sin(t * 0.7) * 10.0, 0)
+			p["offset"] = Vector3(0, -HIP_H + 0.1, 0)
+		"kneel_play": # à genoux près de l'enfant : il lui montre un jouet et lui parle
+			var show := sin(t * 2.0)
+			p["hp_l"] = Vector3(112, 0, -12)
+			p["hp_r"] = Vector3(112, 0, 12)
+			p["kn_l"] = Vector3(-140, 0, 0)
+			p["kn_r"] = Vector3(-140, 0, 0)
+			p["spine"] = Vector3(-20.0 - breathe, 0, 0)
+			p["sh_r"] = Vector3(58.0 + show * 12.0, 8, 0)
+			p["el_r"] = Vector3(34.0 + cos(t * 2.0) * 12.0, 0, 0)
+			p["sh_l"] = Vector3(50.0 - show * 8.0, 0, -6)
+			p["el_l"] = Vector3(50, 0, 0)
+			p["neck"] = Vector3(2, sin(t * 0.8) * 8.0, sin(t * 1.0) * 5.0)
 			p["offset"] = Vector3(0, -0.5, 0)
 		"celebrate":
 			var j := absf(sin(t * 8.0))
