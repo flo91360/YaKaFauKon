@@ -212,12 +212,35 @@ func apply_quality(level: int) -> void:
 	sun.shadow_blur = [0.8, 1.2, 1.6][level]
 	inside_light.shadow_blur = [1.2, 1.8, 2.4][level]
 	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM, RenderingServer.SHADOW_QUALITY_SOFT_HIGH][level])
-	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 8192][level], true)
+	# 4 096 suffit même en « Beau » (8 192 réservait environ 128 Mo de mémoire vidéo).
+	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 4096][level], true)
+	# « Léger » : pas d'ombre intérieure (la lumière reste), et les petits objets
+	# n'ont plus d'ombre. Seule l'ombre du soleil, dans le jardin, est gardée.
+	inside_light.shadow_enabled = level >= 1
+	_small_shadows(level >= 1)
 	if is_inside_tree():
 		get_viewport().msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][level]
 		get_viewport().screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if level == 0 else Viewport.SCREEN_SPACE_AA_DISABLED
 	for l in _lamps:
 		l["light"].shadow_enabled = level >= 2 and l["shadow"]
+
+
+const SMALL_OBJECT := 0.25 ## taille (m) sous laquelle un objet perd son ombre en « Léger »
+
+func _small_shadows(on: bool) -> void:
+	for m in find_children("*", "MeshInstance3D", true, false):
+		var mesh: MeshInstance3D = m
+		if mesh.mesh == null:
+			continue
+		if not mesh.has_meta("ombre"):
+			var small := mesh.get_aabb().size * mesh.global_basis.get_scale() if mesh.is_inside_tree() else mesh.get_aabb().size
+			if small.x > SMALL_OBJECT or small.y > SMALL_OBJECT or small.z > SMALL_OBJECT:
+				mesh.set_meta("ombre", -1) # grand objet : on n'y touche pas
+				continue
+			mesh.set_meta("ombre", mesh.cast_shadow)
+		var orig: int = mesh.get_meta("ombre")
+		if orig >= 0:
+			mesh.cast_shadow = orig if on else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _set_layers(node: Node, layer: int) -> void:

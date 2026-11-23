@@ -18,7 +18,11 @@ func setup(appearance: Dictionary, age := "adulte", size := Vector2(180, 200), f
 	var viewport := SubViewport.new()
 	viewport.own_world_3d = true
 	viewport.transparent_bg = true
-	viewport.msaa_3d = Viewport.MSAA_4X
+	# L'antialiasing suit la qualité graphique (aucun en « Léger »).
+	var quality := 1
+	if Engine.get_main_loop() is SceneTree and Engine.get_main_loop().root.has_node("Game"):
+		quality = int(Engine.get_main_loop().root.get_node("Game").local_settings.get("qualite", 1))
+	viewport.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][clampi(quality, 0, 2)]
 	add_child(viewport)
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-30, 25, 0)

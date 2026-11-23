@@ -42,7 +42,7 @@ func _ready() -> void:
 		var b := UiTheme.button(game.QUALITY_LABELS[i], UiTheme.COL_ACCENT, 18)
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func():
-			game.set_local_setting("qualite", i)
+			game.choose_quality(i)
 			_refresh_quality())
 		q_row.add_child(b)
 		_quality_buttons.append(b)

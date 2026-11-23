@@ -16,6 +16,7 @@ const FamilyPanel = preload("res://scripts/ui/family_panel.gd")
 const Family = preload("res://scripts/core/family.gd")
 const Recap = preload("res://scripts/core/recap.gd")
 const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
+const Portrait = preload("res://scripts/ui/portrait.gd")
 
 var _fails := 0
 var _count := 0
@@ -700,6 +701,30 @@ func _run() -> void:
 	check(places.size() >= 2, "la bonne réponse ne reste pas toujours à la même place")
 	mp.queue_free()
 	await process_frame
+
+	print("Mode « Léger »")
+	screen.studio.apply_quality(0)
+	var small_off := 0
+	var small_total := 0
+	for m in screen.studio.find_children("*", "MeshInstance3D", true, false):
+		if m.has_meta("ombre") and int(m.get_meta("ombre")) > 0:
+			small_total += 1
+			small_off += 1 if m.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF else 0
+	check(not screen.studio.inside_light.shadow_enabled and screen.studio.sun.shadow_enabled, "« Léger » : plus d'ombre intérieure, le soleil garde la sienne")
+	check(small_total > 50 and small_off == small_total, "« Léger » : les petits objets n'ont plus d'ombre (%d)" % small_total)
+	screen.studio.apply_quality(1)
+	var restored := true
+	for m in screen.studio.find_children("*", "MeshInstance3D", true, false):
+		if m.has_meta("ombre") and int(m.get_meta("ombre")) > 0:
+			restored = restored and m.cast_shadow == int(m.get_meta("ombre"))
+	check(screen.studio.inside_light.shadow_enabled and restored, "« Normal » : ombres rendues")
+	var quality_backup: int = game.local_settings["qualite"]
+	game.local_settings["qualite"] = 0
+	var portrait := Portrait.new()
+	portrait.setup(profile["appearance"])
+	check(portrait.get_child(0).msaa_3d == Viewport.MSAA_DISABLED, "« Léger » : portrait sans antialiasing")
+	portrait.free()
+	game.local_settings["qualite"] = quality_backup
 
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
