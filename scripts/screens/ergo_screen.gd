@@ -8,6 +8,9 @@ const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 const Recap = preload("res://scripts/core/recap.gd")
+const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
+
+const PC := -2 # _selected quand la page « Ce PC » est ouverte
 
 var profiles: Array = []
 var save_enabled := true # désactivé pour la démonstration
@@ -70,6 +73,13 @@ func _build_list() -> void:
 		var b := UiTheme.button(str(profiles[i]["name"]), UiTheme.COL_ACCENT.darkened(0.2) if i == _selected else UiTheme.COL_ACCENT, 20)
 		b.pressed.connect(func(): _select(i, "recap"))
 		_list.add_child(b)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_list.add_child(spacer)
+	var pc := UiTheme.button("Ce PC : mot d'accès, prénoms", Color(0.5, 0.52, 0.6).darkened(0.2) if _selected == PC else Color(0.5, 0.52, 0.6), 18)
+	pc.name = "CePC"
+	pc.pressed.connect(_show_pc)
+	_list.add_child(pc)
 
 
 func _select(index: int, tab: String) -> void:
@@ -93,6 +103,55 @@ func _select(index: int, tab: String) -> void:
 		_show_recap(p)
 	else:
 		_show_settings(p)
+
+
+## Réglages communs à tous les joueurs de ce PC.
+func _show_pc() -> void:
+	_selected = PC
+	_build_list()
+	for c in _content.get_children():
+		c.queue_free()
+	var game = get_node("/root/Game")
+	_content.add_child(UiTheme.label("Ce PC", 30))
+	_section("Écran « Qui joue ? »")
+	var hide := CheckButton.new()
+	hide.name = "CacherPrenoms"
+	hide.text = "Cacher les prénoms (seulement l'initiale et la couleur du joueur)"
+	hide.add_theme_font_size_override("font_size", 20)
+	hide.button_pressed = bool(game.local_settings.get("prenoms_caches", false))
+	hide.toggled.connect(func(on):
+		if save_enabled:
+			game.set_local_setting("prenoms_caches", on))
+	_content.add_child(hide)
+	_line("Chaque enfant ne voit plus les prénoms des autres. Deux joueurs de même initiale se distinguent par leur couleur.", 18)
+
+	_section("Mot d'accès à cet espace")
+	var edit := LineEdit.new()
+	edit.name = "NouveauMot"
+	edit.secret = true
+	edit.placeholder_text = "Nouveau mot (au moins %d caractères)" % ErgoAccess.MIN_LENGTH
+	_content.add_child(edit)
+	var confirm := LineEdit.new()
+	confirm.name = "ConfirmationMot"
+	confirm.secret = true
+	confirm.placeholder_text = "Le même mot, encore une fois"
+	_content.add_child(confirm)
+	var msg := UiTheme.label("", 20)
+	msg.name = "MessageMot"
+	var change := UiTheme.button("Changer le mot d'accès", UiTheme.COL_ACCENT, 20)
+	change.name = "ChangerMot"
+	change.pressed.connect(func():
+		var why := ErgoAccess.refusal(edit.text, confirm.text)
+		if why == "" and save_enabled and not game.set_ergo_word(edit.text):
+			why = "Le mot n'a pas pu être enregistré sur ce PC."
+		msg.text = why if why != "" else "Nouveau mot enregistré."
+		msg.add_theme_color_override("font_color", UiTheme.COL_BAD if why != "" else UiTheme.COL_GOOD.darkened(0.2))
+		if why == "":
+			edit.clear()
+			confirm.clear())
+	_content.add_child(change)
+	_content.add_child(msg)
+	_line("Mot oublié : fermer le jeu et supprimer le fichier acces_ergo.json du dossier %s. Le mot « ergo » ouvre alors l'espace une fois, puis le jeu demande un nouveau mot." % ProjectSettings.globalize_path("user://"), 18)
 
 
 func _section(text: String) -> void:

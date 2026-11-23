@@ -88,8 +88,16 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 
 ## Espace ergothérapeute
 
-Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`**
-(modifiable dans `scripts/screens/profile_screen.gd`, constante `ERGO_CODE`).
+Sur l'écran « Qui joue ? », bouton en bas à droite. **Au premier passage, le mot
+`ergo`** ouvre l'espace, puis le jeu demande de choisir son propre mot (6 caractères
+ou plus). Ce mot est gardé haché (SHA-256 avec sel) dans `acces_ergo.json`, à côté
+des sauvegardes, et `ergo` ne marche plus. Il se change dans la page « Ce PC ». Mot
+oublié : fermer le jeu et supprimer `acces_ergo.json`.
+
+- **Ce PC** : mot d'accès, et prénoms cachés sur « Qui joue ? » (seulement l'initiale
+  et la couleur du joueur), pour qu'un enfant ne voie pas les prénoms des autres.
+  À la création d'un joueur, un prénom déjà pris est signalé (on peut ajouter une
+  initiale ou le garder).
 
 - **Réglages par enfant** : fréquence et exigence du chronomètre, tolérance aux fautes,
   niveau des textes (auto ou forcé), vitesse des besoins, minutes entre deux missions,
@@ -103,7 +111,7 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
 
 ## Tests
 
-828 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+846 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

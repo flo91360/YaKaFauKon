@@ -10,6 +10,24 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.3] - 2026-11-23
+
+### Pour l'adulte
+
+- **Mot d'accès choisi par l'ergo** : au premier passage, `ergo` ouvre l'espace
+  ergothérapeute puis le jeu demande un mot à soi (6 caractères ou plus). Il est
+  gardé haché sur le PC, et `ergo` ne marche plus. Il se change dans la nouvelle
+  page « Ce PC » de l'espace ergo.
+- **Prénoms cachés** : dans « Ce PC », l'ergo peut n'afficher que l'initiale et la
+  couleur de chaque joueur sur « Qui joue ? ». Un enfant ne voit plus les prénoms
+  des autres patients.
+
+### Changé
+
+- **Prénom déjà pris** : à la création d'un joueur, un prénom qui existe déjà est
+  signalé. L'enfant peut ajouter l'initiale de son nom, ou appuyer encore pour
+  garder ce prénom.
+
 ## [2.4.2] - 2026-11-23
 
 ### Pour l'adulte

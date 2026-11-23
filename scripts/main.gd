@@ -72,6 +72,7 @@ func show_profiles() -> void:
 
 func show_create() -> void:
 	var screen := CreateProfileScreen.new()
+	screen.existing_names = _game().list_profiles().map(func(p): return str(p.get("name", "")))
 	_set_screen(screen)
 	screen.back.connect(show_profiles)
 	screen.created.connect(func(child_name, appearance):

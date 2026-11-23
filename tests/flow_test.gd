@@ -75,6 +75,75 @@ func _run() -> void:
 	check(main._screen is ProfileScreen, "retour à la liste des joueurs")
 	var names: Array = main._screen.profiles.map(func(p): return p["name"])
 	check("Parcours Test" in names, "le nouveau joueur est dans la liste")
+
+	print("Accès ergo et prénoms")
+	var had_access := FileAccess.file_exists(game.ACCESS_PATH)
+	var access_backup := FileAccess.get_file_as_string(game.ACCESS_PATH) if had_access else ""
+	var hide_backup: bool = game.local_settings.get("prenoms_caches", false)
+	DirAccess.remove_absolute(game.ACCESS_PATH)
+	var ps = main._screen
+	ps._ask_code()
+	await _frames()
+	var ask: Node = ps.find_child("AccesErgo", true, false)
+	ask.find_child("Mot", true, false).text = "mauvais"
+	ask.find_child("Entrer", true, false).pressed.emit()
+	await _frames()
+	check(main._screen == ps and ps.find_child("ChoixMot", true, false) == null, "mauvais mot : l'espace reste fermé")
+	ask.find_child("Mot", true, false).text = " Ergo "
+	ask.find_child("Entrer", true, false).pressed.emit()
+	await _frames()
+	var choose: Node = ps.find_child("ChoixMot", true, false)
+	check(main._screen == ps and choose != null, "mot de départ « ergo » : il faut d'abord choisir son propre mot")
+	if choose == null:
+		quit(1)
+		return
+	choose.find_child("Nouveau", true, false).text = "abc"
+	choose.find_child("Confirmation", true, false).text = "abc"
+	choose.find_child("Enregistrer", true, false).pressed.emit()
+	await _frames()
+	check(main._screen == ps and choose.find_child("Message", true, false).text != "", "mot trop court refusé")
+	choose.find_child("Nouveau", true, false).text = "Cabinet2026"
+	choose.find_child("Confirmation", true, false).text = "cabinet2026"
+	choose.find_child("Enregistrer", true, false).pressed.emit()
+	await _frames()
+	check(main._screen is ErgoScreen, "nouveau mot enregistré : l'espace s'ouvre")
+	var stored := FileAccess.get_file_as_string(game.ACCESS_PATH)
+	check(stored != "" and not stored.to_lower().contains("cabinet"), "le mot n'est pas écrit en clair")
+	check(game.check_ergo_word("cabinet2026") and not game.check_ergo_word("ergo"), "« ergo » ne marche plus, le nouveau mot oui")
+	main._screen._show_pc()
+	await _frames()
+	check(main._screen.find_child("CacherPrenoms", true, false) != null and main._screen.find_child("ChangerMot", true, false) != null, "page « Ce PC » : prénoms et mot d'accès")
+	main._screen.find_child("CacherPrenoms", true, false).button_pressed = true
+	main.show_profiles()
+	await _frames()
+	var labels: Array = main._screen.find_children("*", "Button", true, false).map(func(b): return b.text)
+	check(labels.any(func(t): return t.begins_with("P.")) and not labels.any(func(t): return t.contains("Parcours")), "prénoms cachés : seulement l'initiale")
+	game.set_local_setting("prenoms_caches", hide_backup)
+	main.show_profiles()
+	await _frames()
+	main._screen._ask_code()
+	await _frames()
+	ask = main._screen.find_child("AccesErgo", true, false)
+	ask.find_child("Mot", true, false).text = "cabinet2026"
+	ask.find_child("Entrer", true, false).pressed.emit()
+	await _frames()
+	check(main._screen is ErgoScreen, "le mot choisi ouvre l'espace directement")
+	DirAccess.remove_absolute(game.ACCESS_PATH)
+	if had_access:
+		var f := FileAccess.open(game.ACCESS_PATH, FileAccess.WRITE)
+		f.store_string(access_backup)
+		f.close()
+	main.show_profiles()
+	await _frames()
+	main._screen.new_profile_requested.emit()
+	await _frames()
+	create = main._screen
+	create._name_edit.text = "parcours TEST"
+	create._validate()
+	await _frames()
+	check(main._screen == create and create._message.text.contains("déjà"), "prénom déjà pris : signalé avant de créer")
+	main.show_profiles()
+	await _frames()
 	main._screen.ergo_requested.emit()
 	await _frames()
 	check(main._screen is ErgoScreen, "espace ergothérapeute")

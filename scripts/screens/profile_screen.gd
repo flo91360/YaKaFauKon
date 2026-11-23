@@ -1,6 +1,6 @@
 extends Control
 ## Écran d'accueil : « Qui joue ? » — un bouton par enfant, création d'un nouveau joueur,
-## et accès discret à l'espace ergothérapeute (protégé par un mot à taper).
+## et accès discret à l'espace ergothérapeute (protégé par un mot choisi par l'ergo).
 
 signal profile_selected(data: Dictionary)
 signal new_profile_requested
@@ -8,8 +8,7 @@ signal ergo_requested
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
-
-const ERGO_CODE := "ergo"
+const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
 
 var profiles: Array = []
 
@@ -49,9 +48,10 @@ func _ready() -> void:
 	scroll.custom_minimum_size = Vector2(0, mini(ceili(profiles.size() / 2.0), 4) * 84)
 	box.add_child(scroll)
 	scroll.add_child(grid)
+	var hide_names := bool(_game().local_settings.get("prenoms_caches", false))
 	for p in profiles:
 		var stars := int(p.get("etoiles", 0))
-		var b := UiTheme.icon_button("perso", str(p.get("name", "?")) + ("  ·  %d étoile%s" % [stars, "" if stars == 1 else "s"] if stars > 0 else ""), Data.OUTFIT_COLORS[clampi(int(p.get("appearance", {}).get("outfit", 0)), 0, Data.OUTFIT_COLORS.size() - 1)].darkened(0.1), 30)
+		var b := UiTheme.icon_button("perso", ErgoAccess.display_name(str(p.get("name", "?")), hide_names) + ("  ·  %d étoile%s" % [stars, "" if stars == 1 else "s"] if stars > 0 else ""), Data.OUTFIT_COLORS[clampi(int(p.get("appearance", {}).get("outfit", 0)), 0, Data.OUTFIT_COLORS.size() - 1)].darkened(0.1), 30)
 		b.custom_minimum_size = Vector2(340, 70)
 		b.pressed.connect(func(): profile_selected.emit(p))
 		grid.add_child(b)
@@ -93,8 +93,13 @@ func _ready() -> void:
 	add_child(ergo)
 
 
+func _game():
+	return get_node("/root/Game")
+
+
 func _ask_code() -> void:
 	var root := Control.new()
+	root.name = "AccesErgo"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var shade := ColorRect.new()
 	shade.color = Color(0.1, 0.12, 0.2, 0.45)
@@ -104,6 +109,7 @@ func _ask_code() -> void:
 	var box := UiTheme.centered_panel(root, 520)
 	box.add_child(UiTheme.label("Espace réservé à l'ergothérapeute.\nTape le mot d'accès :", 24))
 	var edit := LineEdit.new()
+	edit.name = "Mot"
 	edit.secret = true
 	box.add_child(edit)
 	var msg := UiTheme.label("", 20, UiTheme.COL_BAD)
@@ -115,13 +121,69 @@ func _ask_code() -> void:
 	cancel.pressed.connect(root.queue_free)
 	row.add_child(cancel)
 	var ok := UiTheme.button("Entrer")
+	ok.name = "Entrer"
 	row.add_child(ok)
 	var try_code := func():
-		if edit.text.strip_edges().to_lower() == ERGO_CODE:
+		if not _game().check_ergo_word(edit.text):
+			msg.text = "Mot d'accès incorrect."
+			edit.clear()
+		elif not ErgoAccess.is_set(_game().ergo_access()):
+			root.queue_free()
+			_choose_word()
+		else:
 			root.queue_free()
 			ergo_requested.emit()
-		else:
-			msg.text = "Mot d'accès incorrect."
 	ok.pressed.connect(try_code)
 	edit.text_submitted.connect(func(_t): try_code.call())
+	edit.grab_focus()
+
+
+## Premier passage avec le mot de départ « ergo » : l'ergo choisit son propre mot,
+## que les enfants ne connaissent pas.
+func _choose_word() -> void:
+	var root := Control.new()
+	root.name = "ChoixMot"
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var shade := ColorRect.new()
+	shade.color = Color(0.1, 0.12, 0.2, 0.45)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(shade)
+	add_child(root)
+	var box := UiTheme.centered_panel(root, 600)
+	box.add_child(UiTheme.label("Choisis ton propre mot d'accès (au moins %d caractères).\nLe mot « ergo » ne marchera plus ensuite." % ErgoAccess.MIN_LENGTH, 22))
+	var edit := LineEdit.new()
+	edit.name = "Nouveau"
+	edit.secret = true
+	edit.placeholder_text = "Nouveau mot"
+	box.add_child(edit)
+	var confirm := LineEdit.new()
+	confirm.name = "Confirmation"
+	confirm.secret = true
+	confirm.placeholder_text = "Le même mot, encore une fois"
+	box.add_child(confirm)
+	var msg := UiTheme.label("", 20, UiTheme.COL_BAD)
+	msg.name = "Message"
+	box.add_child(msg)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(row)
+	var cancel := UiTheme.button("Retour", Color(0.6, 0.62, 0.68))
+	cancel.pressed.connect(root.queue_free)
+	row.add_child(cancel)
+	var ok := UiTheme.button("Enregistrer")
+	ok.name = "Enregistrer"
+	row.add_child(ok)
+	var save := func():
+		var why := ErgoAccess.refusal(edit.text, confirm.text)
+		if why != "":
+			msg.text = why
+			return
+		if not _game().set_ergo_word(edit.text):
+			msg.text = "Le mot n'a pas pu être enregistré sur ce PC."
+			return
+		root.queue_free()
+		ergo_requested.emit()
+	ok.pressed.connect(save)
+	edit.text_submitted.connect(func(_t): confirm.grab_focus())
+	confirm.text_submitted.connect(func(_t): save.call())
 	edit.grab_focus()
