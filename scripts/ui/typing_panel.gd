@@ -38,6 +38,7 @@ var _gain: Label
 var _panel: PanelContainer
 var _elapsed := 0.0
 var _first_key_time := -1.0
+var _attempts := 0 # appuis sur Entrée pour ce texte (les fautes ne sont comptées qu'à la première)
 var _active := false
 var _closing := false
 var _open_id := 0
@@ -135,7 +136,7 @@ func _ready() -> void:
 	bottom.add_child(_feedback)
 	_cancel = UiTheme.button("Annuler", UiTheme.COL_GREY, 20)
 	_cancel.focus_mode = Control.FOCUS_NONE
-	_cancel.pressed.connect(func(): _close({"status": "cancel"}))
+	_cancel.pressed.connect(func(): _close({"status": "cancel", "typed": _first_key_time >= 0.0}))
 	bottom.add_child(_cancel)
 	_validate = UiTheme.icon_button("coche", "Valider (Entrée)", UiTheme.COL_GOOD, 20)
 	_validate.focus_mode = Control.FOCUS_NONE
@@ -196,6 +197,7 @@ func _open(text: String, title: String, p_timed: bool, limit: float) -> void:
 	_show_feedback("Prends ton temps." if not timed else "Chronomètre ! Tape vite et bien.", UiTheme.COL_TEXT.lightened(0.15))
 	_elapsed = 0.0
 	_first_key_time = -1.0
+	_attempts = 0
 	_active = true
 	_closing = false
 	_open_id += 1
@@ -325,7 +327,8 @@ func _submit() -> void:
 	var start := maxf(_first_key_time, 0.0)
 	var seconds := maxf(_elapsed - start, 0.4)
 	var cps := TypingCheck.normalize(model_text).length() / seconds
-	game.record_typing(check, model_text.length(), seconds)
+	_attempts += 1
+	game.record_typing(check, model_text.length(), seconds, _attempts == 1)
 	if check["ok"]:
 		_active = false
 		_input.editable = false

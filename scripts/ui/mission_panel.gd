@@ -95,10 +95,16 @@ func _show_question(m: Dictionary) -> void:
 	var question := UiTheme.label(q["q"], 28)
 	question.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(question)
-	row.add_child(UiTheme.speak_button(func(): return q["q"] + " " + ". ".join(q["choices"])))
+	# Ordre des choix mélangé à chaque affichage : la bonne réponse n'est pas
+	# toujours à la même place (elle était au milieu pour plus de la moitié des questions).
+	var order := range(q["choices"].size())
+	order.shuffle()
+	var spoken := order.map(func(i): return q["choices"][i])
+	row.add_child(UiTheme.speak_button(func(): return q["q"] + " " + ". ".join(spoken)))
 	var first_try := [true]
-	for i in q["choices"].size():
+	for i in order:
 		var b := UiTheme.button(q["choices"][i], UiTheme.COL_ACCENT, 24)
+		b.name = "Choix_%d" % i
 		b.pressed.connect(func(): _answer(q, i, b, first_try))
 		_box.add_child(b)
 	_feedback = UiTheme.label("", 22)

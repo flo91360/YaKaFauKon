@@ -257,7 +257,7 @@ func start_session() -> void:
 		"date": Time.get_datetime_string_from_system(false, true),
 		"duree_sec": 0.0,
 		"frappes_ok": 0, "frappes_ratees": 0, "chronos_reussis": 0, "chronos_rates": 0,
-		"caracteres": 0, "temps_frappe_sec": 0.0,
+		"caracteres": 0, "temps_frappe_sec": 0.0, "caracteres_tentes": 0, "vitesse_niveaux": {},
 		"erreurs": {"substitution": 0, "oubli": 0, "ajout": 0, "inversion": 0, "accents": 0, "majuscules": 0},
 		"taches_finies": 0, "taches_abandonnees": 0,
 		"missions_reussies": 0, "missions_abandonnees": 0,
@@ -288,13 +288,26 @@ func end_session() -> void:
 	save_profile()
 
 
-func record_typing(result: Dictionary, chars: int, seconds: float) -> void:
-	for k in result["details"]:
-		session["erreurs"][k] = session["erreurs"].get(k, 0) + result["details"][k]
+## Note une frappe validée. Les fautes ne sont comptées qu'à la première tentative
+## d'un texte (sinon chaque appui sur Entrée recompterait les mêmes fautes), et le
+## taux de fautes se calcule sur les caractères de tous les textes tentés.
+func record_typing(result: Dictionary, chars: int, seconds: float, first_attempt := true) -> void:
+	if first_attempt:
+		for k in result["details"]:
+			session["erreurs"][k] = session["erreurs"].get(k, 0) + result["details"][k]
+		session["caracteres_tentes"] = int(session.get("caracteres_tentes", 0)) + chars
 	if result["ok"]:
 		session["frappes_ok"] += 1
 		session["caracteres"] += chars
 		session["temps_frappe_sec"] += seconds
+		# Vitesse par niveau de texte : on ne compare que des textes du même niveau.
+		if not session.get("vitesse_niveaux") is Dictionary:
+			session["vitesse_niveaux"] = {}
+		var level := str(Progression.text_level(profile)) if not profile.is_empty() else "1"
+		var v: Dictionary = session["vitesse_niveaux"].get(level, {"caracteres": 0, "sec": 0.0})
+		v["caracteres"] = int(v.get("caracteres", 0)) + chars
+		v["sec"] = float(v.get("sec", 0.0)) + seconds
+		session["vitesse_niveaux"][level] = v
 	else:
 		session["frappes_ratees"] += 1
 
