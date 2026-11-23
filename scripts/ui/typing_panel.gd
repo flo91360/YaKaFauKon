@@ -293,14 +293,18 @@ func _refresh_model() -> void:
 	else:
 		var good := UiTheme.COL_GOOD.darkened(0.15).to_html(false)
 		var bad := UiTheme.COL_BAD.to_html(false)
+		# Vert tant que le début est juste, rouge sur la première lettre différente
+		# seulement : une lettre oubliée ne colore pas en rouge toute la suite du mot.
+		var wrong := false
 		for i in model_text.length():
 			var c := model_text[i]
-			if i >= typed.length():
+			if wrong or i >= typed.length():
 				out += _escape(c)
 			elif _same(c, typed[i]):
 				out += "[color=#%s]%s[/color]" % [good, _escape(c)]
 			else:
 				out += "[color=#%s][u]%s[/u][/color]" % [bad, _escape(c)]
+				wrong = true
 	_model.text = out + "[/center]"
 
 

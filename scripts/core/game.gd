@@ -108,11 +108,24 @@ func list_profiles() -> Array:
 	var dir := DirAccess.open(SAVE_DIR)
 	if dir == null:
 		return result
-	for file in dir.get_files():
+	var files := dir.get_files()
+	var seen := {}
+	for file in files:
+		var id := ""
 		if file.ends_with(".json"):
-			var data := _read_json(SAVE_DIR + "/" + file)
+			id = file.trim_suffix(".json")
+		elif file.ends_with(".json.bak") or file.ends_with(".json.tmp"):
+			id = file.trim_suffix(".bak").trim_suffix(".tmp").trim_suffix(".json")
+		if id == "" or seen.has(id):
+			continue
+		seen[id] = true
+		# Profil illisible (coupure pendant une ancienne sauvegarde) : on reprend la
+		# dernière sauvegarde complète.
+		for ext in [".json", ".json.tmp", ".json.bak"]:
+			var data := _read_json(SAVE_DIR + "/" + id + ext) if FileAccess.file_exists(SAVE_DIR + "/" + id + ext) else {}
 			if not data.is_empty():
 				result.append(data)
+				break
 	result.sort_custom(func(a, b): return str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", ""))) < 0)
 	return result
 
@@ -143,19 +156,38 @@ func start_demo() -> void:
 func save_profile() -> void:
 	if profile.is_empty() or demo_mode:
 		return
-	var file := FileAccess.open(SAVE_DIR + "/" + profile["id"] + ".json", FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(profile, "\t"))
+	_write_profile(profile)
 
 
 func save_any(data: Dictionary) -> void:
-	var file := FileAccess.open(SAVE_DIR + "/" + str(data["id"]) + ".json", FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(data, "\t"))
+	_write_profile(data)
+
+
+## Sauvegarde sûre : le profil est d'abord écrit dans un fichier temporaire, puis
+## mis à la place de l'ancien, qui est gardé en copie de secours (.bak). Une
+## coupure pendant l'écriture ne peut donc pas effacer le profil.
+func _write_profile(data: Dictionary) -> bool:
+	var path := SAVE_DIR + "/" + str(data["id"]) + ".json"
+	var tmp := path + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(data, "\t"))
+	file.close()
+	if not _read_json(tmp).is_empty(): # le fichier temporaire est complet et lisible
+		if FileAccess.file_exists(path):
+			if FileAccess.file_exists(path + ".bak"):
+				DirAccess.remove_absolute(path + ".bak")
+			DirAccess.rename_absolute(path, path + ".bak")
+		return DirAccess.rename_absolute(tmp, path) == OK
+	DirAccess.remove_absolute(tmp)
+	return false
 
 
 func delete_profile(id: String) -> void:
-	DirAccess.remove_absolute(SAVE_DIR + "/" + id + ".json")
+	for ext in [".json", ".json.bak", ".json.tmp"]:
+		if FileAccess.file_exists(SAVE_DIR + "/" + id + ext):
+			DirAccess.remove_absolute(SAVE_DIR + "/" + id + ext)
 
 
 func close_profile() -> void:

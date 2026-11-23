@@ -109,8 +109,18 @@ func _run() -> void:
 	game.close_profile()
 	check(game.list_profiles().size() == before + 1, "la séance vide n'est pas gardée et rien n'est dupliqué")
 
+	print("Sauvegarde sûre")
+	var path: String = game.SAVE_DIR + "/" + id + ".json"
+	check(FileAccess.file_exists(path + ".bak") and not FileAccess.file_exists(path + ".tmp"), "l'ancienne sauvegarde est gardée en copie de secours")
+	var cut := FileAccess.open(path, FileAccess.WRITE) # coupure de courant pendant l'écriture
+	cut.store_string("{\"name\": \"Test Au")
+	cut.close()
+	var rescued: Array = game.list_profiles().filter(func(x): return x["id"] == id)
+	check(rescued.size() == 1 and rescued[0]["name"] == "Test Auto", "profil coupé en route : la copie de secours le retrouve")
+	check(game.list_profiles().size() == before + 1, "pas de doublon avec la copie de secours")
+
 	game.delete_profile(id)
-	check(game.list_profiles().size() == before, "profil de test supprimé")
+	check(game.list_profiles().size() == before and not FileAccess.file_exists(path + ".bak"), "profil de test supprimé, copie de secours comprise")
 
 	print("Sauvegarde de la version 1")
 	var v1 := {

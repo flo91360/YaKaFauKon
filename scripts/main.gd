@@ -239,8 +239,8 @@ func _start_demo(args: Array) -> void:
 		screen._start_typing(f, "toilettes")
 
 
-## Scènes de démonstration des graphismes de la famille (version 2.4). Le code de jeu
-## n'existe pas encore : on pose les personnages à la main pour les contrôler en image.
+## Scènes de démonstration des graphismes de la famille (version 2.4) : on pose les
+## personnages à la main pour les contrôler en image.
 ## Famille de démonstration (jamais sauvegardée) : où en est l'histoire.
 func _demo_family_state(state: String) -> void:
 	var Family = load("res://scripts/core/family.gd")

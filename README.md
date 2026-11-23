@@ -17,7 +17,8 @@ avec la commande ci-dessous. Chaque nouvelle version est publiée automatiquemen
 
 - Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur » car le fichier
   n'est pas signé : cliquer sur **Informations complémentaires** puis **Exécuter quand même**.
-- Les sauvegardes restent sur l'ordinateur, dans `%APPDATA%\Godot\app_userdata\YaKaFauKon\profils`.
+- Les sauvegardes restent sur l'ordinateur, dans `%APPDATA%\Godot\app_userdata\YaKaFauKon\profils`
+  (avec une copie de secours `.bak` de la sauvegarde précédente).
   Les joueurs créés avec la version 1 sont repris tels quels.
 - Si le jeu saccade : touche **Échap** → Graphismes → **Léger** (le jeu le fait aussi tout seul
   s'il détecte qu'il est trop lent).
@@ -102,7 +103,7 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
 
 ## Tests
 
-805 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+816 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd
