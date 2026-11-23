@@ -20,6 +20,7 @@ const THIGH := 0.34
 const SHIN := 0.31
 
 var state := "idle" # idle / walk / act
+var frozen := false # jeu en pause : le personnage s'arrête au milieu de sa marche
 var age := "adulte" # adulte / enfant (plus petit, avec une grosse tête)
 var pose := "debout" # debout / assis / allonge / course
 var anim := "idle"
@@ -547,7 +548,7 @@ func _process(delta: float) -> void:
 	if _model == null:
 		return
 	_time += delta
-	if state == "walk":
+	if state == "walk" and not frozen:
 		_walk(delta)
 	var current_anim := anim
 	if _one_shot_left > 0.0:

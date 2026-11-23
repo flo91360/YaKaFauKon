@@ -595,6 +595,65 @@ func _run() -> void:
 	check(Dreams.steps_done(profile) == 5 and Dreams.is_done(profile), "le rêve « Fonder une famille » est réalisé")
 	screen._close_overlay()
 
+	print("Marche pendant une pause ou une frappe de mission")
+	game.claim_dream() # le rêve est fêté : pas de panneau de fête pendant la suite
+	screen._close_overlay()
+	screen._interrupt_action()
+	var tapis = _object(screen, "tapis")
+	screen.character.position = _object(screen, "lit").use_point
+	screen._start_typing(tapis, "sport")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	await _wait(1.0)
+	var where: Vector3 = screen.character.position
+	screen._open_shop()
+	await _wait(1.5)
+	check(screen._state == "walking" and screen.character.position.distance_to(where) < 0.05 and not screen.typing.is_open(), "magasin ouvert : le personnage attend, aucune série ne démarre derrière")
+	screen._close_overlay()
+	check(await _wait_state(screen, "series", 8.0), "magasin fermé : il repart et la série commence")
+	screen.typing._close({"status": "cancel"})
+	await process_frame
+	# Mission : la frappe d'un élément ne doit pas être remplacée par une série.
+	if profile["career"]["current"] == "":
+		screen._on_career_chosen("organisateur")
+	profile["mission_timer"] = 0.0
+	await _wait(0.3)
+	screen._open_mission()
+	check(screen._mission_panel != null, "mission ouverte")
+	if screen._mission_panel == null:
+		quit(1)
+		return
+	screen._mission_panel.state["step"] = "items"
+	screen._mission_panel.state["item"] = 0
+	screen._mission_panel.refresh()
+	screen.character.position = _object(screen, "lit").use_point # loin du tapis
+	screen._start_typing(tapis, "sport")
+	screen.typing._input.text = screen.typing.model_text
+	screen.typing._submit()
+	await _wait(0.9)
+	screen._mission_panel.visible = false
+	screen._on_mission_typing_requested("ballons", "Mission")
+	screen.character.position = tapis.use_point
+	screen._on_arrived()
+	check(screen._typing_mode == "mission" and screen.typing.model_text == "ballons", "arrivé pendant la frappe de mission : la mission garde la frappe")
+	screen.typing._input.text = "ballons"
+	screen.typing._submit()
+	await _wait(1.0)
+	check(screen._mission_panel.visible and screen._mission_panel.state["item"] == 1, "l'élément de mission est compté et le panneau revient")
+	check(screen._state == "series" and screen._typing_mode == "series", "puis la série de l'activité commence")
+	var series_word: String = screen.typing.model_text
+	screen._mission_panel.visible = false
+	screen._on_mission_typing_requested("bougies", "Mission")
+	check(screen._typing_mode == "series" and screen.typing.model_text == series_word and screen._mission_panel.visible, "pendant une série, « Taper » de la mission attend : la série garde le clavier")
+	screen.typing._close({"status": "cancel"})
+
+	print("Aide en couleur")
+	screen.typing.open("maison", "test", false)
+	screen.typing._input.text = "mison"
+	screen.typing._refresh_model()
+	check(screen.typing._model.text.count("[u]") == 1, "une lettre oubliée : une seule lettre en rouge")
+	screen.typing._close({"status": "cancel"})
+
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)

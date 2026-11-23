@@ -10,6 +10,28 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.1] - 2026-11-23
+
+### Corrigé
+
+- **Mission bloquée** : si le personnage arrivait à une activité pendant que
+  l'enfant tapait un élément de mission, la série de mots prenait sa place et la
+  mission devenait introuvable. La mission garde maintenant la frappe, puis
+  l'activité commence. Pendant une série, « Taper » de la mission attend la fin
+  de la série.
+- **Pause** : le personnage s'arrête quand un panneau (magasin, pause…) est
+  ouvert. Une série ne démarre plus cachée derrière, et le chronomètre ne compte
+  plus un mot « trop lent » que l'enfant ne voyait pas.
+- **Lettres en couleur** : seule la première lettre différente passe en rouge.
+  Une lettre oubliée ne colore plus toute la fin du mot.
+
+### Pour l'adulte
+
+- **Sauvegarde sûre** : le profil est écrit dans un fichier temporaire avant de
+  remplacer l'ancien, gardé en copie de secours (`.bak`). Après une coupure de
+  courant pendant une sauvegarde, le jeu reprend la dernière sauvegarde complète
+  au lieu de faire disparaître l'enfant de la liste.
+
 ## [2.4.0] - 2026-11-15
 
 ### Ajouté

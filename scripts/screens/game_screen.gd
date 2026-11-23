@@ -62,6 +62,7 @@ var _dream_wait := 0.0
 var _char_zone := "maison" # où est le personnage : la caméra le suit quand il change de zone
 var _fps_time := 0.0
 var _fps_frames := 0
+var _arrival_pending := false # arrivé pendant une frappe de mission : l'activité attend la fin de la frappe
 
 
 func _ready() -> void:
@@ -146,6 +147,11 @@ func _process(delta: float) -> void:
 		return
 	if tutorial != null:
 		_tutorial_avoid()
+	# En pause (menu, panneau), le personnage s'arrête : rien ne démarre derrière un panneau.
+	character.frozen = paused
+	if _arrival_pending and not paused and not typing.is_open():
+		_arrival_pending = false
+		_on_arrived()
 	if not paused:
 		var sleeping: bool = _state == "acting" and Data.ACTIONS[_action_id].get("sleep", false)
 		var factor := SLEEP_TIME_FACTOR if sleeping else 1.0
@@ -412,6 +418,9 @@ func _on_typing_finished(result: Dictionary) -> void:
 func _on_arrived() -> void:
 	if _state != "walking":
 		return
+	if typing.is_open(): # une frappe de mission est en cours : l'activité attend qu'elle se termine
+		_arrival_pending = true
+		return
 	if _object == null or _action_id == "":
 		_state = "idle"
 		_tutorial_event("moved")
@@ -469,6 +478,7 @@ func _leave_object() -> void:
 
 
 func _interrupt_action() -> void:
+	_arrival_pending = false
 	if _state == "acting" or _state == "series":
 		_leave_object()
 	elif _state == "walking":
@@ -1202,6 +1212,11 @@ func _drop_mission() -> void:
 
 func _on_mission_typing_requested(text: String, title: String) -> void:
 	var profile: Dictionary = _game().profile
+	if typing.is_open() or _state == "series": # une série est en cours : elle garde le clavier
+		if _mission_panel != null:
+			_mission_panel.visible = true
+		hud.toast("Termine d'abord ta série de mots, puis reviens à la mission.", UiTheme.COL_ACCENT, 4.0, "drapeau")
+		return
 	var timed := Progression.next_is_timed(profile)
 	_typing_mode = "mission"
 	typing.open(text, title, timed, Progression.time_limit(profile, text) if timed else 0.0)
