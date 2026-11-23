@@ -112,7 +112,7 @@ static func candidates(profile: Dictionary) -> Array:
 			var job_help := "Clique sur le bouton « Travail » en haut à droite et choisis un métier."
 			var dream := Dreams.current(profile)
 			if dream != "" and Data.DREAMS[dream]["career"] != "":
-				job_help = "Clique sur le bouton « Travail » en haut à droite. Pour ton rêve, choisis : %s." % Data.CAREERS[Data.DREAMS[dream]["career"]]["label"]
+				job_help = "Clique sur le bouton « Travail » en haut à droite. Pour ton rêve, choisis : %s." % Data.career(Data.DREAMS[dream]["career"], profile)["label"]
 			result.append({"type": "metier", "target": 1,
 				"label": "Choisir un métier",
 				"aide": job_help,
@@ -130,7 +130,7 @@ static func candidates(profile: Dictionary) -> Array:
 		var tier := Progression.current_tier(profile)
 		if tier < 5:
 			result.append({"type": "palier", "target": tier + 1,
-				"label": "Devenir %s" % _lower_first(Data.CAREERS[career]["tiers"][tier]["title"]),
+				"label": "Devenir %s" % _lower_first(Data.career(career, profile)["tiers"][tier]["title"]),
 				"aide": "Réussis %d missions et monte les compétences demandées (bouton « Travail »)." % Data.MISSIONS_PER_TIER,
 				"pieces": 50, "icone": "travail"})
 	# Les objectifs qui font avancer le rêve de l'enfant sont signalés.

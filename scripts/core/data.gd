@@ -7,12 +7,18 @@ extends RefCounted
 # decay = points perdus par heure de jeu (1 heure de jeu = 1 minute réelle).
 const NEEDS := {
 	"faim": {"label": "Faim", "decay": 14.0, "alerte": "a très faim !", "conseil": "Va à la cuisine pour manger."},
-	"sommeil": {"label": "Sommeil", "decay": 7.0, "alerte": "est très fatigué !", "conseil": "Va dormir dans le lit."},
+	"sommeil": {"label": "Sommeil", "decay": 7.0, "alerte": "est très fatigué !", "alerte_f": "est très fatiguée !", "conseil": "Va dormir dans le lit."},
 	"toilettes": {"label": "Toilettes", "decay": 16.0, "alerte": "doit aller aux toilettes !", "conseil": "Va aux toilettes."},
 	"hygiene": {"label": "Hygiène", "decay": 9.0, "alerte": "a besoin de se laver !", "conseil": "Prends une douche ou brosse-toi les dents."},
-	"social": {"label": "Vie sociale", "decay": 8.0, "alerte": "se sent seul !", "conseil": "Appelle un ami ou invite des amis."},
+	"social": {"label": "Vie sociale", "decay": 8.0, "alerte": "se sent seul !", "alerte_f": "se sent seule !", "conseil": "Appelle un ami ou invite des amis."},
 }
 const NEED_ORDER := ["faim", "sommeil", "toilettes", "hygiene", "social"]
+
+
+## Alerte d'un besoin, accordée au corps choisi (« Femme » : fatiguée, seule).
+static func need_alert(need: String, appearance: Dictionary) -> String:
+	var n: Dictionary = NEEDS[need]
+	return n.get("alerte_f", n["alerte"]) if int(appearance.get("body", 0)) == 0 else n["alerte"]
 const RED_THRESHOLD := 25.0
 const ORANGE_THRESHOLD := 50.0
 
@@ -461,54 +467,59 @@ static func shop_items_for_skill(skill: String) -> Array:
 const CAREERS := {
 	"organisateur": {
 		"label": "Organisateur d'événements",
+		"label_f": "Organisatrice d'événements",
 		"icone": "organisation",
 		"description": "Prépare des fêtes et des réunions : anniversaires, baby showers, séminaires.",
 		"mission_skills": {"organisation": 18.0, "charisme": 10.0, "creativite": 6.0},
 		"tiers": [
-			{"title": "Assistant d'organisation", "salary": 20, "req": {}},
-			{"title": "Organisateur débutant", "salary": 35, "req": {"organisation": 2, "charisme": 1}},
-			{"title": "Organisateur confirmé", "salary": 50, "req": {"organisation": 4, "charisme": 3, "creativite": 2}},
-			{"title": "Chef de projet", "salary": 70, "req": {"organisation": 6, "charisme": 5, "creativite": 4}},
-			{"title": "Grand organisateur", "salary": 100, "req": {"organisation": 8, "charisme": 7, "creativite": 6}},
+			{"title": "Assistant d'organisation", "title_f": "Assistante d'organisation", "salary": 20, "req": {}},
+			{"title": "Organisateur débutant", "title_f": "Organisatrice débutante", "salary": 35, "req": {"organisation": 2, "charisme": 1}},
+			{"title": "Organisateur confirmé", "title_f": "Organisatrice confirmée", "salary": 50, "req": {"organisation": 4, "charisme": 3, "creativite": 2}},
+			{"title": "Chef de projet", "title_f": "Cheffe de projet", "salary": 70, "req": {"organisation": 6, "charisme": 5, "creativite": 4}},
+			{"title": "Grand organisateur", "title_f": "Grande organisatrice", "salary": 100, "req": {"organisation": 8, "charisme": 7, "creativite": 6}},
 		],
 	},
 	"artisan": {
 		"label": "Artisan",
+		"label_f": "Artisane",
 		"icone": "marteau",
 		"description": "Récolte du bois, achète des outils, entraîne-toi et construis des objets.",
 		"mission_skills": {"physique": 18.0, "creativite": 10.0, "organisation": 6.0},
 		"tiers": [
-			{"title": "Apprenti artisan", "salary": 20, "req": {}},
-			{"title": "Artisan débutant", "salary": 35, "req": {"physique": 2, "creativite": 1}},
-			{"title": "Artisan", "salary": 50, "req": {"physique": 4, "creativite": 3, "organisation": 2}},
-			{"title": "Artisan confirmé", "salary": 70, "req": {"physique": 6, "creativite": 5, "organisation": 4}},
-			{"title": "Maître artisan", "salary": 100, "req": {"physique": 8, "creativite": 7, "organisation": 6}},
+			{"title": "Apprenti artisan", "title_f": "Apprentie artisane", "salary": 20, "req": {}},
+			{"title": "Artisan débutant", "title_f": "Artisane débutante", "salary": 35, "req": {"physique": 2, "creativite": 1}},
+			{"title": "Artisan", "title_f": "Artisane", "salary": 50, "req": {"physique": 4, "creativite": 3, "organisation": 2}},
+			{"title": "Artisan confirmé", "title_f": "Artisane confirmée", "salary": 70, "req": {"physique": 6, "creativite": 5, "organisation": 4}},
+			{"title": "Maître artisan", "title_f": "Maîtresse artisane", "salary": 100, "req": {"physique": 8, "creativite": 7, "organisation": 6}},
 		],
 	},
 	"sportif": {
 		"label": "Sportif",
+		"label_f": "Sportive",
 		"icone": "physique",
 		"description": "Entraîne-toi, prépare tes matchs et deviens un champion.",
+		"description_f": "Entraîne-toi, prépare tes matchs et deviens une championne.",
 		"mission_skills": {"physique": 18.0, "organisation": 8.0, "patience": 8.0},
 		"tiers": [
-			{"title": "Sportif débutant", "salary": 20, "req": {}},
-			{"title": "Sportif de club", "salary": 35, "req": {"physique": 3}},
-			{"title": "Sportif régional", "salary": 50, "req": {"physique": 5, "organisation": 2}},
-			{"title": "Sportif national", "salary": 70, "req": {"physique": 8, "organisation": 3, "patience": 2}},
-			{"title": "Champion", "salary": 100, "req": {"physique": 10, "organisation": 5, "patience": 4}},
+			{"title": "Sportif débutant", "title_f": "Sportive débutante", "salary": 20, "req": {}},
+			{"title": "Sportif de club", "title_f": "Sportive de club", "salary": 35, "req": {"physique": 3}},
+			{"title": "Sportif régional", "title_f": "Sportive régionale", "salary": 50, "req": {"physique": 5, "organisation": 2}},
+			{"title": "Sportif national", "title_f": "Sportive nationale", "salary": 70, "req": {"physique": 8, "organisation": 3, "patience": 2}},
+			{"title": "Champion", "title_f": "Championne", "salary": 100, "req": {"physique": 10, "organisation": 5, "patience": 4}},
 		],
 	},
 	"chanteur": {
 		"label": "Chanteur",
+		"label_f": "Chanteuse",
 		"icone": "charisme",
 		"description": "Répète tes chansons, monte sur scène et fais chanter le public.",
 		"mission_skills": {"charisme": 18.0, "creativite": 10.0, "humour": 6.0},
 		"tiers": [
-			{"title": "Chanteur débutant", "salary": 20, "req": {}},
-			{"title": "Chanteur de quartier", "salary": 35, "req": {"charisme": 2, "creativite": 1}},
-			{"title": "Chanteur de scène", "salary": 50, "req": {"charisme": 4, "creativite": 3, "humour": 2}},
-			{"title": "Artiste reconnu", "salary": 70, "req": {"charisme": 6, "creativite": 5, "humour": 4}},
-			{"title": "Star de la chanson", "salary": 100, "req": {"charisme": 8, "creativite": 7, "humour": 6}},
+			{"title": "Chanteur débutant", "title_f": "Chanteuse débutante", "salary": 20, "req": {}},
+			{"title": "Chanteur de quartier", "title_f": "Chanteuse de quartier", "salary": 35, "req": {"charisme": 2, "creativite": 1}},
+			{"title": "Chanteur de scène", "title_f": "Chanteuse de scène", "salary": 50, "req": {"charisme": 4, "creativite": 3, "humour": 2}},
+			{"title": "Artiste reconnu", "title_f": "Artiste reconnue", "salary": 70, "req": {"charisme": 6, "creativite": 5, "humour": 4}},
+			{"title": "Star de la chanson", "title_f": "Star de la chanson", "salary": 100, "req": {"charisme": 8, "creativite": 7, "humour": 6}},
 		],
 	},
 	"scientifique": {
@@ -517,24 +528,25 @@ const CAREERS := {
 		"description": "Observe, mesure et fais des expériences pour comprendre le monde.",
 		"mission_skills": {"logique": 18.0, "organisation": 10.0, "patience": 6.0},
 		"tiers": [
-			{"title": "Assistant de laboratoire", "salary": 20, "req": {}},
-			{"title": "Jeune chercheur", "salary": 35, "req": {"logique": 2, "organisation": 1}},
-			{"title": "Chercheur", "salary": 50, "req": {"logique": 4, "organisation": 3, "patience": 2}},
-			{"title": "Chercheur confirmé", "salary": 70, "req": {"logique": 6, "organisation": 5, "patience": 4}},
-			{"title": "Grand savant", "salary": 100, "req": {"logique": 8, "organisation": 7, "patience": 6}},
+			{"title": "Assistant de laboratoire", "title_f": "Assistante de laboratoire", "salary": 20, "req": {}},
+			{"title": "Jeune chercheur", "title_f": "Jeune chercheuse", "salary": 35, "req": {"logique": 2, "organisation": 1}},
+			{"title": "Chercheur", "title_f": "Chercheuse", "salary": 50, "req": {"logique": 4, "organisation": 3, "patience": 2}},
+			{"title": "Chercheur confirmé", "title_f": "Chercheuse confirmée", "salary": 70, "req": {"logique": 6, "organisation": 5, "patience": 4}},
+			{"title": "Grand savant", "title_f": "Grande savante", "salary": 100, "req": {"logique": 8, "organisation": 7, "patience": 6}},
 		],
 	},
 	"ingenieur": {
 		"label": "Ingénieur",
+		"label_f": "Ingénieure",
 		"icone": "reglages",
 		"description": "Imagine des ponts, des robots et des machines, puis construis-les.",
 		"mission_skills": {"logique": 18.0, "creativite": 10.0, "organisation": 6.0},
 		"tiers": [
-			{"title": "Apprenti ingénieur", "salary": 20, "req": {}},
-			{"title": "Technicien", "salary": 35, "req": {"logique": 2, "creativite": 1}},
-			{"title": "Ingénieur", "salary": 50, "req": {"logique": 4, "creativite": 3, "organisation": 2}},
-			{"title": "Ingénieur en chef", "salary": 70, "req": {"logique": 6, "creativite": 5, "organisation": 4}},
-			{"title": "Grand inventeur", "salary": 100, "req": {"logique": 8, "creativite": 7, "organisation": 6}},
+			{"title": "Apprenti ingénieur", "title_f": "Apprentie ingénieure", "salary": 20, "req": {}},
+			{"title": "Technicien", "title_f": "Technicienne", "salary": 35, "req": {"logique": 2, "creativite": 1}},
+			{"title": "Ingénieur", "title_f": "Ingénieure", "salary": 50, "req": {"logique": 4, "creativite": 3, "organisation": 2}},
+			{"title": "Ingénieur en chef", "title_f": "Ingénieure en chef", "salary": 70, "req": {"logique": 6, "creativite": 5, "organisation": 4}},
+			{"title": "Grand inventeur", "title_f": "Grande inventrice", "salary": 100, "req": {"logique": 8, "creativite": 7, "organisation": 6}},
 		],
 	},
 	"nature": {
@@ -543,11 +555,11 @@ const CAREERS := {
 		"description": "Occupe-toi des plantes, des animaux et de la forêt.",
 		"mission_skills": {"patience": 18.0, "physique": 8.0, "douceur": 8.0},
 		"tiers": [
-			{"title": "Promeneur curieux", "salary": 20, "req": {}},
-			{"title": "Apprenti jardinier", "salary": 35, "req": {"physique": 2, "patience": 1}},
-			{"title": "Soigneur d'animaux", "salary": 50, "req": {"patience": 3, "physique": 3, "douceur": 1}},
-			{"title": "Garde forestier", "salary": 70, "req": {"patience": 5, "physique": 5, "douceur": 3}},
-			{"title": "Gardien de la nature", "salary": 100, "req": {"patience": 8, "physique": 6, "douceur": 5}},
+			{"title": "Promeneur curieux", "title_f": "Promeneuse curieuse", "salary": 20, "req": {}},
+			{"title": "Apprenti jardinier", "title_f": "Apprentie jardinière", "salary": 35, "req": {"physique": 2, "patience": 1}},
+			{"title": "Soigneur d'animaux", "title_f": "Soigneuse d'animaux", "salary": 50, "req": {"patience": 3, "physique": 3, "douceur": 1}},
+			{"title": "Garde forestier", "title_f": "Garde forestière", "salary": 70, "req": {"patience": 5, "physique": 5, "douceur": 3}},
+			{"title": "Gardien de la nature", "title_f": "Gardienne de la nature", "salary": 100, "req": {"patience": 8, "physique": 6, "douceur": 5}},
 		],
 	},
 }
@@ -560,16 +572,45 @@ const CAREER_CHANGE_MIN_TIER := 2 # palier à atteindre avant de pouvoir changer
 # se réalise en atteignant le palier 5 de la carrière ; le rêve « maison » en
 # achetant tout le magasin. Voir scripts/core/dreams.gd.
 const DREAMS := {
-	"organisateur": {"label": "Organiser de grandes fêtes", "description": "Devenir un grand organisateur d'événements.", "career": "organisateur"},
-	"artisan": {"label": "Devenir maître artisan", "description": "Construire de beaux objets de tes mains.", "career": "artisan"},
-	"sportif": {"label": "Devenir champion", "description": "T'entraîner et gagner le championnat.", "career": "sportif"},
+	"organisateur": {"label": "Organiser de grandes fêtes", "description": "Devenir un grand organisateur d'événements.", "description_f": "Devenir une grande organisatrice d'événements.", "career": "organisateur"},
+	"artisan": {"label": "Devenir maître artisan", "label_f": "Devenir maîtresse artisane", "description": "Construire de beaux objets de tes mains.", "career": "artisan"},
+	"sportif": {"label": "Devenir champion", "label_f": "Devenir championne", "description": "T'entraîner et gagner le championnat.", "career": "sportif"},
 	"chanteur": {"label": "Devenir une star de la chanson", "description": "Chanter sur scène devant un grand public.", "career": "chanteur"},
-	"scientifique": {"label": "Devenir un grand savant", "description": "Faire des expériences et des découvertes.", "career": "scientifique"},
-	"ingenieur": {"label": "Devenir un grand inventeur", "description": "Imaginer et construire des machines.", "career": "ingenieur"},
+	"scientifique": {"label": "Devenir un grand savant", "label_f": "Devenir une grande savante", "description": "Faire des expériences et des découvertes.", "career": "scientifique"},
+	"ingenieur": {"label": "Devenir un grand inventeur", "label_f": "Devenir une grande inventrice", "description": "Imaginer et construire des machines.", "career": "ingenieur"},
 	"nature": {"label": "Vivre dans la nature", "description": "Prendre soin des plantes et des animaux.", "career": "nature"},
 	"maison": {"label": "Avoir une belle maison", "description": "Acheter tout ce qu'il y a au magasin.", "career": ""},
 	"famille": {"label": "Fonder une famille", "description": "Rencontrer quelqu'un, vivre ensemble et avoir un enfant.", "career": ""},
 }
+## Accord au féminin : un corps « Femme » (body 0) prend les formes en `_f`.
+static func is_female(profile: Dictionary) -> bool:
+	var a = profile.get("appearance", {})
+	return a is Dictionary and a.has("body") and int(a["body"]) == 0
+
+
+static func _agreed(info: Dictionary, female: bool) -> Dictionary:
+	var r := info.duplicate(true)
+	if female:
+		for key in info:
+			if str(key).ends_with("_f"):
+				r[str(key).trim_suffix("_f")] = info[key]
+		if r.has("tiers"):
+			for t in r["tiers"]:
+				if t.has("title_f"):
+					t["title"] = t["title_f"]
+	return r
+
+
+## Le métier avec ses textes (nom, description, paliers) accordés au personnage.
+static func career(c: String, profile: Dictionary) -> Dictionary:
+	return _agreed(CAREERS[c], is_female(profile))
+
+
+## Le rêve avec ses textes accordés au personnage.
+static func dream(d: String, profile: Dictionary) -> Dictionary:
+	return _agreed(DREAMS[d], is_female(profile))
+
+
 const DREAM_ORDER := ["organisateur", "artisan", "sportif", "chanteur", "scientifique", "ingenieur", "nature", "maison", "famille"]
 const DREAM_REWARD_PIECES := 100
 const DREAM_REWARD_STARS := 3
@@ -768,12 +809,12 @@ const MISSIONS := [
 	{
 		"id": "relais", "career": "sportif", "min_tier": 2,
 		"title": "La course de relais",
-		"consigne": "Vous êtes 4 coureurs. Chacun court 100 mètres. Tu es le dernier : tu reçois le bâton et tu le gardes jusqu'à la ligne.",
+		"consigne": "Vous êtes 4 coureurs. Chacun court 100 mètres. Tu cours en dernier : tu reçois le bâton et tu le gardes jusqu'à la ligne.",
 		"questions": [
 			{"q": "Quelle distance court l'équipe en tout ?", "choices": ["100 mètres", "400 mètres", "1 000 mètres"], "good": 1,
 				"aide": "4 coureurs qui courent 100 mètres : 400 mètres."},
 			{"q": "Que fais-tu du bâton ?", "choices": ["Je le donne à un autre coureur", "Je le pose par terre", "Je le garde jusqu'à la ligne"], "good": 2,
-				"aide": "Tu es le dernier coureur : tu gardes le bâton jusqu'à la ligne."},
+				"aide": "Tu cours en dernier : tu gardes le bâton jusqu'à la ligne."},
 		],
 		"items": [["relais", "le relais", "courir le relais"], ["bâton", "le bâton", "tenir le bâton"], ["ligne", "la ligne", "passer la ligne"]],
 	},

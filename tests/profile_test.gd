@@ -77,7 +77,8 @@ func _run() -> void:
 	check(p["money"] == 15 and typeof(p["money"]) == TYPE_INT, "argent conservé (entier)")
 	check(p["achats"] == ["lecture"], "achats du magasin conservés")
 	check(p["reve"]["id"] == "artisan" and p["reve"]["changements"] == 1 and typeof(p["reve"]["changements"]) == TYPE_INT, "rêve et nombre de changements conservés")
-	check(Recap.dream_line(p) == "Rêve : devenir maître artisan, 2 étape(s) sur 5 — changé 1 fois en cours de route", "rêve visible pour l'ergo")
+	var artisan := "maîtresse artisane" if p["appearance"]["body"] == 0 else "maître artisan" # accordé au corps choisi
+	check(Recap.dream_line(p) == "Rêve : devenir %s, 2 étape(s) sur 5 — changé 1 fois en cours de route" % artisan, "rêve visible pour l'ergo, accordé au personnage")
 	check(Recap.session_lines(p["sessions"][0]).has("A changé de rêve : 1 fois"), "changement de rêve dans le récapitulatif de la séance")
 	p["career"]["tiers"]["artisan"] = 5
 	var reward: Dictionary = game.claim_dream()

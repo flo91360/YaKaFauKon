@@ -10,6 +10,18 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.5] - 2026-11-23
+
+### Changé
+
+- **Accords au féminin** : avec un personnage « Femme », les alertes disent « est
+  très fatiguée ! » et « se sent seule ! ». Les métiers, leurs paliers et les rêves
+  sont accordés aussi : sportive, artisane, chanteuse, ingénieure, organisatrice…
+  et « Devenir championne », « Devenir une grande savante ». Le récapitulatif de
+  l'ergo suit le même accord.
+- **Course de relais** : « Tu cours en dernier » remplace « Tu es le dernier », qui
+  ne convenait pas à tous les enfants.
+
 ## [2.4.4] - 2026-11-23
 
 ### Changé

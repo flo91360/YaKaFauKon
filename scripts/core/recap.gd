@@ -141,13 +141,13 @@ static func dream_line(profile: Dictionary) -> String:
 	if dream == "":
 		parts.append("pas encore choisi")
 	elif Dreams.is_done(profile):
-		parts.append("%s (réalisé)" % Data.DREAMS[dream]["label"].to_lower())
+		parts.append("%s (réalisé)" % Data.dream(dream, profile)["label"].to_lower())
 	else:
-		parts.append("%s, %d étape(s) sur %d" % [Data.DREAMS[dream]["label"].to_lower(), Dreams.steps_done(profile), Dreams.steps(profile).size()])
+		parts.append("%s, %d étape(s) sur %d" % [Data.dream(dream, profile)["label"].to_lower(), Dreams.steps_done(profile), Dreams.steps(profile).size()])
 	var others := []
 	for d in Dreams.achieved(profile):
 		if d != dream:
-			others.append(Data.DREAMS[d]["label"].to_lower())
+			others.append(Data.dream(d, profile)["label"].to_lower())
 	if not others.is_empty():
 		parts.append("déjà réalisé : %s" % ", ".join(others))
 	var changes := int(profile.get("reve", {}).get("changements", 0))

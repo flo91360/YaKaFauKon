@@ -477,7 +477,7 @@ func _update_dream(profile: Dictionary) -> void:
 		dream_button.modulate = Color(1, 1, 1).lerp(Color(1.2, 1.15, 1.0), 0.5 + 0.5 * sin(_time * 3.0))
 		return
 	var done := Dreams.is_done(profile)
-	_dream_text.text = "Réalisé ! Bravo !" if done else Data.DREAMS[dream]["label"]
+	_dream_text.text = "Réalisé ! Bravo !" if done else Data.dream(dream, profile)["label"]
 	_dream_bar.value = lerpf(_dream_bar.value, Dreams.fraction(profile), 0.15)
 	_dream_count.text = "%d / %d" % [Dreams.steps_done(profile), Dreams.steps(profile).size()]
 	_dream_badge.get_child(0).texture = UiTheme.icon_texture("coupe" if done else "reve")

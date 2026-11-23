@@ -37,6 +37,7 @@ func _init() -> void:
 	_test_recap_speeds()
 	_test_ergo_access()
 	_test_quality_retry()
+	_test_agreement()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -668,3 +669,29 @@ func _test_quality_retry() -> void:
 	GameScript.quality_lowered(q)
 	check(not GameScript.quality_retry(q) and q["qualite"] == 1, "après %d essais, on en reste là" % GameScript.QUALITY_RETRIES)
 	check(not GameScript.quality_retry({"qualite": 0, "qualite_voulue": -1, "essais_remontee": 0}), "« Léger » choisi à la main : jamais remonté")
+
+
+func _test_agreement() -> void:
+	print("Accords au féminin")
+	check(Data.need_alert("sommeil", {"body": 0}) == "est très fatiguée !" and Data.need_alert("sommeil", {"body": 1}) == "est très fatigué !", "alerte de fatigue accordée au corps choisi")
+	check(Data.need_alert("social", {"body": 0}) == "se sent seule !" and Data.need_alert("social", {"body": 1}) == "se sent seul !", "alerte de solitude accordée")
+	check(Data.need_alert("faim", {"body": 0}) == Data.need_alert("faim", {"body": 1}), "alerte sans accord : la même pour tous")
+	var gendered := []
+	for m in Data.MISSIONS:
+		for t in [m["consigne"]] + m["questions"].map(func(q): return q["aide"]):
+			for w in ["Tu es le dernier", "Tu es la dernière", "tu es prêt ", "Tu es seul "]:
+				if t.contains(w):
+					gendered.append(m["id"])
+	check(gendered.is_empty(), "consignes des missions sans accord masculin pour l'enfant %s" % str(gendered))
+	var woman := {"appearance": {"body": 0}}
+	var man := {"appearance": {"body": 1}}
+	check(Data.career("sportif", woman)["label"] == "Sportive" and Data.career("sportif", woman)["tiers"][4]["title"] == "Championne", "métier accordé : sportive, championne")
+	check(Data.career("sportif", man)["tiers"][4]["title"] == "Champion" and Data.CAREERS["sportif"]["tiers"][4]["title"] == "Champion", "corps « Homme » : masculin, les données ne changent pas")
+	check(Data.career("scientifique", woman)["label"] == "Scientifique" and Data.career("ingenieur", woman)["tiers"][4]["title"] == "Grande inventrice", "accords des titres de paliers")
+	check(Data.dream("sportif", woman)["label"] == "Devenir championne" and Data.dream("chanteur", woman)["label"] == Data.dream("chanteur", man)["label"], "rêve accordé (et inchangé s'il est déjà neutre)")
+	check(Data.career("artisan", {})["label"] == "Artisan", "profil sans apparence : forme d'origine")
+	var all_f := true
+	for c in Data.CAREERS:
+		for t in Data.CAREERS[c]["tiers"]:
+			all_f = all_f and t.has("title_f")
+	check(all_f, "chaque palier a sa forme au féminin")
