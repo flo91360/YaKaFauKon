@@ -21,7 +21,9 @@ avec la commande ci-dessous. Chaque nouvelle version est publiée automatiquemen
   (avec une copie de secours `.bak` de la sauvegarde précédente).
   Les joueurs créés avec la version 1 sont repris tels quels.
 - Si le jeu saccade : touche **Échap** → Graphismes → **Léger** (le jeu le fait aussi tout seul
-  s'il détecte qu'il est trop lent).
+  s'il détecte qu'il est trop lent, puis retente le niveau au-dessus au début des 2 parties
+  suivantes). « Léger » coupe l'ombre intérieure et celle des petits objets, l'antialiasing
+  et les portraits de « Ma famille » antialiasés ; seule l'ombre du soleil reste.
 
 ### Depuis le code source
 
@@ -111,7 +113,7 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
 
 ## Tests
 
-846 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+855 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

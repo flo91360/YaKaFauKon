@@ -20,7 +20,8 @@ const AUTOSAVE_SEC := 20.0
 const SETTINGS_PATH := "user://reglages.json"
 const ACCESS_PATH := "user://acces_ergo.json" # mot d'accès de l'ergo, haché
 ## Réglages de l'ordinateur (communs à tous les joueurs).
-const DEFAULT_LOCAL_SETTINGS := {"volume": 70, "musique": 35, "qualite": 1, "plein_ecran": false, "prenoms_caches": false}
+const DEFAULT_LOCAL_SETTINGS := {"volume": 70, "musique": 35, "qualite": 1, "plein_ecran": false, "prenoms_caches": false,
+	"qualite_voulue": -1, "essais_remontee": 0} # qualite_voulue : niveau d'avant l'allègement automatique
 const QUALITY_LABELS := ["Léger", "Normal", "Beau"]
 
 var profile: Dictionary = {}
@@ -469,6 +470,43 @@ func _load_local_settings() -> void:
 	local_settings["volume"] = clampi(local_settings["volume"], 0, 100)
 	local_settings["musique"] = clampi(local_settings["musique"], 0, 100)
 	local_settings["qualite"] = clampi(local_settings["qualite"], 0, 2)
+	local_settings["qualite_voulue"] = clampi(local_settings["qualite_voulue"], -1, 2)
+
+
+## Graphismes allégés tout seuls parce que le jeu saccadait : on note le niveau
+## d'avant pour le retenter plus tard.
+static func quality_lowered(s: Dictionary) -> void:
+	if int(s.get("qualite_voulue", -1)) < 0:
+		s["qualite_voulue"] = int(s["qualite"])
+	s["qualite"] = maxi(int(s["qualite"]) - 1, 0)
+
+
+const QUALITY_RETRIES := 2 ## remontées automatiques tentées avant d'en rester là
+
+## Au début d'une partie : si les graphismes ont été allégés tout seuls, on retente
+## le niveau au-dessus (un ralentissement passager ne laisse pas « Léger » pour
+## toujours). Au plus QUALITY_RETRIES fois, tant que l'adulte n'a rien choisi.
+## Renvoie true si le niveau a changé.
+static func quality_retry(s: Dictionary) -> bool:
+	var wanted := int(s.get("qualite_voulue", -1))
+	if wanted <= int(s["qualite"]) or int(s.get("essais_remontee", 0)) >= QUALITY_RETRIES:
+		return false
+	s["qualite"] = int(s["qualite"]) + 1
+	s["essais_remontee"] = int(s.get("essais_remontee", 0)) + 1
+	return true
+
+
+## Choix fait à la main dans les réglages : il remplace l'allègement automatique.
+func choose_quality(level: int) -> void:
+	local_settings["qualite_voulue"] = -1
+	local_settings["essais_remontee"] = 0
+	set_local_setting("qualite", level)
+
+
+## Début de partie : retente si besoin un niveau de graphismes plus beau.
+func retry_quality() -> void:
+	if quality_retry(local_settings):
+		set_local_setting("qualite", local_settings["qualite"])
 
 
 func set_local_setting(key: String, value) -> void:

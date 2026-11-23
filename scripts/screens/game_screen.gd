@@ -100,6 +100,8 @@ func _ready() -> void:
 	typing.finished.connect(_on_typing_finished)
 	game.skill_level_up.connect(_on_skill_level_up)
 	game.settings_changed.connect(_apply_settings)
+	if not game.demo_mode:
+		game.retry_quality()
 	_apply_settings()
 	game.start_music()
 	for n in Data.NEED_ORDER:
@@ -225,7 +227,8 @@ func _watch_fps(delta: float) -> void:
 		_fps_time = 0.0
 		_fps_frames = 0
 		if fps < 24.0 and game.local_settings["qualite"] > 0:
-			game.set_local_setting("qualite", game.local_settings["qualite"] - 1)
+			game.quality_lowered(game.local_settings)
+			game.set_local_setting("qualite", game.local_settings["qualite"])
 			hud.toast("Graphismes allégés pour que le jeu reste fluide.", UiTheme.COL_GREY, 5.0, "reglages")
 
 

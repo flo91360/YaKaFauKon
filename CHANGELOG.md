@@ -10,6 +10,21 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.4] - 2026-11-23
+
+### Changé
+
+- **Mode « Léger » plus léger** : plus d'ombre à l'intérieur de la maison (la
+  lumière reste), plus d'ombre sous les petits objets (plus de 900 sur environ
+  1 300), et les portraits de « Ma famille » sans antialiasing. Seule l'ombre du
+  soleil, dans le jardin, est gardée. En « Beau », la carte des ombres passe de
+  8 192 à 4 096 pixels : environ 96 Mo de mémoire vidéo en moins, pour des
+  ombres à peine moins fines.
+- **Allègement automatique réversible** : quand le jeu allège tout seul les
+  graphismes parce qu'il saccade, il retente le niveau au-dessus au début des
+  2 parties suivantes. Un ralentissement passager ne laisse plus « Léger » pour
+  toujours. Un choix fait à la main dans les réglages est toujours respecté.
+
 ## [2.4.3] - 2026-11-23
 
 ### Pour l'adulte

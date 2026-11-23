@@ -12,6 +12,7 @@ const Recap = preload("res://scripts/core/recap.gd")
 const Build = preload("res://scripts/core/build.gd")
 const Family = preload("res://scripts/core/family.gd")
 const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
+const GameScript = preload("res://scripts/core/game.gd")
 
 var _fails := 0
 var _count := 0
@@ -35,6 +36,7 @@ func _init() -> void:
 	_test_family()
 	_test_recap_speeds()
 	_test_ergo_access()
+	_test_quality_retry()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -653,3 +655,16 @@ func _test_ergo_access() -> void:
 	check(ErgoAccess.refusal("Cabinet", "cabinet ") == "", "mot valable accepté")
 	check(ErgoAccess.display_name("léo", true) == "L." and ErgoAccess.display_name("Léo", false) == "Léo", "prénom caché : seulement l'initiale")
 	check(ErgoAccess.is_duplicate(" LÉO ", ["Camille", "Leo"]) and not ErgoAccess.is_duplicate("Léon", ["Léo"]), "prénom en double reconnu malgré majuscules et accents")
+
+
+func _test_quality_retry() -> void:
+	print("Graphismes allégés puis retentés")
+	var q := {"qualite": 2, "qualite_voulue": -1, "essais_remontee": 0}
+	GameScript.quality_lowered(q)
+	GameScript.quality_lowered(q)
+	check(q["qualite"] == 0 and q["qualite_voulue"] == 2, "allègement automatique : le niveau choisi est retenu")
+	check(GameScript.quality_retry(q) and q["qualite"] == 1, "partie suivante : le niveau au-dessus est retenté")
+	check(GameScript.quality_retry(q) and q["qualite"] == 2, "puis encore au-dessus")
+	GameScript.quality_lowered(q)
+	check(not GameScript.quality_retry(q) and q["qualite"] == 1, "après %d essais, on en reste là" % GameScript.QUALITY_RETRIES)
+	check(not GameScript.quality_retry({"qualite": 0, "qualite_voulue": -1, "essais_remontee": 0}), "« Léger » choisi à la main : jamais remonté")
