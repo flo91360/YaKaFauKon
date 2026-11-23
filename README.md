@@ -65,7 +65,8 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   joue de la guitare, arrose le potager, caresse le chat, coupe du bois, ramasse des pierres… La caméra se rapproche pendant l'activité.
 - **5 jauges** : faim, sommeil, toilettes, hygiène, vie sociale. Alerte quand une jauge passe au rouge.
 - **Frappe** : 3 niveaux de texte (« toilettes » → « les toilettes » → « aller aux toilettes »).
-  Accents et majuscules ignorés, 1 faute admise sur un mot seul, 2 sur plusieurs mots.
+  Accents et majuscules ignorés. Sur un mot seul : aucune faute jusqu'à 3 lettres, 1 jusqu'à 8,
+  2 au-delà ; 2 fautes sur plusieurs mots.
   Les lettres bien tapées passent en vert, la première lettre différente en rouge (réglable).
 - **10 compétences** : physique, créativité, charisme, organisation et humour dès le départ ; logique,
   sociabilité, patience, responsabilité et douceur avec les achats du magasin ou les missions de certains métiers.
@@ -76,6 +77,7 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   les points déjà gagnés sont gardés.
 - **Vitesse adaptative** : 6 premières frappes sans chronomètre pour mesurer la vitesse de base,
   puis un chronomètre régulier ; l'exigence suit les progrès puis se stabilise (au plus 2 × la vitesse de départ).
+  Après 2 chronomètres ratés de suite, elle baisse (80 %, puis 65 % après 4) jusqu'au prochain réussi.
 - **Objectifs à choix** : le jeu propose 3 objectifs (monter une compétence, taper des mots, prendre soin
   de soi, choisir un métier, réussir une mission, acheter au magasin, récolter, construire…). L'enfant en choisit un, suit sa barre d'avancement
   et gagne des pièces et une étoile.
@@ -113,7 +115,7 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
 
 ## Tests
 
-865 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+874 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

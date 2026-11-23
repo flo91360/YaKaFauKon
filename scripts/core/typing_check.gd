@@ -1,7 +1,8 @@
 extends RefCounted
 ## Comparaison tolérante entre le texte modèle et ce que l'enfant a tapé.
 ## - accents et majuscules ignorés (mais comptés pour le récapitulatif) ;
-## - 1 erreur admise sur un mot seul, 2 sur un texte de plusieurs mots
+## - mot seul : aucune erreur jusqu'à 3 lettres (« dé » n'accepte pas « d »),
+##   1 jusqu'à 8 lettres, 2 au-delà ; texte de plusieurs mots : 2 erreurs
 ##   (réglable : stricte = une de moins, large = une de plus).
 
 const ACCENTS := {
@@ -34,8 +35,14 @@ static func normalize(text: String) -> String:
 	return strip_accents(clean_spaces(text).to_lower())
 
 
+const SHORT_WORD := 3 ## jusqu'à cette longueur, un mot seul doit être exact
+const LONG_WORD := 8 ## au-delà, un mot seul admet 2 erreurs
+
 static func allowed_errors(model: String, tolerance_offset := 0) -> int:
-	var base := 1 if not normalize(model).contains(" ") else 2
+	var text := normalize(model)
+	var base := 2
+	if not text.contains(" "):
+		base = 0 if text.length() <= SHORT_WORD else (1 if text.length() <= LONG_WORD else 2)
 	return maxi(base + tolerance_offset, 0)
 
 

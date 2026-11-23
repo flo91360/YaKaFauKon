@@ -86,7 +86,7 @@ func _run() -> void:
 	screen._start_typing(_object(screen, "toilettes"), "toilettes")
 	check(screen.typing.is_open(), "le panneau de frappe s'ouvre")
 	check(screen.typing.model_text == "toilettes", "texte modèle niveau 1")
-	screen.typing._input.text = "toilete" # 2 fautes sur un mot seul
+	screen.typing._input.text = "tolete" # 3 fautes sur un mot de 9 lettres
 	screen.typing._submit()
 	check(screen.typing.is_open() and screen._state == "typing", "trop de fautes : on peut corriger")
 	screen.typing._input.text = "Toiletes" # 1 faute + majuscule : accepté

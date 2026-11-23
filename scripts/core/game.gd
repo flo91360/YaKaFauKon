@@ -227,6 +227,7 @@ func _sanitize(data: Dictionary) -> Dictionary:
 	data["typing"]["level"] = int(data["typing"]["level"])
 	data["typing"]["level_successes"] = int(data["typing"]["level_successes"])
 	data["typing"]["since_timed"] = int(data["typing"]["since_timed"])
+	data["typing"]["rates_suite"] = int(data["typing"]["rates_suite"])
 	data["settings"]["missions_minutes"] = int(data["settings"]["missions_minutes"])
 	data["appearance"] = Data.complete_appearance(data["appearance"])
 	data["version"] = 2

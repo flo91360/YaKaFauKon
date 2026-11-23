@@ -49,7 +49,7 @@ static func setting(profile: Dictionary, key: String):
 
 
 static func new_typing_state() -> Dictionary:
-	return {"level": 1, "level_successes": 0, "samples": [], "baseline_cps": 0.0, "ema_cps": 0.0, "since_timed": 0}
+	return {"level": 1, "level_successes": 0, "samples": [], "baseline_cps": 0.0, "ema_cps": 0.0, "since_timed": 0, "rates_suite": 0}
 
 
 # --- Vitesse adaptative --------------------------------------------------------
@@ -74,6 +74,8 @@ static func time_limit(profile: Dictionary, text: String) -> float:
 	var current: float = maxf(t["ema_cps"], base)
 	var factor: float = EXIGENCE_FACTOR.get(setting(profile, "exigence"), 0.75)
 	var target := clampf(current * factor, base * 0.5, base * SPEED_CAP_FACTOR)
+	# Après des « Trop lent » de suite (enfant fatigué), le chronomètre s'adoucit.
+	target *= softening(profile)
 	return READ_MARGIN_SEC + text.length() / maxf(target, 0.3)
 
 
@@ -82,6 +84,7 @@ static func record_success(profile: Dictionary, cps: float, timed: bool) -> void
 	var t: Dictionary = profile["typing"]
 	if timed:
 		t["since_timed"] = 0
+		t["rates_suite"] = 0
 	else:
 		t["since_timed"] += 1
 	if t["baseline_cps"] <= 0.0:
@@ -103,6 +106,14 @@ static func record_success(profile: Dictionary, cps: float, timed: bool) -> void
 
 static func record_timeout(profile: Dictionary) -> void:
 	profile["typing"]["since_timed"] = 0
+	profile["typing"]["rates_suite"] = int(profile["typing"].get("rates_suite", 0)) + 1
+
+
+## Vitesse demandée après des chronomètres ratés de suite : 80 % après 2, 65 % après 4.
+## Un chronomètre réussi remet l'exigence normale.
+static func softening(profile: Dictionary) -> float:
+	var n := int(profile["typing"].get("rates_suite", 0))
+	return 0.65 if n >= 4 else (0.8 if n >= 2 else 1.0)
 
 
 static func reset_calibration(profile: Dictionary) -> void:
