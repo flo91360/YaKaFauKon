@@ -195,7 +195,7 @@ func _update_needs(profile: Dictionary, hours: float, sleeping: bool, real_delta
 			any_red = true
 			_game().session["rouge_sec"][n] = _game().session["rouge_sec"].get(n, 0.0) + real_delta
 		if red and not _was_red[n]:
-			hud.toast("%s %s %s" % [profile["name"], Data.NEEDS[n]["alerte"], Data.NEEDS[n]["conseil"]], UiTheme.COL_BAD, 6.0, n)
+			hud.toast("%s %s %s" % [profile["name"], Data.need_alert(n, profile.get("appearance", {})), Data.NEEDS[n]["conseil"]], UiTheme.COL_BAD, 6.0, n)
 			_game().play_sound("alerte")
 		_was_red[n] = red
 	if any_red:
@@ -870,10 +870,10 @@ func _on_dream_chosen(dream: String) -> void:
 	_dream_wait = 0.0
 	_close_overlay()
 	game.play_sound("clic")
-	hud.toast("Ton rêve : %s !" % Data.DREAMS[dream]["label"].to_lower(), UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
+	hud.toast("Ton rêve : %s !" % Data.dream(dream, game.profile)["label"].to_lower(), UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
 	var career: String = Data.DREAMS[dream]["career"]
 	if not _dream_intro and career != "" and game.profile["career"]["current"] == "":
-		hud.toast("Clique sur « Travail » et choisis : %s." % Data.CAREERS[career]["label"], UiTheme.COL_ACCENT, 6.0, "travail")
+		hud.toast("Clique sur « Travail » et choisis : %s." % Data.career(career, game.profile)["label"], UiTheme.COL_ACCENT, 6.0, "travail")
 	_end_dream_intro()
 
 
@@ -1160,7 +1160,7 @@ func _on_career_chosen(career: String) -> void:
 		_close_overlay()
 		_drop_mission()
 		profile["mission_timer"] = 3.0 # première mission très vite
-		hud.toast("Ton nouveau travail : %s !" % Data.CAREERS[career]["label"], UiTheme.COL_GOOD, 4.0)
+		hud.toast("Ton nouveau travail : %s !" % Data.career(career, profile)["label"], UiTheme.COL_GOOD, 4.0)
 		var dream := Dreams.current(profile)
 		if dream != "" and Data.DREAMS[dream]["career"] == career:
 			hud.toast("C'est le travail de ton rêve !", UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
@@ -1286,6 +1286,6 @@ func _announce_promotion() -> void:
 	var profile: Dictionary = _game().profile
 	var c: String = profile["career"]["current"]
 	var tier := Progression.current_tier(profile)
-	hud.toast("Promotion ! Tu deviens %s (palier %d)." % [Data.CAREERS[c]["tiers"][tier - 1]["title"], tier], UiTheme.COL_PURPLE, 7.0, "travail")
+	hud.toast("Promotion ! Tu deviens %s (palier %d)." % [Data.career(c, profile)["tiers"][tier - 1]["title"], tier], UiTheme.COL_PURPLE, 7.0, "travail")
 	_game().play_sound("niveau")
 	studio.burst(character.position)

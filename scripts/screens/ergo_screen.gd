@@ -208,7 +208,7 @@ func _show_recap(p: Dictionary) -> void:
 	_line(Recap.dream_line(p))
 	var career: String = p["career"]["current"]
 	if career != "":
-		_line("Travail : %s, palier %d sur 5 — argent : %d pièces" % [Data.CAREERS[career]["label"], Progression.current_tier(p), int(p["money"])])
+		_line("Travail : %s, palier %d sur 5 — argent : %d pièces" % [Data.career(career, p)["label"], Progression.current_tier(p), int(p["money"])])
 	var t: Dictionary = p["typing"]
 	_line("Niveau des textes : %d — vitesse de départ mesurée : %s" % [Progression.text_level(p),
 		("%d caractères/min" % roundi(t["baseline_cps"] * 60.0)) if t["baseline_cps"] > 0.0 else "pas encore mesurée"])

@@ -113,7 +113,7 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
 
 ## Tests
 
-855 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+865 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

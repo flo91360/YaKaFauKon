@@ -81,7 +81,7 @@ func _dream_career(profile: Dictionary) -> String:
 
 
 func _career_card(profile: Dictionary, c: String, is_dream: bool) -> Control:
-	var info: Dictionary = Data.CAREERS[c]
+	var info: Dictionary = Data.career(c, profile)
 	var color: Color = UiTheme.CAREER_COLORS.get(c, UiTheme.COL_ORANGE)
 	var card := UiTheme.card(Color(1.0, 0.96, 0.82) if is_dream else UiTheme.COL_SOFT, 14)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -127,7 +127,7 @@ func _career_card(profile: Dictionary, c: String, is_dream: bool) -> Control:
 func _show_status(profile: Dictionary) -> void:
 	_clear()
 	var c: String = profile["career"]["current"]
-	var info: Dictionary = Data.CAREERS[c]
+	var info: Dictionary = Data.career(c, profile)
 	var tier := Progression.current_tier(profile)
 	var tier_info: Dictionary = info["tiers"][tier - 1]
 	_header(info["label"], info["icone"], UiTheme.CAREER_COLORS.get(c, UiTheme.COL_ORANGE))

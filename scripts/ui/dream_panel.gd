@@ -51,7 +51,7 @@ func _show_choice() -> void:
 	head.add_child(UiTheme.speak_button(func():
 		var parts := [title_text]
 		for d in Data.DREAM_ORDER:
-			parts.append(Data.DREAMS[d]["label"] + ".")
+			parts.append(Data.dream(d, _profile)["label"] + ".")
 		return " ".join(parts)))
 	var later := UiTheme.button("Plus tard" if current == "" else "Retour", UiTheme.COL_GREY, 20)
 	later.name = "PlusTard"
@@ -73,7 +73,7 @@ func _show_choice() -> void:
 
 
 func _dream_card(dream: String, is_current: bool) -> Control:
-	var info: Dictionary = Data.DREAMS[dream]
+	var info: Dictionary = Data.dream(dream, _profile)
 	var color: Color = UiTheme.CAREER_COLORS.get(dream, UiTheme.COL_DREAM)
 	var done: bool = dream in Dreams.achieved(_profile)
 	var card := UiTheme.card(Color(1.0, 0.96, 0.82) if is_current else UiTheme.COL_SOFT, 14)
@@ -106,7 +106,7 @@ func _dream_card(dream: String, is_current: bool) -> Control:
 func _show_status() -> void:
 	_clear()
 	var dream := Dreams.current(_profile)
-	var info: Dictionary = Data.DREAMS[dream]
+	var info: Dictionary = Data.dream(dream, _profile)
 	var color: Color = UiTheme.CAREER_COLORS.get(dream, UiTheme.COL_DREAM)
 	var done := Dreams.is_done(_profile)
 	UiTheme.header(_box, "Mon rêve", func(): closed.emit(), "reve", UiTheme.COL_DREAM)

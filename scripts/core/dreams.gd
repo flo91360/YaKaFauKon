@@ -82,7 +82,7 @@ static func steps(profile: Dictionary, dream: String = "") -> Array:
 			result.append({"label": "Acheter : %s" % Data.SHOP[item]["label"].to_lower(), "done": Shop.owns(profile, item)})
 		return result
 	var tier := int(profile["career"]["tiers"].get(career, 0))
-	var info: Dictionary = Data.CAREERS[career]
+	var info: Dictionary = Data.career(career, profile)
 	result.append({"label": "Choisir le travail : %s" % info["label"], "done": tier >= 1})
 	for t in range(2, 6):
 		var title: String = info["tiers"][t - 1]["title"]
@@ -133,7 +133,7 @@ static func advice(profile: Dictionary) -> String:
 	if now == career:
 		return "Réussis tes missions et monte les compétences demandées : tout est dans « Travail »."
 	if now == "":
-		return "Clique sur « Travail » et choisis : %s." % Data.CAREERS[career]["label"]
+		return "Clique sur « Travail » et choisis : %s." % Data.career(career, profile)["label"]
 	return "Tu pourras changer de travail à partir du palier %d : continue tes missions, puis clique sur « Travail »." % Data.CAREER_CHANGE_MIN_TIER
 
 
@@ -152,7 +152,7 @@ static func claim(profile: Dictionary) -> Dictionary:
 	if not state["id"] in state["realises"]:
 		state["realises"].append(state["id"])
 	profile["etoiles"] = int(profile.get("etoiles", 0)) + Data.DREAM_REWARD_STARS
-	return {"pieces": Data.DREAM_REWARD_PIECES, "etoiles": Data.DREAM_REWARD_STARS, "label": Data.DREAMS[state["id"]]["label"]}
+	return {"pieces": Data.DREAM_REWARD_PIECES, "etoiles": Data.DREAM_REWARD_STARS, "label": Data.dream(state["id"], profile)["label"]}
 
 
 ## Cet objectif à choix fait-il avancer le rêve en cours ?
