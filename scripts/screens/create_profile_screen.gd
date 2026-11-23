@@ -9,6 +9,7 @@ signal back
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const Data = preload("res://scripts/core/data.gd")
 const Character = preload("res://scripts/world/character.gd")
+const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
 
 ## Onglets : [titre, pictogramme, vue rapprochée du visage ?, lignes [clé, libellé, noms ou couleurs]]
 const TABS := [
@@ -30,6 +31,8 @@ const TABS := [
 
 var appearance: Dictionary = {}
 var edit_mode := false
+var existing_names: Array = [] # prénoms des joueurs déjà créés sur ce PC
+var _duplicate_ok := "" # prénom en double déjà signalé : le second appui le garde
 
 var _name_edit: LineEdit
 var _preview_character
@@ -272,6 +275,11 @@ func _validate() -> void:
 	var child_name := _name_edit.text.strip_edges()
 	if child_name == "":
 		_message.text = "Écris ton prénom pour commencer."
+		_name_edit.grab_focus()
+		return
+	if ErgoAccess.is_duplicate(child_name, existing_names) and _duplicate_ok != child_name:
+		_duplicate_ok = child_name
+		_message.text = "Il y a déjà un joueur qui s'appelle %s. Ajoute l'initiale de ton nom (par exemple « %s B. »), ou appuie encore pour garder ce prénom." % [child_name, child_name]
 		_name_edit.grab_focus()
 		return
 	created.emit(child_name, appearance.duplicate())

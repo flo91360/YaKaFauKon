@@ -12,13 +12,15 @@ const Shop = preload("res://scripts/core/shop.gd")
 const Dreams = preload("res://scripts/core/dreams.gd")
 const Build = preload("res://scripts/core/build.gd")
 const Family = preload("res://scripts/core/family.gd")
+const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
 const AUTOSAVE_SEC := 20.0
 const SETTINGS_PATH := "user://reglages.json"
+const ACCESS_PATH := "user://acces_ergo.json" # mot d'accès de l'ergo, haché
 ## Réglages de l'ordinateur (communs à tous les joueurs).
-const DEFAULT_LOCAL_SETTINGS := {"volume": 70, "musique": 35, "qualite": 1, "plein_ecran": false}
+const DEFAULT_LOCAL_SETTINGS := {"volume": 70, "musique": 35, "qualite": 1, "plein_ecran": false, "prenoms_caches": false}
 const QUALITY_LABELS := ["Léger", "Normal", "Beau"]
 
 var profile: Dictionary = {}
@@ -434,6 +436,26 @@ func claim_dream() -> Dictionary:
 	session["reves_realises"].append(Dreams.current(profile))
 	save_profile()
 	return reward
+
+
+# --- Mot d'accès de l'espace ergothérapeute -----------------------------------------
+
+func ergo_access() -> Dictionary:
+	return _read_json(ACCESS_PATH) if FileAccess.file_exists(ACCESS_PATH) else {}
+
+
+func check_ergo_word(word: String) -> bool:
+	return ErgoAccess.check(ergo_access(), word)
+
+
+## Enregistre le mot choisi par l'ergo (haché). Renvoie false si l'écriture échoue.
+func set_ergo_word(word: String) -> bool:
+	var file := FileAccess.open(ACCESS_PATH, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(ErgoAccess.make(word), "\t"))
+	file.close()
+	return ErgoAccess.is_set(ergo_access())
 
 
 # --- Réglages de l'ordinateur, sons et musique ---------------------------------------

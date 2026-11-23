@@ -11,6 +11,7 @@ const Dreams = preload("res://scripts/core/dreams.gd")
 const Recap = preload("res://scripts/core/recap.gd")
 const Build = preload("res://scripts/core/build.gd")
 const Family = preload("res://scripts/core/family.gd")
+const ErgoAccess = preload("res://scripts/core/ergo_access.gd")
 
 var _fails := 0
 var _count := 0
@@ -33,6 +34,7 @@ func _init() -> void:
 	_test_family_graphics()
 	_test_family()
 	_test_recap_speeds()
+	_test_ergo_access()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -637,3 +639,17 @@ func _test_recap_speeds() -> void:
 		sessions.append({"frappes_ok": 1, "caracteres": int(v), "temps_frappe_sec": 60.0, "vitesse_niveaux": {"2": {"caracteres": int(v), "sec": 60.0}}})
 	var words := Recap.keywords({"sessions": sessions})
 	check(not words.has("Vitesse en baisse") and words.has("Vitesse stable"), "changer de niveau de texte ne passe pas pour une baisse")
+
+
+func _test_ergo_access() -> void:
+	print("Accès ergo et prénoms")
+	check(ErgoAccess.check({}, "Ergo ") and not ErgoAccess.check({}, "erg"), "sans mot choisi : « ergo » ouvre l'espace")
+	var a := ErgoAccess.make("Cabinet2026")
+	check(ErgoAccess.is_set(a) and not JSON.stringify(a).to_lower().contains("cabinet"), "mot gardé haché, pas en clair")
+	check(ErgoAccess.check(a, " cabinet2026") and not ErgoAccess.check(a, "ergo") and not ErgoAccess.check(a, "cabinet"), "mot choisi : seul lui ouvre l'espace")
+	var b := ErgoAccess.make("Cabinet2026")
+	check(a["sel"] != b["sel"] and a["hache"] != b["hache"], "un sel différent à chaque mot")
+	check(ErgoAccess.refusal("abc", "abc") != "" and ErgoAccess.refusal("ergo", "ergo") != "" and ErgoAccess.refusal("cabinet", "cabinat") != "", "mot trop court, « ergo » ou mal recopié : refusé")
+	check(ErgoAccess.refusal("Cabinet", "cabinet ") == "", "mot valable accepté")
+	check(ErgoAccess.display_name("léo", true) == "L." and ErgoAccess.display_name("Léo", false) == "Léo", "prénom caché : seulement l'initiale")
+	check(ErgoAccess.is_duplicate(" LÉO ", ["Camille", "Leo"]) and not ErgoAccess.is_duplicate("Léon", ["Léo"]), "prénom en double reconnu malgré majuscules et accents")
