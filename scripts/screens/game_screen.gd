@@ -411,7 +411,9 @@ func _on_typing_finished(result: Dictionary) -> void:
 			game.session["chronos_rates"] += 1
 			_state = "idle"
 		"cancel":
-			game.session["taches_abandonnees"] += 1
+			# Un objet cliqué par erreur, refermé sans rien taper, n'est pas un abandon.
+			if result.get("typed", true):
+				game.session["taches_abandonnees"] += 1
 			_state = "idle"
 
 

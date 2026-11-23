@@ -20,6 +20,20 @@ static func speed_cpm(s: Dictionary) -> float:
 	return s.get("caracteres", 0) / t * 60.0 if t > 0.0 else 0.0
 
 
+## Caractères des textes tentés (séances 2.4.2 et suivantes), sinon des frappes réussies.
+static func attempted_chars(s: Dictionary) -> int:
+	return int(s.get("caracteres_tentes", s.get("caracteres", 0)))
+
+
+## Vitesse en caractères par minute pour un niveau de texte (0 si rien à ce niveau).
+static func level_cpm(s: Dictionary, level: String) -> float:
+	var levels = s.get("vitesse_niveaux", {})
+	if not levels is Dictionary or not levels.has(level):
+		return 0.0
+	var sec := float(levels[level].get("sec", 0.0))
+	return float(levels[level].get("caracteres", 0)) / sec * 60.0 if sec > 0.0 else 0.0
+
+
 static func error_count(s: Dictionary) -> int:
 	var total := 0
 	for k in COUNTED_ERRORS:
@@ -36,6 +50,13 @@ static func session_lines(s: Dictionary) -> Array:
 	lines.append("Temps de jeu : %s" % format_duration(s.get("duree_sec", 0.0)))
 	var cpm := speed_cpm(s)
 	lines.append("Vitesse de frappe moyenne : %d caractères/min (environ %d mots/min)" % [roundi(cpm), roundi(cpm / 5.0)])
+	var by_level := []
+	for level in ["1", "2", "3"]:
+		var v := level_cpm(s, level)
+		if v > 0.0:
+			by_level.append("niveau %s : %d" % [level, roundi(v)])
+	if not by_level.is_empty():
+		lines.append("Vitesse par niveau de texte (caractères/min) : " + ", ".join(by_level))
 	lines.append("Frappes réussies : %d — ratées (trop de fautes) : %d" % [s.get("frappes_ok", 0), s.get("frappes_ratees", 0)])
 	lines.append("Chronomètres réussis : %d — trop lents : %d" % [s.get("chronos_reussis", 0), s.get("chronos_rates", 0)])
 	var errs := []
@@ -157,7 +178,7 @@ static func overview(profile: Dictionary) -> Dictionary:
 		o["missions"] += int(s.get("missions_reussies", 0))
 		o["choix_ok"] += int(s.get("choix_justes_du_premier_coup", 0))
 		o["choix"] += int(s.get("choix_total", 0))
-		o["caracteres"] += int(s.get("caracteres", 0))
+		o["caracteres"] += attempted_chars(s)
 		o["erreurs"] += error_count(s)
 		for key in ["series_finies", "series_interrompues", "objectifs_choisis", "objectifs_finis", "objectifs_abandonnes"]:
 			o[key] += int(s.get(key, 0))
@@ -171,6 +192,16 @@ static func overview(profile: Dictionary) -> Dictionary:
 		if s.get("frappes_ok", 0) > 0:
 			speeds.append(speed_cpm(s))
 	o["vitesses"] = speeds
+	# Vitesses par niveau de texte, séance après séance (pour comparer à niveau égal).
+	var per_level := {}
+	for s in sessions:
+		for level in ["1", "2", "3"]:
+			var v := level_cpm(s, level)
+			if v > 0.0:
+				if not per_level.has(level):
+					per_level[level] = []
+				per_level[level].append(v)
+	o["vitesses_niveaux"] = per_level
 	return o
 
 
@@ -179,6 +210,15 @@ static func keywords(profile: Dictionary) -> Array:
 	var o := overview(profile)
 	var words := []
 	var speeds: Array = o["vitesses"]
+	# On compare au niveau de texte le plus pratiqué sur au moins 2 séances : un
+	# changement de niveau ne passe pas pour un progrès ou une baisse.
+	var best_level := ""
+	for level in o["vitesses_niveaux"]:
+		var n_level: int = o["vitesses_niveaux"][level].size()
+		if n_level >= 2 and (best_level == "" or n_level > o["vitesses_niveaux"][best_level].size()):
+			best_level = level
+	if best_level != "":
+		speeds = o["vitesses_niveaux"][best_level]
 	if speeds.size() >= 2:
 		var n := mini(3, speeds.size() / 2)
 		var first := _mean(speeds.slice(0, n))

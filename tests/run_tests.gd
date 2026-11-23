@@ -32,6 +32,7 @@ func _init() -> void:
 	_test_garden()
 	_test_family_graphics()
 	_test_family()
+	_test_recap_speeds()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -618,3 +619,21 @@ func _test_family() -> void:
 	for id in Data.ACTIONS:
 		if Data.ACTIONS[id].has("famille"):
 			check(Data.ACTIONS[id]["famille"] in Data.FAMILY_ACTIONS and id in Data.FAMILY_ACTIONS[Data.ACTIONS[id]["famille"]], "activité %s : rangée avec la famille" % id)
+
+
+func _test_recap_speeds() -> void:
+	print("Récapitulatif : vitesse par niveau et fautes")
+	var s := {"caracteres": 100, "caracteres_tentes": 150, "vitesse_niveaux": {"1": {"caracteres": 60, "sec": 30.0}}}
+	check(Recap.attempted_chars(s) == 150, "taux de fautes calculé sur les caractères tentés")
+	check(Recap.attempted_chars({"caracteres": 80}) == 80, "ancienne séance : on reprend les caractères réussis")
+	check(is_equal_approx(Recap.level_cpm(s, "1"), 120.0) and Recap.level_cpm(s, "2") == 0.0, "vitesse en caractères/min par niveau de texte")
+	check(Recap.session_lines(s).any(func(l): return l.begins_with("Vitesse par niveau de texte") and l.contains("niveau 1 : 120")), "la séance montre la vitesse par niveau")
+	check(not Recap.session_lines({}).any(func(l): return l.begins_with("Vitesse par niveau")), "ancienne séance : pas de ligne de vitesse par niveau")
+	# Passage au niveau 2 (textes plus longs, donc plus lents) : ce n'est pas une baisse.
+	var sessions := []
+	for v in [100.0, 110.0, 105.0]:
+		sessions.append({"frappes_ok": 1, "caracteres": int(v), "temps_frappe_sec": 60.0, "vitesse_niveaux": {"1": {"caracteres": int(v), "sec": 60.0}}})
+	for v in [50.0, 55.0]:
+		sessions.append({"frappes_ok": 1, "caracteres": int(v), "temps_frappe_sec": 60.0, "vitesse_niveaux": {"2": {"caracteres": int(v), "sec": 60.0}}})
+	var words := Recap.keywords({"sessions": sessions})
+	check(not words.has("Vitesse en baisse") and words.has("Vitesse stable"), "changer de niveau de texte ne passe pas pour une baisse")

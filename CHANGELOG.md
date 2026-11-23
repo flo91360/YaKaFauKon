@@ -10,6 +10,26 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.2] - 2026-11-23
+
+### Pour l'adulte
+
+- **Fautes comptées une fois** : appuyer plusieurs fois sur Entrée pour le même
+  texte ne recompte plus les mêmes fautes. Le taux de fautes se calcule sur tous
+  les textes tentés, réussis ou non.
+- **Abandons** : fermer un texte sans avoir tapé une lettre n'est plus compté
+  comme une tâche abandonnée.
+- **Vitesse par niveau de texte** : le récapitulatif de séance donne la vitesse
+  pour chaque niveau de texte, et le mot-clé « Vitesse en progrès / stable / en
+  baisse » compare des séances du même niveau. Passer à des textes plus longs ne
+  passe plus pour une baisse.
+
+### Changé
+
+- **Choix des missions mélangés** : l'ordre des réponses change à chaque
+  question, la bonne n'est plus presque toujours au milieu. Le bouton qui lit la
+  question suit le même ordre.
+
 ## [2.4.1] - 2026-11-23
 
 ### Corrigé

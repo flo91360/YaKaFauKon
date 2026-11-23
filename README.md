@@ -103,7 +103,7 @@ Sur l'écran « Qui joue ? », bouton en bas à droite. **Mot d'accès : `ergo`*
 
 ## Tests
 
-816 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+828 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

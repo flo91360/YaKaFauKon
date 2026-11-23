@@ -14,6 +14,8 @@ const Build = preload("res://scripts/core/build.gd")
 const BuildPanel = preload("res://scripts/ui/build_panel.gd")
 const FamilyPanel = preload("res://scripts/ui/family_panel.gd")
 const Family = preload("res://scripts/core/family.gd")
+const Recap = preload("res://scripts/core/recap.gd")
+const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 
 var _fails := 0
 var _count := 0
@@ -653,6 +655,51 @@ func _run() -> void:
 	screen.typing._refresh_model()
 	check(screen.typing._model.text.count("[u]") == 1, "une lettre oubliée : une seule lettre en rouge")
 	screen.typing._close({"status": "cancel"})
+
+	print("Récapitulatif fiable")
+	var errs_before := Recap.error_count(game.session)
+	var tried_before := int(game.session.get("caracteres_tentes", 0))
+	screen.typing.open("maison", "test", false)
+	for attempt in 3:
+		screen.typing._input.text = "mizon"
+		screen.typing._submit()
+	check(Recap.error_count(game.session) - errs_before == 2, "trois appuis sur Entrée : les fautes ne sont comptées qu'une fois")
+	check(int(game.session["caracteres_tentes"]) - tried_before == 6, "caractères tentés comptés une seule fois")
+	screen.typing._close({"status": "cancel"})
+	game.session["vitesse_niveaux"] = {}
+	game.record_typing({"ok": true, "details": {}}, 60, 30.0, false)
+	var lvl := str(Progression.text_level(profile))
+	check(is_equal_approx(Recap.level_cpm(game.session, lvl), 120.0), "vitesse notée pour le niveau de texte en cours")
+	screen._interrupt_action()
+	await process_frame
+	game.session["taches_abandonnees"] = 0
+	screen._start_typing(_object(screen, "lavabo"), "dents")
+	screen.typing._cancel.pressed.emit()
+	check(game.session["taches_abandonnees"] == 0, "annuler sans avoir tapé : pas d'abandon")
+	screen._start_typing(_object(screen, "lavabo"), "dents")
+	screen.typing._input.text = "d"
+	screen.typing._on_text_changed("d")
+	screen.typing._cancel.pressed.emit()
+	check(game.session["taches_abandonnees"] == 1, "annuler après une lettre tapée : abandon compté")
+	var mp := MissionPanel.new()
+	var demo := {"title": "Test", "consigne": "Lis.", "questions": [{"q": "Quoi ?", "choices": ["a", "b", "c"], "good": 1}]}
+	mp.state = {"data": demo, "step": "question", "q": 0, "item": 0}
+	root.add_child(mp)
+	var places := {}
+	for n in 30:
+		for c in mp._box.get_children():
+			mp._box.remove_child(c)
+			c.free()
+		mp._show_question(demo)
+		var idx := 0
+		for c in mp._box.get_children():
+			if c.name.begins_with("Choix_"):
+				if c.name == "Choix_1":
+					places[idx] = true
+				idx += 1
+	check(places.size() >= 2, "la bonne réponse ne reste pas toujours à la même place")
+	mp.queue_free()
+	await process_frame
 
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
