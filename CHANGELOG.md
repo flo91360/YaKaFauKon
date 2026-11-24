@@ -10,6 +10,22 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.8] - 2026-11-24
+
+### Changé
+
+- **Les besoins comptent** : tant qu'une jauge est dans le rouge, les
+  compétences montent moitié moins vite. L'alerte le dit à l'enfant. L'ergo peut
+  choisir « sans effet » dans les réglages de l'enfant (« Jauge rouge :
+  compétences »).
+- **14 missions nouvelles** pour les paliers 4 et 5, deux par métier : le
+  mariage de Nadia et Tom, le festival de la ville, la grande bibliothèque, les
+  apprentis, la finale, le championnat de France, le premier album, la tournée,
+  le nouveau remède, la conférence, le pont sur la rivière, le robot qui aide, le
+  refuge des hérissons et la forêt protégée. Leurs consignes demandent de relier
+  deux informations (un petit calcul, une heure, une règle). Chaque métier a
+  maintenant 7 missions.
+
 ## [2.4.7] - 2026-11-24
 
 ### Pour l'adulte

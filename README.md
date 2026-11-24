@@ -63,7 +63,8 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **Personnage animé** : il marche, court, dort, mange, cuisine, se brosse les dents, se douche,
   téléphone, reçoit des amis, peint, parle au miroir, bricole, écrit, lit, joue à un jeu de société,
   joue de la guitare, arrose le potager, caresse le chat, coupe du bois, ramasse des pierres… La caméra se rapproche pendant l'activité.
-- **5 jauges** : faim, sommeil, toilettes, hygiène, vie sociale. Alerte quand une jauge passe au rouge.
+- **5 jauges** : faim, sommeil, toilettes, hygiène, vie sociale. Alerte quand une jauge passe au rouge ;
+  tant qu'elle y reste, les compétences montent moitié moins vite (réglable par l'ergo).
 - **Frappe** : 3 niveaux de texte (« toilettes » → « les toilettes » → « aller aux toilettes »).
   Accents et majuscules ignorés. Sur un mot seul : aucune faute jusqu'à 3 lettres, 1 jusqu'à 8,
   2 au-delà ; 2 fautes sur plusieurs mots.
@@ -85,7 +86,7 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   qui présente toutes les actions possibles avec chaque objet.
 - **7 carrières** : organisateur d'événements, artisan, sportif, chanteur, scientifique, ingénieur et
   vie dans la nature. 5 paliers chacune, changement possible à partir du palier 2. Missions régulières
-  (35 en tout) avec consigne, choix et liste à taper.
+  (49 en tout, dont une nouvelle à chaque palier de 2 à 5) avec consigne, choix et liste à taper.
 - **Accessibilité** : police Lexend, gros texte, pictogrammes, bouton « Écouter » (voix du système),
   sons doux et musique réglables ou coupables.
 - **Réglages** (touche Échap) : volume des sons, de la musique, qualité des graphismes, plein écran.
@@ -104,7 +105,7 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
   initiale ou le garder).
 
 - **Réglages par enfant** : fréquence et exigence du chronomètre, tolérance aux fautes,
-  niveau des textes (auto ou forcé), vitesse des besoins, minutes entre deux missions,
+  niveau des textes (auto ou forcé), vitesse des besoins, effet des jauges rouges, minutes entre deux missions,
   lettres en couleur pendant la frappe, durée de la séance (minuterie : l'enfant est prévenu
   une minute avant, puis la séance se termine en douceur et tout est sauvegardé),
   nouvelle mesure de la vitesse, suppression du profil.
@@ -120,7 +121,7 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
 
 ## Tests
 
-893 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+910 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

@@ -40,6 +40,7 @@ func _init() -> void:
 	_test_agreement()
 	_test_lock()
 	_test_session_timer()
+	_test_red_needs()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -390,7 +391,7 @@ func _test_new_careers() -> void:
 			previous = t["req"]
 		check(skills_ok, "carrière %s : compétences connues, entraînées par ses missions" % c)
 		check(rising and info["tiers"][0]["req"].is_empty(), "carrière %s : exigences de plus en plus hautes" % c)
-		check(Data.missions_for(c, 1).size() == 3 and Data.missions_for(c, 2).size() == 4 and Data.missions_for(c, 5).size() == 5, "carrière %s : 3 missions au départ, 5 en tout" % c)
+		check(Data.missions_for(c, 1).size() == 3 and Data.missions_for(c, 2).size() == 4 and Data.missions_for(c, 3).size() == 5 and Data.missions_for(c, 4).size() == 6 and Data.missions_for(c, 5).size() == 7, "carrière %s : 3 missions au départ, une nouvelle aux paliers 2 à 5, 7 en tout" % c)
 	var ids := {}
 	var texts_ok := true
 	for m in Data.MISSIONS:
@@ -402,7 +403,7 @@ func _test_new_careers() -> void:
 			texts_ok = texts_ok and it[0].length() < it[1].length() and it[1].length() < it[2].length()
 			for text in it:
 				texts_ok = texts_ok and not text.contains("œ") and text == text.strip_edges()
-	check(ids.size() == Data.MISSIONS.size() and Data.MISSIONS.size() == 35, "35 missions, toutes avec un nom différent")
+	check(ids.size() == Data.MISSIONS.size() and Data.MISSIONS.size() == 49, "49 missions, toutes avec un nom différent")
 	check(texts_ok, "missions : 2 questions à 3 choix, textes de plus en plus longs, sans « œ »")
 	# Une compétence qui ne vient que du travail se voit quand même.
 	var p := _profile()
@@ -741,3 +742,16 @@ func _test_session_timer() -> void:
 	check(Progression.session_limit_sec(p) == 600.0, "10 min : 600 secondes")
 	check(Recap.session_lines({"duree_sec": 600.0, "fin_minuterie": true})[0].ends_with("(fin par la minuterie de séance)"), "l'ergo voit que la minuterie a fini la séance")
 	check(not Recap.session_lines({"duree_sec": 600.0})[0].contains("minuterie"), "sans minuterie : rien de plus")
+
+
+func _test_red_needs() -> void:
+	print("Jauges rouges : conséquence douce")
+	var p := _profile()
+	p["needs"] = {}
+	for n in Data.NEED_ORDER:
+		p["needs"][n] = 80.0
+	check(Progression.xp_factor(p) == 1.0 and Progression.red_needs(p).is_empty(), "jauges correctes : compétences à vitesse normale")
+	p["needs"]["faim"] = Data.RED_THRESHOLD - 1.0
+	check(Progression.red_needs(p) == ["faim"] and Progression.xp_factor(p) == 0.5, "une jauge rouge : compétences moitié moins vite")
+	p["settings"]["jauges_rouges"] = "sans effet"
+	check(Progression.xp_factor(p) == 1.0, "réglage « sans effet » : aucune conséquence")
