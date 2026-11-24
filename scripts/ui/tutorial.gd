@@ -19,6 +19,9 @@ const STEPS := [
 	{"id": "activite", "wait": "series_started", "text": "Maintenant, clique sur le tapis de course et recopie le mot. Les activités font monter tes compétences."},
 	{"id": "serie", "wait": "series_end", "text": "Tape les mots un par un. À chaque mot réussi, ta barre de compétence monte !"},
 	{"id": "boutons", "wait": "", "text": "En haut à droite : « Magasin » agrandit ta maison avec tes pièces, « Compétences » montre tes niveaux, « Travail » te donne un métier, « Guide » explique tout."},
+	{"id": "reve", "wait": "", "text": "À gauche, « Mon rêve » : c'est ton grand projet. Clique dessus pour voir les étapes qui t'en rapprochent."},
+	{"id": "jardin", "wait": "", "text": "En bas à droite, le jardin : tu y récoltes du bois et des pierres. Avec ta réserve, « Construire » ajoute des choses au jardin."},
+	{"id": "famille", "wait": "", "text": "Sous ton rêve, « Ma famille » : si tu veux, tu peux rencontrer quelqu'un, vivre ensemble et avoir des enfants. C'est toi qui choisis."},
 	{"id": "objectif", "wait": "", "text": "Dernière chose : choisis un objectif. Il te guide et te fait gagner des pièces et des étoiles !"},
 ]
 

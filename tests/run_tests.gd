@@ -159,6 +159,16 @@ func _test_careers() -> void:
 	var p := _profile()
 	check(Progression.choose_career(p, "artisan"), "choisir artisan")
 	check(Progression.current_tier(p) == 1, "palier 1 au départ")
+	# Première séance : un changement libre, une seule fois.
+	p["sessions"] = [{}]
+	check(Progression.free_change(p) and Progression.can_change_career(p), "première séance : changement libre au palier 1")
+	check(Progression.choose_career(p, "nature") and Progression.current_tier(p) == 1, "changement libre accepté")
+	check(not Progression.free_change(p) and not Progression.choose_career(p, "sportif"), "un seul changement libre")
+	check(not Progression.choose_career(p, "artisan"), "pas de retour libre au premier travail")
+	p = _profile()
+	Progression.choose_career(p, "artisan")
+	p["sessions"] = [{}, {}]
+	check(not Progression.free_change(p), "pas de changement libre après la première séance")
 	check(not Progression.can_change_career(p), "pas de changement au palier 1")
 	check(not Progression.choose_career(p, "organisateur"), "changement refusé au palier 1")
 	for i in Data.MISSIONS_PER_TIER:
@@ -447,6 +457,9 @@ func _test_dreams() -> void:
 	check(helping == ["metier"], "sans travail : l'objectif « choisir un métier » aide le rêve")
 	check(Objectives.candidates(p).filter(func(o): return o["type"] == "metier")[0]["aide"].contains("Sportif"), "l'aide cite le métier du rêve")
 	Progression.choose_career(p, "artisan")
+	p["sessions"] = [{}]
+	check(Dreams.advice(p).contains("première séance") and Dreams.advice(p).contains("Sportif"), "première séance : le conseil propose de changer tout de suite")
+	p["sessions"] = [{}, {}]
 	check(Dreams.steps_done(p) == 0 and Dreams.advice(p).contains("palier 2"), "autre travail : il faut le palier 2 avant de changer")
 	helping = Objectives.candidates(p).filter(func(o): return o["reve"]).map(func(o): return o["type"])
 	check("missions" in helping and "palier" in helping and not "competence" in helping, "les missions de l'autre travail aident à pouvoir changer")
@@ -465,18 +478,27 @@ func _test_dreams() -> void:
 			kinds[o["type"]] = true
 		always = always and offers.size() == 3 and kinds.size() == 3 and offers.any(func(o): return o["reve"])
 	check(always, "toujours une proposition pour le rêve, et 3 types différents")
+	check(Dreams.milestone(p) == {"pieces": Data.DREAM_STEP_PIECES, "etape": "Choisir le travail : Sportif"}, "étape franchie : une petite récompense")
+	check(Dreams.milestone(p).is_empty(), "une étape ne rapporte qu'une fois")
+	p["career"]["tiers"]["sportif"] = 3
+	check(Dreams.milestone(p).get("pieces", 0) == 2 * Data.DREAM_STEP_PIECES, "deux étapes d'un coup : deux récompenses")
 	p["career"]["tiers"]["sportif"] = 4
+	var fourth: String = Dreams.steps(p)[3]["label"]
+	check(Dreams.milestone(p).get("etape", "") == fourth, "la récompense nomme l'étape franchie")
 	check(Dreams.steps_done(p) == 4 and Dreams.next_step(p) == "Devenir champion" and not Dreams.is_done(p), "palier 4 : il reste à devenir champion")
 	check(Dreams.claim(p).is_empty(), "pas de récompense avant la fin")
 	check(Recap.dream_line(p) == "Rêve : devenir champion, 4 étape(s) sur 5", "ligne du récapitulatif en cours de route")
 	p["career"]["tiers"]["sportif"] = 5
 	check(Dreams.is_done(p) and Dreams.to_celebrate(p) and Dreams.next_step(p) == "" and Dreams.advice(p) == "", "palier 5 : rêve réalisé")
+	check(Dreams.milestone(p).is_empty(), "dernière étape : pas de petite récompense, c'est la grande fête")
 	var reward := Dreams.claim(p)
 	check(reward.get("pieces", 0) == Data.DREAM_REWARD_PIECES and p["etoiles"] == Data.DREAM_REWARD_STARS, "récompense : pièces et étoiles")
 	check(not Dreams.to_celebrate(p) and Dreams.claim(p).is_empty() and Dreams.achieved(p) == ["sportif"], "le rêve n'est fêté qu'une fois")
 	check(Objectives.candidates(p).filter(func(o): return o["reve"]).is_empty(), "rêve réalisé : plus d'objectif signalé")
 	# Un nouveau rêve après le premier
 	check(not Dreams.choose(p, "maison") and p["reve"]["changements"] == 0, "nouveau rêve après un rêve réalisé : pas compté comme un changement")
+	var old_save := Dreams.clean({"id": "sportif", "realises": []})
+	check(old_save["jalons"] == -1, "ancienne sauvegarde : étapes à recompter")
 	check(Dreams.steps(p).size() == Data.SHOP_ORDER.size() and Dreams.advice(p).contains("Magasin"), "rêve « maison » : une étape par achat")
 	p["money"] = 45
 	Shop.buy(p, "lecture")
@@ -488,7 +510,7 @@ func _test_dreams() -> void:
 	check(not Dreams.to_celebrate(p) and Dreams.is_done(p), "revenir à un rêve déjà réalisé ne le fête pas deux fois")
 	# Sauvegardes
 	var cleaned := Dreams.clean({"id": "licorne", "changements": 2.0, "realises": ["sportif", "sportif", "x"], "fete": true})
-	check(cleaned == {"id": "", "fete": false, "changements": 2, "realises": ["sportif"]}, "état relu d'une sauvegarde : remis en ordre")
+	check(cleaned == {"id": "", "fete": false, "changements": 2, "realises": ["sportif"], "jalons": -1}, "état relu d'une sauvegarde : remis en ordre")
 	check(Dreams.clean(null) == Dreams.new_state() and Dreams.clean({"id": "maison"})["id"] == "maison", "sauvegarde sans rêve : état neuf")
 	check(Recap.session_lines({"reves_realises": ["sportif"], "reves_changes": 1}).filter(func(l): return l.to_lower().contains("rêve")).size() == 2, "séance : rêve réalisé et changement dans le récapitulatif")
 
@@ -606,6 +628,19 @@ func _test_family() -> void:
 	check(Family.can_meet(p) and Objectives.candidates(p).any(func(o): return o["type"] == "rencontre"), "avec le charisme : objectif « rencontrer quelqu'un »")
 	check(Family.meet(p, people[1]) and Family.partner_name(p) == people[1]["nom"] and Family.complicity(p) == 10, "rencontre : la complicité commence à 10")
 	check(not Family.meet(p, people[2]), "une seule personne à la fois")
+	# Le cadeau selon les goûts
+	check(Data.FAMILY_GIFTS.size() == Data.FAMILY_LIKES.size() and Data.FAMILY_LIKES.all(func(l): return Data.FAMILY_GIFTS.has(l)), "un cadeau pour chaque goût")
+	p["game_minutes"] = 8.0 * 60.0
+	var rng_gift := RandomNumberGenerator.new()
+	rng_gift.seed = 3
+	var q := Family.gift_question(p, rng_gift)
+	var like: String = Family.partner(p)["aime"]
+	check(q["choices"].size() == 3 and q["choices"][q["good"]] == Data.FAMILY_GIFTS[like] and q["aide"].contains(like), "cadeau : 3 choix, le bon suit la consigne")
+	var c0 := Family.complicity(p)
+	check(Family.give_gift(p) == c0 + Data.FAMILY_GIFT_COMPLICITY and not Family.gift_ready(p) and Family.give_gift(p) == -1, "un cadeau par jour du jeu")
+	p["game_minutes"] += 24.0 * 60.0
+	check(Family.gift_ready(p), "le lendemain : un nouveau cadeau")
+	check(Family.clean(p["famille"])["cadeau_jour"] == p["famille"]["cadeau_jour"], "le jour du cadeau est gardé dans la sauvegarde")
 	check(Family.stage(p) == "rencontre" and Data.is_available("fleurs", p) and not Data.is_available("bercer", p), "les moments à deux sont possibles")
 	check(Objectives.candidates(p).any(func(o): return o["type"] == "famille"), "objectif « passer du temps en famille »")
 	check(not Family.can_move_in(p) and not Family.move_in(p), "pas encore assez complices pour vivre ensemble")

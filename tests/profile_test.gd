@@ -42,7 +42,7 @@ func _run() -> void:
 	game.profile["typing"]["level"] = 3
 	check(game.buy("lecture") and game.profile["money"] == 15, "achat au magasin : 40 pièces dépensées")
 	check(not game.buy("chat"), "achat refusé sans assez de pièces")
-	check(game.profile["reve"] == {"id": "", "fete": false, "changements": 0, "realises": []}, "nouveau profil : pas encore de rêve")
+	check(game.profile["reve"] == {"id": "", "fete": false, "changements": 0, "realises": [], "jalons": 0}, "nouveau profil : pas encore de rêve")
 	game.choose_dream("maison")
 	game.choose_dream("artisan")
 	check(game.session["reves_changes"] == 1, "changement de rêve noté dans la séance")

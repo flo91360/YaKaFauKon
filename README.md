@@ -41,7 +41,8 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **Objectif de vie (« Mon rêve »)** : en début de partie, l'enfant choisit son grand rêve parmi 9
   (devenir champion, star de la chanson, grand savant, grand inventeur, maître artisan, organiser de
   grandes fêtes, vivre dans la nature, avoir une belle maison, fonder une famille). Le jeu montre les étapes, signale les
-  objectifs qui en rapprochent, et fête le rêve réalisé (100 pièces, 3 étoiles). On peut en changer.
+  objectifs qui en rapprochent, donne 20 pièces à chaque étape franchie et fête le rêve réalisé (100 pièces,
+  3 étoiles). On peut en changer.
 - **Profils** : plusieurs enfants sur le même PC. Sauvegarde automatique locale (toutes les 20 s et en quittant).
 - **Création du personnage** par onglets : femme ou homme, taille, corpulence, peau, forme du visage,
   joues, nez, bouche, taches de rousseur, yeux (couleur, forme, sourcils, lunettes), 9 coiffures,
@@ -56,7 +57,8 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
   construit dans la cour un banc (se reposer), une fontaine (se laver) et un barbecue (manger avec un ami).
   L'écran « Construire » montre sa réserve et ce qu'il lui manque (ressources, niveaux de compétence).
 - **Ma famille** (cadre à gauche, jamais obligatoire) : rencontrer quelqu'un (une femme ou un homme,
-  l'enfant choisit ; charisme niveau 1), faire monter la complicité sur le canapé (fleurs, danse, câlin),
+  l'enfant choisit ; charisme niveau 1), faire monter la complicité sur le canapé (fleurs, danse, câlin) et avec le cadeau du jour
+  (lire ce que la personne aime, puis choisir le bon cadeau parmi 3),
   vivre ensemble (grand lit, le conjoint reste à la maison), puis avoir des enfants ou non (organisation
   niveau 2, choix modifiable). Le bébé a son berceau dans une chambre d'enfant (bercer, biberon) ; après
   4 soins, il grandit (jouer, raconter une histoire). Deux enfants au plus.
@@ -82,10 +84,12 @@ godot --headless --path . --export-release "Windows" build/YaKaFauKon.exe
 - **Objectifs à choix** : le jeu propose 3 objectifs (monter une compétence, taper des mots, prendre soin
   de soi, choisir un métier, réussir une mission, acheter au magasin, récolter, construire…). L'enfant en choisit un, suit sa barre d'avancement
   et gagne des pièces et une étoile.
-- **Tutoriel** au premier lancement (on peut le passer et le revoir depuis la pause) et **Guide**
+- **Tutoriel** au premier lancement (gestes, besoins, boutons, puis le rêve, le jardin et la famille ;
+  on peut le passer et le revoir depuis la pause) et **Guide**
   qui présente toutes les actions possibles avec chaque objet.
 - **7 carrières** : organisateur d'événements, artisan, sportif, chanteur, scientifique, ingénieur et
-  vie dans la nature. 5 paliers chacune, changement possible à partir du palier 2. Missions régulières
+  vie dans la nature. 5 paliers chacune, changement possible à partir du palier 2 (et une fois librement pendant
+  la première séance). Missions régulières
   (49 en tout, dont une nouvelle à chaque palier de 2 à 5) avec consigne, choix et liste à taper.
 - **Accessibilité** : police Lexend, gros texte, pictogrammes, bouton « Écouter » (voix du système),
   sons doux et musique réglables ou coupables.

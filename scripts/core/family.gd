@@ -6,14 +6,15 @@ extends RefCounted
 ##   "complicite": 0 à 100, "ensemble": vivent ensemble,
 ##   "enfants": [{"nom", "genre" (0 fille, 1 garçon), "age" ("bebe" ou "enfant"), "soins", "apparence"}],
 ##   "choix_enfant": "" (pas encore décidé) ou "non" (pas d'enfant pour l'instant),
-##   "vu": l'enfant a déjà ouvert « Ma famille »}.
+##   "vu": l'enfant a déjà ouvert « Ma famille »,
+##   "cadeau_jour": jour du jeu du dernier cadeau (-1 = jamais)}.
 
 const Data = preload("res://scripts/core/data.gd")
 const Progression = preload("res://scripts/core/progression.gd")
 
 
 static func new_state() -> Dictionary:
-	return {"partenaire": {}, "complicite": 0, "ensemble": false, "enfants": [], "choix_enfant": "", "vu": false}
+	return {"partenaire": {}, "complicite": 0, "ensemble": false, "enfants": [], "choix_enfant": "", "vu": false, "cadeau_jour": -1}
 
 
 ## Remet en ordre l'état lu dans une sauvegarde (anciennes versions, fichier modifié à la main).
@@ -36,6 +37,7 @@ static func clean(state) -> Dictionary:
 					"soins": maxi(int(k.get("soins", 0)), 0), "apparence": Data.complete_appearance(k.get("apparence", {}) if k.get("apparence", {}) is Dictionary else {})})
 	result["choix_enfant"] = "non" if str(state.get("choix_enfant", "")) == "non" and result["enfants"].is_empty() else ""
 	result["vu"] = bool(state.get("vu", false))
+	result["cadeau_jour"] = int(state.get("cadeau_jour", -1)) if result["partenaire"].size() > 0 else -1
 	return result
 
 
@@ -152,6 +154,52 @@ static func meet(profile: Dictionary, person: Dictionary) -> bool:
 	state["complicite"] = 10
 	state["ensemble"] = false
 	return true
+
+
+# --- Un cadeau selon ses goûts (une petite consigne à lire) ------------------------------
+
+static func _today(profile: Dictionary) -> int:
+	return int(float(profile.get("game_minutes", 0.0)) / (24.0 * 60.0))
+
+
+## Un cadeau peut-il être offert aujourd'hui (un par jour du jeu) ?
+static func gift_ready(profile: Dictionary) -> bool:
+	return has_partner(profile) and Data.FAMILY_GIFTS.has(partner(profile)["aime"]) \
+		and int(_state(profile).get("cadeau_jour", -1)) != _today(profile)
+
+
+## La consigne et la question à 3 choix, comme dans les missions :
+## {"consigne", "q", "choices", "good", "aide"} ({} si aucun cadeau possible).
+static func gift_question(profile: Dictionary, rng: RandomNumberGenerator = null) -> Dictionary:
+	if not gift_ready(profile):
+		return {}
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var p := partner(profile)
+	var like: String = p["aime"]
+	var others: Array = Data.FAMILY_GIFTS.keys().filter(func(k): return k != like)
+	var choices := [Data.FAMILY_GIFTS[like]]
+	while choices.size() < 3:
+		var other: String = Data.FAMILY_GIFTS[others.pop_at(rng.randi() % others.size())]
+		choices.append(other)
+	# Mélange sans changer les textes : la bonne réponse n'est pas toujours au même endroit.
+	for i in range(choices.size() - 1, 0, -1):
+		var j := rng.randi() % (i + 1)
+		var tmp = choices[i]
+		choices[i] = choices[j]
+		choices[j] = tmp
+	return {"consigne": "%s aime %s." % [p["nom"], like], "q": "Quel cadeau fais-tu à %s ?" % p["nom"],
+		"choices": choices, "good": choices.find(Data.FAMILY_GIFTS[like]),
+		"aide": "Relis la consigne : %s aime %s." % [p["nom"], like]}
+
+
+## Le bon cadeau est offert : la complicité monte. Renvoie la nouvelle complicité (-1 si impossible).
+static func give_gift(profile: Dictionary) -> int:
+	if not gift_ready(profile):
+		return -1
+	_state(profile)["cadeau_jour"] = _today(profile)
+	return add_complicity(profile, Data.FAMILY_GIFT_COMPLICITY)
 
 
 ## La complicité monte avec les activités en couple. Renvoie la nouvelle valeur.
