@@ -17,6 +17,7 @@ const Family = preload("res://scripts/core/family.gd")
 const Recap = preload("res://scripts/core/recap.gd")
 const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 const Portrait = preload("res://scripts/ui/portrait.gd")
+const SessionEndPanel = preload("res://scripts/ui/session_end_panel.gd")
 
 var _fails := 0
 var _count := 0
@@ -532,8 +533,10 @@ func _run() -> void:
 	check(Family.partner_name(profile) == people[3]["nom"] and screen._overlay == null, "la personne choisie est rencontrée")
 	check(studio.family.size() == 1 and game.session["famille"].size() == 1, "elle vient dire bonjour ; la rencontre est notée pour l'adulte")
 	check(sofa.actions.has("fleurs") and sofa.actions.has("danser") and sofa.actions.has("calin"), "le canapé propose les moments à deux")
+	screen._state = "walking" # l'enfant a cliqué ailleurs pendant les au revoir
 	await _wait(4.0)
-	check(studio.family.is_empty(), "avant de vivre ensemble, elle repart")
+	check(studio.family.is_empty(), "avant de vivre ensemble, elle repart (même si l'enfant est déjà parti ailleurs)")
+	screen._state = "idle"
 	_arrive(screen, "canape", "fleurs")
 	check(screen._state == "series" and screen.character.anim == "give" and studio.family.size() == 1 and studio.family[0].anim == "celebrate", "offrir des fleurs : la personne aimée est là, ravie")
 	var complicity := Family.complicity(profile)
@@ -725,6 +728,28 @@ func _run() -> void:
 	check(portrait.get_child(0).msaa_3d == Viewport.MSAA_DISABLED, "« Léger » : portrait sans antialiasing")
 	portrait.free()
 	game.local_settings["qualite"] = quality_backup
+
+	print("Minuterie de séance")
+	screen._close_overlay()
+	screen._interrupt_action()
+	profile["settings"]["duree_seance"] = "5 min"
+	game.session["duree_sec"] = 300.0 - 50.0
+	await _wait(0.2)
+	check(screen._session_warned and not screen._session_over, "une minute avant : l'enfant est prévenu")
+	game.session["duree_sec"] = 301.0
+	await _wait(0.2)
+	check(screen._session_over and screen._overlay is SessionEndPanel and screen.paused, "l'heure est passée : fin douce de la séance (jeu en pause)")
+	check(game.session.get("fin_minuterie", false), "la fin par la minuterie est notée pour l'ergo")
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.pressed = true
+	screen._unhandled_input(esc)
+	check(screen._overlay is SessionEndPanel, "Échap ne referme pas la fin de séance")
+	var ended := [false]
+	screen.quit_to_profiles.connect(func(): ended[0] = true)
+	screen._overlay.find_child("Terminer", true, false).pressed.emit()
+	check(ended[0], "« Terminer » ramène à la liste des joueurs")
+	profile["settings"]["duree_seance"] = "sans limite"
 
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])

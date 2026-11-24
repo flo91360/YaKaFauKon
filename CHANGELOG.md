@@ -10,6 +10,31 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.7] - 2026-11-24
+
+### Pour l'adulte
+
+- **Minuterie de séance** : nouveau réglage par enfant « Durée de la séance »
+  (sans limite, 5, 10, 15, 20 ou 30 minutes). Une minute avant, l'enfant est
+  prévenu. À l'heure, la séance se termine en douceur, après le mot en cours :
+  tout est sauvegardé et « Terminer » ramène à la liste des joueurs. Le
+  récapitulatif note une séance finie par la minuterie.
+- **Notes et export du récapitulatif** : un champ de notes par enfant, et un
+  bouton qui écrit le récapitulatif complet avec les notes dans un fichier texte,
+  dans `Documents\YaKaFauKon`.
+- **Un seul jeu ouvert** : lancer le jeu une deuxième fois affiche un message au
+  lieu de charger les joueurs. Deux fenêtres ne peuvent plus écraser la même
+  sauvegarde.
+
+### Corrigé
+
+- L'objectif « Finir 2 séries de mots sans arrêter » repart de zéro quand une
+  série est arrêtée.
+- L'aide de « Gagner 60 pièces » ne parle plus des objectifs, qui ne comptent
+  pas : seul le salaire des missions compte.
+- Après une rencontre, la personne rencontrée repart même si l'enfant a déjà
+  cliqué ailleurs. Elle ne reste plus plantée dans le salon.
+
 ## [2.4.6] - 2026-11-23
 
 ### Changé

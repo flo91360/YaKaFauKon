@@ -15,6 +15,7 @@ const Hud = preload("res://scripts/ui/hud.gd")
 const TypingPanel = preload("res://scripts/ui/typing_panel.gd")
 const SkillsPanel = preload("res://scripts/ui/skills_panel.gd")
 const CareerPanel = preload("res://scripts/ui/career_panel.gd")
+const SessionEndPanel = preload("res://scripts/ui/session_end_panel.gd")
 const MissionPanel = preload("res://scripts/ui/mission_panel.gd")
 const ObjectivePanel = preload("res://scripts/ui/objective_panel.gd")
 const GuidePanel = preload("res://scripts/ui/guide_panel.gd")
@@ -62,6 +63,8 @@ var _dream_wait := 0.0
 var _char_zone := "maison" # où est le personnage : la caméra le suit quand il change de zone
 var _fps_time := 0.0
 var _fps_frames := 0
+var _session_warned := false # « plus qu'une minute » déjà dit
+var _session_over := false # minuterie de séance arrivée au bout
 var _arrival_pending := false # arrivé pendant une frappe de mission : l'activité attend la fin de la frappe
 
 
@@ -180,6 +183,36 @@ func _process(delta: float) -> void:
 		_char_zone = zone
 		_set_view(zone)
 	_watch_fps(delta)
+	_watch_session_timer()
+
+
+## Minuterie de séance (réglée par l'ergo) : on prévient une minute avant, puis la
+## séance se termine en douceur, une fois la frappe en cours finie.
+func _watch_session_timer() -> void:
+	var game = _game()
+	var limit := Progression.session_limit_sec(game.profile)
+	if limit <= 0.0 or _session_over:
+		return
+	var elapsed: float = game.session.get("duree_sec", 0.0)
+	if not _session_warned and elapsed >= limit - 60.0:
+		_session_warned = true
+		hud.toast("Plus qu'une minute de jeu : termine ce que tu fais !", UiTheme.COL_ACCENT, 6.0, "horloge")
+	if elapsed >= limit and not typing.is_open() and _state != "series":
+		_end_session_by_timer()
+
+
+func _end_session_by_timer() -> void:
+	_session_over = true
+	_interrupt_action()
+	if _mission_panel != null:
+		_mission_panel.visible = false
+	var game = _game()
+	game.session["fin_minuterie"] = true
+	game.save_profile()
+	game.play_sound("bravo")
+	var panel := SessionEndPanel.new()
+	panel.finished.connect(func(): quit_to_profiles.emit())
+	_open_overlay(panel)
 
 
 func _update_needs(profile: Dictionary, hours: float, sleeping: bool, real_delta: float) -> void:
@@ -236,6 +269,8 @@ func _watch_fps(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		if _session_over: # la séance est finie : on ne referme pas le panneau pour rejouer
+			return
 		if _overlay != null:
 			_close_overlay()
 		elif _menu != null:
@@ -640,6 +675,7 @@ func _stop_series() -> void:
 	_typing_mode = "action"
 	game.session["series_interrompues"] += 1
 	game.session["taches_abandonnees"] += 1
+	Objectives.notify(game.profile, "serie_arretee")
 	hud.toast("Série arrêtée. Tes mots réussis sont gardés !", UiTheme.COL_GREY, 3.0)
 	_leave_object()
 	_tutorial_event("series_end")
@@ -765,8 +801,11 @@ func _on_family_met(person: Dictionary) -> void:
 	var end := create_tween()
 	end.tween_interval(3.5)
 	end.tween_callback(func():
+		# La personne rencontrée repart même si l'enfant a déjà cliqué ailleurs
+		# (pendant une activité, l'activité a déjà placé la famille).
 		if _state == "idle":
 			character.stop()
+		if _state == "idle" or _state == "walking":
 			_sync_family())
 
 

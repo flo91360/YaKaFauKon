@@ -169,7 +169,30 @@ func _run() -> void:
 		garden_shown = garden_shown or l.text.begins_with("Jardin : 0 bûche et 0 pierre en réserve")
 	check(dream_shown, "le rêve de l'enfant est dans le récapitulatif")
 	check(garden_shown, "le jardin (réserve et constructions) est dans le récapitulatif")
+	var notes: TextEdit = ergo._content.find_child("NotesErgo", true, false)
+	notes.text = "Fatigue en fin de séance."
+	ergo._content.find_child("EnregistrerNotes", true, false).pressed.emit()
+	var with_notes: Dictionary = {}
+	for p in game.list_profiles():
+		if p["id"] == id:
+			with_notes = p
+	check(with_notes.get("notes_ergo", "") == "Fatigue en fin de séance.", "notes de l'ergo enregistrées dans le profil")
+	ergo.export_dir = ProjectSettings.globalize_path("user://test_export")
+	var exported: String = ergo.export_recap(ergo.profiles[index])
+	var exported_text := FileAccess.get_file_as_string(exported)
+	check(exported != "" and exported_text.contains("Récapitulatif de Parcours Test") and exported_text.contains("== Par séance ==") and exported_text.contains("Fatigue en fin de séance."), "export texte : récapitulatif complet et notes")
+	DirAccess.remove_absolute(exported)
+	DirAccess.remove_absolute(ergo.export_dir)
 	game.delete_profile(id)
+	print("Jeu ouvert deux fois")
+	game.already_running = true
+	var second := Node.new()
+	second.set_script(MainScript)
+	main.queue_free()
+	root.add_child(second)
+	await _frames()
+	check(second._screen != null and second._screen.find_child("Fermer", true, false) != null and not second._screen is ProfileScreen, "deuxième fenêtre : message, aucun joueur chargé")
+	game.already_running = false
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)

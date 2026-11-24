@@ -20,6 +20,7 @@ const GameScreen = preload("res://scripts/screens/game_screen.gd")
 const ProfileScreen = preload("res://scripts/screens/profile_screen.gd")
 const CreateProfileScreen = preload("res://scripts/screens/create_profile_screen.gd")
 const ErgoScreen = preload("res://scripts/screens/ergo_screen.gd")
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 var _screen: Node = null
 
@@ -29,6 +30,9 @@ func _game():
 
 
 func _ready() -> void:
+	if _game().already_running:
+		_show_already_running()
+		return
 	var args := Array(OS.get_cmdline_user_args())
 	for a in args:
 		if a.begins_with("--capture="):
@@ -94,6 +98,25 @@ func show_ergo(profiles: Array, save_enabled: bool) -> void:
 	screen.save_enabled = save_enabled
 	_set_screen(screen)
 	screen.back.connect(show_profiles)
+
+
+## Un autre YaKaFauKon est déjà ouvert : on ne charge rien, pour ne pas écraser sa sauvegarde.
+func _show_already_running() -> void:
+	var screen := Control.new()
+	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var bg := ColorRect.new()
+	bg.color = Color(0.93, 0.95, 0.97)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	screen.add_child(bg)
+	var box := UiTheme.centered_panel(screen, 640)
+	var text := UiTheme.label("YaKaFauKon est déjà ouvert sur cet ordinateur.\nUtilise l'autre fenêtre : avec deux fenêtres, les sauvegardes s'écraseraient.\n\nSi le jeu vient de se fermer brutalement, réessaie dans 2 minutes.", 26)
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(text)
+	var close := UiTheme.button("Fermer cette fenêtre", UiTheme.COL_ACCENT, 24)
+	close.name = "Fermer"
+	close.pressed.connect(func(): get_tree().quit())
+	box.add_child(close)
+	_set_screen(screen)
 
 
 func _load_all_profiles() -> Array:

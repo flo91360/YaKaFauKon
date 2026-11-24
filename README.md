@@ -105,17 +105,22 @@ oublié : fermer le jeu et supprimer `acces_ergo.json`.
 
 - **Réglages par enfant** : fréquence et exigence du chronomètre, tolérance aux fautes,
   niveau des textes (auto ou forcé), vitesse des besoins, minutes entre deux missions,
-  lettres en couleur pendant la frappe,
+  lettres en couleur pendant la frappe, durée de la séance (minuterie : l'enfant est prévenu
+  une minute avant, puis la séance se termine en douceur et tout est sauvegardé),
   nouvelle mesure de la vitesse, suppression du profil.
 - **Récapitulatif** : par séance datée (vitesse moyenne, types d'erreurs, temps de jeu,
   missions, tâches terminées/abandonnées, mots de champ lexical par activité, séries terminées ou
   arrêtées, objectifs choisis/atteints, achats au magasin, récoltes et constructions du jardin, grands moments de la famille, rêve réalisé ou changé, temps dans le rouge) et sur la durée
   (évolution de la vitesse, persévérance, gestion de vie, compétences), avec un résumé en mots-clés.
+  Un champ de **notes** par enfant, et un bouton **Exporter** qui écrit le récapitulatif complet
+  et les notes dans un fichier texte (`Documents\YaKaFauKon`), à imprimer ou joindre à un bilan.
   Rien n'est envoyé en ligne.
+- **Un seul jeu ouvert** : une deuxième fenêtre affiche un message au lieu de charger les
+  joueurs, pour que deux fenêtres n'écrasent pas la même sauvegarde.
 
 ## Tests
 
-874 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
+893 vérifications automatiques (logique, parcours de jeu, sauvegardes dont celles de la version 1, écrans) :
 
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tests/run_tests.gd

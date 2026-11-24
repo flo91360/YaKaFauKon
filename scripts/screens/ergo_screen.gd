@@ -14,6 +14,7 @@ const PC := -2 # _selected quand la page « Ce PC » est ouverte
 
 var profiles: Array = []
 var save_enabled := true # désactivé pour la démonstration
+var export_dir := "" # dossier d'export ; vide = Documents/YaKaFauKon
 var _list: VBoxContainer
 var _content: VBoxContainer
 var _selected := -1
@@ -156,6 +157,7 @@ func _show_pc() -> void:
 
 func _section(text: String) -> void:
 	var l := UiTheme.label(text, 24, UiTheme.COL_ACCENT.darkened(0.3))
+	l.set_meta("section", true)
 	_content.add_child(l)
 
 
@@ -164,6 +166,72 @@ func _line(text: String, size := 20) -> void:
 
 
 func _show_recap(p: Dictionary) -> void:
+	_recap_body(p)
+	_section("Notes de l'ergothérapeute")
+	var notes := TextEdit.new()
+	notes.name = "NotesErgo"
+	notes.text = str(p.get("notes_ergo", ""))
+	notes.placeholder_text = "Observations, objectifs de travail, ce qu'il faut regarder la prochaine fois…"
+	notes.custom_minimum_size = Vector2(0, 140)
+	notes.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	notes.add_theme_font_size_override("font_size", 18)
+	_content.add_child(notes)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content.add_child(row)
+	var msg := UiTheme.label("", 18)
+	msg.name = "MessageExport"
+	var save_notes := UiTheme.button("Enregistrer les notes", UiTheme.COL_ACCENT, 20)
+	save_notes.name = "EnregistrerNotes"
+	save_notes.pressed.connect(func():
+		p["notes_ergo"] = notes.text
+		_save(p)
+		msg.text = "Notes enregistrées.")
+	row.add_child(save_notes)
+	var export := UiTheme.button("Exporter le récapitulatif (fichier texte)", UiTheme.COL_GOOD, 20)
+	export.name = "Exporter"
+	export.pressed.connect(func():
+		p["notes_ergo"] = notes.text
+		_save(p)
+		var path := export_recap(p)
+		msg.text = ("Récapitulatif enregistré : %s" % path) if path != "" else "L'export n'a pas pu être écrit sur ce PC.")
+	row.add_child(export)
+	_content.add_child(msg)
+
+
+## Texte complet du récapitulatif d'un enfant (le même qu'à l'écran) avec les notes.
+func recap_text(p: Dictionary) -> String:
+	var saved := _content
+	_content = VBoxContainer.new()
+	_recap_body(p)
+	var lines := ["Récapitulatif de %s — YaKaFauKon %s — exporté le %s" % [p["name"], ProjectSettings.get_setting("application/config/version", ""), _format_date(Time.get_datetime_string_from_system(false, true))], ""]
+	for l in _content.find_children("*", "Label", true, false):
+		lines.append(("\n== %s ==" % l.text) if l.get_meta("section", false) else l.text)
+	_content.free()
+	_content = saved
+	lines.append("\n== Notes de l'ergothérapeute ==")
+	lines.append(str(p.get("notes_ergo", "")) if str(p.get("notes_ergo", "")).strip_edges() != "" else "(aucune)")
+	return "\n".join(lines) + "\n"
+
+
+## Écrit le récapitulatif dans un fichier texte. Renvoie le chemin, ou "" en cas d'échec.
+func export_recap(p: Dictionary) -> String:
+	var dir := export_dir
+	if dir == "":
+		var docs := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+		dir = (docs + "/YaKaFauKon") if docs != "" else ProjectSettings.globalize_path("user://exports")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var safe := str(p["name"]).validate_filename().replace(" ", "-")
+	var path := "%s/Recapitulatif-%s-%s.txt" % [dir, safe, Time.get_date_string_from_system()]
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return ""
+	file.store_string(recap_text(p))
+	file.close()
+	return path
+
+
+func _recap_body(p: Dictionary) -> void:
 	var o := Recap.overview(p)
 	_section("En résumé")
 	var kw := Recap.keywords(p)

@@ -38,6 +38,8 @@ func _init() -> void:
 	_test_ergo_access()
 	_test_quality_retry()
 	_test_agreement()
+	_test_lock()
+	_test_session_timer()
 	print("")
 	print("%d tests, %d échec(s)" % [_count, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -334,6 +336,13 @@ func _test_objectives() -> void:
 	Objectives.choose(p, {"type": "soins", "target": 1, "label": "x", "pieces": 5})
 	check(not Objectives.notify(p, "action", {"action": "sport"}) and Objectives.notify(p, "action", {"action": "douche"}), "seules les actions de soin comptent")
 	Objectives.claim(p)
+	Objectives.choose(p, {"type": "series", "target": 2, "label": "x", "pieces": 25})
+	Objectives.notify(p, "serie", {"action": "sport"})
+	Objectives.notify(p, "serie_arretee")
+	check(Objectives.current(p)["count"] == 0, "« sans arrêter » : une série arrêtée remet le compteur à zéro")
+	Objectives.notify(p, "serie", {"action": "sport"})
+	check(Objectives.notify(p, "serie", {"action": "sport"}), "deux séries de suite : objectif atteint")
+	Objectives.claim(p)
 	# Travail
 	var with_job := Objectives.candidates(p).map(func(o): return o["type"])
 	check("metier" in with_job and not "missions" in with_job, "sans métier : on propose d'en choisir un")
@@ -343,6 +352,8 @@ func _test_objectives() -> void:
 	check(Objectives.is_done(p), "objectif métier atteint")
 	Objectives.claim(p)
 	var job_types := Objectives.candidates(p).map(func(o): return o["type"])
+	var money_help: Array = Objectives.candidates(p).filter(func(o): return o["type"] == "argent").map(func(o): return o["aide"])
+	check(not money_help.is_empty() and not money_help[0].contains("objectifs"), "aide de « Gagner des pièces » : seulement les missions, qui sont seules comptées")
 	check("missions" in job_types and "palier" in job_types and "argent" in job_types and not "metier" in job_types, "avec un métier : missions, palier, argent")
 	Objectives.choose(p, {"type": "argent", "target": 30, "label": "x", "pieces": 5})
 	check(not Objectives.notify(p, "argent", {"amount": 20}) and Objectives.notify(p, "argent", {"amount": 20}), "argent gagné compté")
@@ -710,3 +721,23 @@ func _test_agreement() -> void:
 		for t in Data.CAREERS[c]["tiers"]:
 			all_f = all_f and t.has("title_f")
 	check(all_f, "chaque palier a sa forme au féminin")
+
+
+func _test_lock() -> void:
+	print("Jeu ouvert deux fois")
+	var now := Time.get_unix_time_from_system()
+	var me := OS.get_process_id()
+	check(not GameScript.lock_is_live({}, me, now), "pas de verrou : le jeu s'ouvre")
+	check(not GameScript.lock_is_live({"pid": me, "t": now}, me, now), "notre propre verrou ne bloque pas")
+	check(GameScript.lock_is_live({"pid": me + 1, "t": now - 10.0}, me, now), "un autre jeu lancé et récent : bloqué")
+	check(not GameScript.lock_is_live({"pid": me + 1, "t": now - GameScript.LOCK_STALE_SEC - 5.0}, me, now), "verrou trop vieux (arrêt brutal) : ignoré")
+
+
+func _test_session_timer() -> void:
+	print("Minuterie de séance")
+	var p := _profile()
+	check(Progression.session_limit_sec(p) == 0.0, "par défaut : sans limite")
+	p["settings"]["duree_seance"] = "10 min"
+	check(Progression.session_limit_sec(p) == 600.0, "10 min : 600 secondes")
+	check(Recap.session_lines({"duree_sec": 600.0, "fin_minuterie": true})[0].ends_with("(fin par la minuterie de séance)"), "l'ergo voit que la minuterie a fini la séance")
+	check(not Recap.session_lines({"duree_sec": 600.0})[0].contains("minuterie"), "sans minuterie : rien de plus")

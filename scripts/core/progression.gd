@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS := {
 	"vitesse_besoins": "normale", # lente / normale / rapide
 	"missions_minutes": 2, # minutes réelles entre deux missions
 	"aide_couleur": "oui", # lettres du modèle en vert / rouge pendant la frappe
+	"duree_seance": "sans limite", # minuterie : fin douce de la séance
 }
 const SETTING_CHOICES := {
 	"chrono": ["jamais", "parfois", "souvent", "toujours"],
@@ -28,6 +29,7 @@ const SETTING_CHOICES := {
 	"vitesse_besoins": ["lente", "normale", "rapide"],
 	"missions_minutes": [1, 2, 3, 5],
 	"aide_couleur": ["oui", "non"],
+	"duree_seance": ["sans limite", "5 min", "10 min", "15 min", "20 min", "30 min"],
 }
 const SETTING_LABELS := {
 	"chrono": "Fréquence du chronomètre",
@@ -37,6 +39,7 @@ const SETTING_LABELS := {
 	"vitesse_besoins": "Vitesse des besoins",
 	"missions_minutes": "Minutes entre deux missions",
 	"aide_couleur": "Lettres en couleur pendant la frappe",
+	"duree_seance": "Durée de la séance (minuterie)",
 }
 const EXIGENCE_FACTOR := {"facile": 0.6, "normale": 0.75, "difficile": 0.9}
 const TOLERANCE_OFFSET := {"stricte": -1, "normale": 0, "large": 1}
@@ -46,6 +49,11 @@ const CHRONO_EVERY := {"jamais": 0, "parfois": 3, "souvent": 2, "toujours": 1}
 
 static func setting(profile: Dictionary, key: String):
 	return profile.get("settings", {}).get(key, DEFAULT_SETTINGS[key])
+
+
+## Durée de séance réglée par l'ergo, en secondes (0 = sans limite).
+static func session_limit_sec(profile: Dictionary) -> float:
+	return str(setting(profile, "duree_seance")).to_int() * 60.0
 
 
 static func new_typing_state() -> Dictionary:
