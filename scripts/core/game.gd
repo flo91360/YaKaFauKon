@@ -17,6 +17,9 @@ const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const SAVE_DIR := "user://profils"
 const AUTOSAVE_SEC := 20.0
+const LOCK_PATH := "user://jeu_ouvert.lock" # un seul jeu ouvert à la fois sur ce PC
+const LOCK_REFRESH_SEC := 30.0
+const LOCK_STALE_SEC := 90.0 # verrou plus vieux : le jeu s'était arrêté brutalement
 const SETTINGS_PATH := "user://reglages.json"
 const ACCESS_PATH := "user://acces_ergo.json" # mot d'accès de l'ergo, haché
 ## Réglages de l'ordinateur (communs à tous les joueurs).
@@ -27,6 +30,9 @@ const QUALITY_LABELS := ["Léger", "Normal", "Beau"]
 var profile: Dictionary = {}
 var session: Dictionary = {}
 var demo_mode := false # profil de démonstration, jamais sauvegardé
+var already_running := false # un autre YaKaFauKon est déjà ouvert sur ce PC
+var _lock_owned := false
+var _lock_timer := 0.0
 var _autosave_timer := 0.0
 var _tts_voice := ""
 var local_settings: Dictionary = DEFAULT_LOCAL_SETTINGS.duplicate()
@@ -49,6 +55,31 @@ func _ready() -> void:
 	_load_local_settings()
 	_setup_audio()
 	apply_local_settings()
+	# Deux fenêtres du jeu écraseraient la sauvegarde l'une de l'autre. Les tests
+	# (sans affichage) ne prennent pas de verrou.
+	if DisplayServer.get_name() != "headless":
+		already_running = lock_is_live(_read_json(LOCK_PATH) if FileAccess.file_exists(LOCK_PATH) else {}, OS.get_process_id(), Time.get_unix_time_from_system())
+		if not already_running:
+			_write_lock()
+
+
+## Un verrou est vivant s'il vient d'un autre jeu et qu'il a été rafraîchi récemment
+## (le jeu ouvert le réécrit toutes les 30 s ; après un arrêt brutal, il vieillit).
+static func lock_is_live(data: Dictionary, my_pid: int, now: float) -> bool:
+	var pid := int(data.get("pid", 0))
+	return pid > 0 and pid != my_pid and now - float(data.get("t", 0.0)) <= LOCK_STALE_SEC
+
+
+func _write_lock() -> void:
+	var file := FileAccess.open(LOCK_PATH, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify({"pid": OS.get_process_id(), "t": Time.get_unix_time_from_system()}))
+		_lock_owned = true
+
+
+func _exit_tree() -> void:
+	if _lock_owned:
+		DirAccess.remove_absolute(LOCK_PATH)
 
 
 func _notification(what: int) -> void:
@@ -58,6 +89,11 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if _lock_owned:
+		_lock_timer += delta
+		if _lock_timer >= LOCK_REFRESH_SEC:
+			_lock_timer = 0.0
+			_write_lock()
 	if profile.is_empty():
 		return
 	session["duree_sec"] = session.get("duree_sec", 0.0) + delta
@@ -95,6 +131,7 @@ func new_profile_data(child_name: String, appearance: Dictionary) -> Dictionary:
 		"objectifs_choisis": 0,
 		"objectifs_finis": 0,
 		"etoiles": 0,
+		"notes_ergo": "", # notes libres de l'ergothérapeute (export du récapitulatif)
 		"tuto_fait": false,
 		"mots_tapes": {},
 		"achats": [],

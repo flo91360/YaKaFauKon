@@ -125,7 +125,7 @@ static func candidates(profile: Dictionary) -> Array:
 			"pieces": 30 * n, "icone": "travail"})
 		result.append({"type": "argent", "target": 60,
 			"label": "Gagner 60 pièces",
-			"aide": "Les missions de travail et les objectifs rapportent des pièces.",
+			"aide": "Réussis des missions de travail : chacune te verse un salaire.",
 			"pieces": 20, "icone": "piece"})
 		var tier := Progression.current_tier(profile)
 		if tier < 5:
@@ -216,7 +216,7 @@ static func abandon(profile: Dictionary) -> void:
 
 ## Signale un événement du jeu. Renvoie true si l'objectif vient d'être atteint.
 ## Événements : "mot" {action}, "serie" {action}, "action" {action}, "argent" {amount},
-## "mission", "metier", "palier", "temps" {sec, rouge}, "recolte" {res, amount}.
+## "serie_arretee", "mission", "metier", "palier", "temps" {sec, rouge}, "recolte" {res, amount}.
 ## (Un achat ou une construction se voit dans le profil.)
 static func notify(profile: Dictionary, event: String, data: Dictionary = {}) -> bool:
 	var o := current(profile)
@@ -229,6 +229,8 @@ static func notify(profile: Dictionary, event: String, data: Dictionary = {}) ->
 		"series":
 			if event == "serie":
 				o["count"] += 1
+			elif event == "serie_arretee": # « sans arrêter » : une série arrêtée remet à zéro
+				o["count"] = 0
 		"soins":
 			if event == "action" and data.get("action", "") in CARE_ACTIONS:
 				o["count"] += 1

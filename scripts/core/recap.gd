@@ -47,7 +47,7 @@ static func red_any_sec(s: Dictionary) -> float:
 
 static func session_lines(s: Dictionary) -> Array:
 	var lines := []
-	lines.append("Temps de jeu : %s" % format_duration(s.get("duree_sec", 0.0)))
+	lines.append("Temps de jeu : %s%s" % [format_duration(s.get("duree_sec", 0.0)), " (fin par la minuterie de séance)" if s.get("fin_minuterie", false) else ""])
 	var cpm := speed_cpm(s)
 	lines.append("Vitesse de frappe moyenne : %d caractères/min (environ %d mots/min)" % [roundi(cpm), roundi(cpm / 5.0)])
 	var by_level := []
