@@ -228,7 +228,8 @@ func _update_needs(profile: Dictionary, hours: float, sleeping: bool, real_delta
 			any_red = true
 			_game().session["rouge_sec"][n] = _game().session["rouge_sec"].get(n, 0.0) + real_delta
 		if red and not _was_red[n]:
-			hud.toast("%s %s %s" % [profile["name"], Data.need_alert(n, profile.get("appearance", {})), Data.NEEDS[n]["conseil"]], UiTheme.COL_BAD, 6.0, n)
+			var slow := " Tant qu'une jauge est rouge, tes compétences montent moitié moins vite." if Progression.setting(profile, "jauges_rouges") == "ralentissent" else ""
+			hud.toast("%s %s %s%s" % [profile["name"], Data.need_alert(n, profile.get("appearance", {})), Data.NEEDS[n]["conseil"], slow], UiTheme.COL_BAD, 7.0, n)
 			_game().play_sound("alerte")
 		_was_red[n] = red
 	if any_red:
@@ -590,6 +591,7 @@ func _on_series_word_ok(result: Dictionary) -> void:
 	var before := Progression.skill_level(profile, skill)
 	var weights := Data.skill_weights(action_id)
 	var xp := Data.word_xp(word)
+	var shown_xp := xp * Progression.xp_factor(profile) # ce qui est vraiment gagné (jauge rouge : moins)
 	for s in weights:
 		game.add_skill_xp(s, xp * weights[s])
 	for n in action["needs"]:
@@ -608,7 +610,7 @@ func _on_series_word_ok(result: Dictionary) -> void:
 		_series["recolte"] = int(_series.get("recolte", 0)) + 1
 		Objectives.notify(profile, "recolte", {"res": action["recolte"], "amount": 1})
 	var after := Progression.skill_level(profile, skill)
-	typing.animate_skill(after, _skill_fraction(skill), xp, after > before)
+	typing.animate_skill(after, _skill_fraction(skill), shown_xp, after > before)
 	_series["results"].append(true)
 
 

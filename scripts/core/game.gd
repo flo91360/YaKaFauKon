@@ -353,7 +353,9 @@ func record_typing(result: Dictionary, chars: int, seconds: float, first_attempt
 		session["frappes_ratees"] += 1
 
 
-func add_skill_xp(skill: String, amount: float) -> void:
+## Ajoute de l'expérience (réduite si une jauge est rouge). Renvoie ce qui a été ajouté.
+func add_skill_xp(skill: String, amount: float) -> float:
+	amount *= Progression.xp_factor(profile)
 	if not profile["skills_xp"].has(skill):
 		profile["skills_xp"][skill] = 0.0
 	var before := Progression.skill_level(profile, skill)
@@ -362,6 +364,7 @@ func add_skill_xp(skill: String, amount: float) -> void:
 	session["competences_fin"] = Progression.skill_levels(profile)
 	if after > before:
 		skill_level_up.emit(skill, after)
+	return amount
 
 
 func add_money(amount: int) -> void:
