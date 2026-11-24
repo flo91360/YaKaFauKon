@@ -10,6 +10,20 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.6] - 2026-11-23
+
+### Changé
+
+- **Tolérance selon la longueur du mot** : sur un mot seul, aucune faute n'est
+  admise jusqu'à 3 lettres (« d » ne passe plus pour « dé », ni « lot » pour
+  « lit »), 1 jusqu'à 8 lettres et 2 au-delà. Toujours 2 sur plusieurs mots.
+  « Stricte » et « large » en admettent une de moins ou de plus, et les accents
+  et majuscules restent ignorés.
+- **Chronomètre qui s'adoucit** : après 2 « Trop lent » de suite, le chronomètre
+  suivant demande 80 % de la vitesse habituelle (65 % après 4). Un chronomètre
+  réussi remet l'exigence normale. Un enfant fatigué en fin de séance n'enchaîne
+  plus les échecs.
+
 ## [2.4.5] - 2026-11-23
 
 ### Changé

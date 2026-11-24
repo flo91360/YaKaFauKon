@@ -269,7 +269,8 @@ func _show_settings(p: Dictionary) -> void:
 			_save(p))
 		row.add_child(option)
 	_line("Chronomètre : « parfois » = une frappe sur trois, « souvent » = une sur deux. L'exigence suit la vitesse de l'enfant et se stabilise.", 18)
-	_line("Tolérance : « normale » = 1 faute admise sur un mot seul, 2 sur plusieurs mots. Les accents et majuscules sont toujours ignorés.", 18)
+	_line("Tolérance : « normale » = sur un mot seul, aucune faute jusqu'à 3 lettres, 1 jusqu'à 8 lettres, 2 au-delà ; 2 sur plusieurs mots. « Stricte » en admet une de moins, « large » une de plus. Les accents et majuscules sont toujours ignorés.", 18)
+	_line("Après 2 chronomètres « trop lents » de suite, le suivant demande 80 % de la vitesse habituelle (65 % après 4). Un chronomètre réussi remet l'exigence normale.", 18)
 
 	_section("Vitesse de frappe")
 	var t: Dictionary = p["typing"]
