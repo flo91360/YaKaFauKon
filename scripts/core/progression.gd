@@ -184,7 +184,14 @@ static func current_tier(profile: Dictionary) -> int:
 
 
 static func can_change_career(profile: Dictionary) -> bool:
-	return profile["career"]["current"] == "" or current_tier(profile) >= Data.CAREER_CHANGE_MIN_TIER
+	return profile["career"]["current"] == "" or current_tier(profile) >= Data.CAREER_CHANGE_MIN_TIER or free_change(profile)
+
+
+## Pendant la première séance, l'enfant peut changer une fois de travail sans
+## attendre le palier 2 : le premier choix se fait souvent un peu au hasard.
+static func free_change(profile: Dictionary) -> bool:
+	return profile["career"]["current"] != "" and profile["career"]["tiers"].size() == 1 \
+		and current_tier(profile) < Data.CAREER_CHANGE_MIN_TIER and profile.get("sessions", []).size() <= 1
 
 
 ## Choisit ou change de carrière. L'ancien palier est conservé, la nouvelle

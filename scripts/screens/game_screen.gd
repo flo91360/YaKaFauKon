@@ -39,6 +39,7 @@ var character
 var hud
 var typing
 var tutorial: Control = null
+var _pulse_tween: Tween = null # clignotement de la zone montrée par le tutoriel
 var ui: CanvasLayer
 var paused := false
 
@@ -175,8 +176,10 @@ func _process(delta: float) -> void:
 		fraction = _action_done_minutes / float(Data.ACTIONS[_action_id]["minutes"])
 	hud.update_display(profile, "" if typing.is_open() else _status_text(), fraction)
 	hud.dream_button.visible = not typing.is_open() # le panneau de frappe a besoin de la place
-	hud.family_button.visible = not typing.is_open() and tutorial == null
-	hud.garden_box.visible = not typing.is_open() and tutorial == null
+	# Pendant le tutoriel, la famille et le jardin n'apparaissent qu'à leur étape.
+	var tuto_step: String = tutorial.current_id() if tutorial != null else ""
+	hud.family_button.visible = not typing.is_open() and (tutorial == null or tuto_step == "famille")
+	hud.garden_box.visible = not typing.is_open() and (tutorial == null or tuto_step == "jardin")
 	# La caméra suit le personnage quand il passe de la maison au jardin (ou revient).
 	var zone: String = studio.zone_of(character.position)
 	if zone != _char_zone:
@@ -779,6 +782,9 @@ func _open_family() -> void:
 	panel.met.connect(_on_family_met)
 	panel.moved_in.connect(_on_moved_in)
 	panel.baby_chosen.connect(_on_baby_chosen)
+	panel.gift_given.connect(func(first_try: bool):
+		_on_gift_given(first_try)
+		panel.refresh())
 	panel.declined.connect(func():
 		_game().decline_children()
 		hud.toast("D'accord, pas d'enfant pour l'instant. Tu pourras changer d'avis quand tu veux.", UiTheme.COL_ACCENT, 5.0)
@@ -809,6 +815,22 @@ func _on_family_met(person: Dictionary) -> void:
 			character.stop()
 		if _state == "idle" or _state == "walking":
 			_sync_family())
+
+
+## Le bon cadeau : la complicité monte. Le choix compte comme une consigne lue
+## (comme dans les missions) pour le récapitulatif de l'ergothérapeute.
+func _on_gift_given(first_try: bool) -> void:
+	var game = _game()
+	var who := Family.partner_name(game.profile)
+	var pleased := "ravie" if int(Family.partner(game.profile).get("genre", 0)) == 0 else "ravi"
+	if Family.give_gift(game.profile) < 0:
+		return
+	game.session["choix_total"] = int(game.session.get("choix_total", 0)) + 1
+	if first_try:
+		game.session["choix_justes_du_premier_coup"] = int(game.session.get("choix_justes_du_premier_coup", 0)) + 1
+	game.play_sound("bravo")
+	hud.toast("%s est %s de ton cadeau ! La complicité monte." % [who, pleased], FamilyPanel.COL_FAMILY.darkened(0.1), 5.0, "coeur")
+	game.save_profile()
 
 
 func _on_moved_in() -> void:
@@ -921,6 +943,11 @@ func _on_dream_chosen(dream: String) -> void:
 ## Le rêve est réalisé : après quelques secondes de calme, on le fête.
 func _check_dream(delta: float) -> void:
 	var game = _game()
+	if tutorial == null:
+		var step: Dictionary = game.claim_dream_step()
+		if not step.is_empty():
+			game.play_sound("bravo")
+			hud.toast("Une étape de ton rêve : %s ! +%d pièces" % [step["etape"], step["pieces"]], UiTheme.COL_DREAM.darkened(0.1), 5.0, "reve")
 	if not Dreams.to_celebrate(game.profile):
 		_dream_wait = 0.0
 		return
@@ -1077,6 +1104,11 @@ func _on_tutorial_step(step_id: String) -> void:
 		f.set_marker(false)
 	hud.needs_panel.modulate = Color.WHITE
 	hud.buttons_row.modulate = Color.WHITE
+	if _pulse_tween != null:
+		_pulse_tween.kill() # l'étape précédente ne clignote plus
+		_pulse_tween = null
+	for c in [hud.dream_button, hud.garden_box, hud.family_button]:
+		c.modulate = Color.WHITE
 	match step_id:
 		"objet", "taper":
 			studio.get_object("lavabo").set_marker(true)
@@ -1086,10 +1118,17 @@ func _on_tutorial_step(step_id: String) -> void:
 			_pulse(hud.needs_panel)
 		"boutons":
 			_pulse(hud.buttons_row)
+		"reve":
+			_pulse(hud.dream_button)
+		"jardin":
+			_pulse(hud.garden_box)
+		"famille":
+			_pulse(hud.family_button)
 
 
 func _pulse(control: Control) -> void:
-	var tween := control.create_tween().set_loops(8)
+	_pulse_tween = control.create_tween().set_loops(8)
+	var tween := _pulse_tween
 	tween.tween_property(control, "modulate", Color(1.35, 1.25, 0.9), 0.35)
 	tween.tween_property(control, "modulate", Color.WHITE, 0.35)
 

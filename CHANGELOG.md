@@ -10,6 +10,25 @@ ajouter ici une section `## [X.Y.Z] - AAAA-MM-JJ` décrivant ce qui change pour
 l'enfant ou l'adulte. Sans section, la publication en rédige une à partir des
 titres des commits.
 
+## [2.4.9] - 2026-11-24
+
+### Ajouté
+
+- **Le cadeau du jour** : dans « Ma famille », une petite consigne à lire
+  (« Nora aime la musique. Quel cadeau fais-tu à Nora ? ») et 3 cadeaux au
+  choix. Le bon cadeau fait monter la complicité, un par jour du jeu. Un mauvais
+  choix fait relire la consigne. Le choix compte dans le récapitulatif de l'ergo
+  comme ceux des missions.
+- **Étapes du rêve récompensées** : chaque étape franchie du rêve rapporte
+  20 pièces, sans attendre la grande fête de la fin (100 pièces, 3 étoiles).
+
+### Changé
+
+- **Premier travail** : pendant la première séance, l'enfant peut changer une
+  fois de travail sans attendre le palier 2.
+- **Tutoriel** : trois nouvelles bulles présentent « Mon rêve », le jardin et
+  « Ma famille » avant le choix du premier objectif.
+
 ## [2.4.8] - 2026-11-24
 
 ### Changé

@@ -7,6 +7,7 @@ signal met(person: Dictionary)
 signal moved_in
 signal baby_chosen(child: Dictionary)
 signal declined
+signal gift_given(first_try: bool)
 signal closed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
@@ -18,6 +19,9 @@ const COL_FAMILY := Color(0.93, 0.45, 0.58)
 
 ## Personnes proposées à la rencontre (gardées tant que le panneau est ouvert).
 var people: Array = []
+## Question du cadeau en cours (gardée tant que le panneau est ouvert) et fautes déjà faites.
+var gift: Dictionary = {}
+var _gift_missed := false
 var _box: VBoxContainer
 var _profile: Dictionary
 
@@ -142,6 +146,8 @@ func _show_family() -> void:
 	var pct := UiTheme.label("Complicité %d %%" % Family.complicity(_profile), 19)
 	pct.autowrap_mode = TextServer.AUTOWRAP_OFF
 	bar_row.add_child(pct)
+	if Family.gift_ready(_profile):
+		_box.add_child(_gift_card())
 	if not together:
 		v.add_child(UiTheme.label("Clique sur le canapé pour offrir des fleurs, danser ou faire un câlin. Chaque mot réussi fait monter la complicité.", 18))
 		var move := UiTheme.icon_button("maison", "Vivre ensemble", UiTheme.COL_GOOD if Family.can_move_in(_profile) else UiTheme.COL_GREY, 21)
@@ -155,6 +161,45 @@ func _show_family() -> void:
 		return
 	v.add_child(UiTheme.label("Clique sur le canapé pour passer du temps ensemble.", 18))
 	_show_children()
+
+
+## Le cadeau du jour : lire ce que la personne aime, puis choisir le bon cadeau.
+func _gift_card() -> Control:
+	if gift.is_empty():
+		gift = Family.gift_question(_profile)
+	var card := UiTheme.card(Color(1.0, 0.95, 0.9), 12)
+	card.name = "Cadeau"
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	v.add_child(head)
+	head.add_child(UiTheme.badge("coeur", COL_FAMILY, 36))
+	var text := UiTheme.label("Un cadeau pour aujourd'hui. %s %s" % [gift["consigne"], gift["q"]], 20)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(text)
+	head.add_child(UiTheme.speak_button(func(): return "%s %s %s" % [gift["consigne"], gift["q"], ", ".join(gift["choices"])]))
+	var help := UiTheme.label(gift["aide"], 18, UiTheme.COL_CORAL.darkened(0.2))
+	help.name = "AideCadeau"
+	help.visible = false
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(row)
+	for i in gift["choices"].size():
+		var b := UiTheme.button(gift["choices"][i], COL_FAMILY, 19)
+		b.name = "Cadeau_%d" % i
+		b.pressed.connect(func():
+			if i == int(gift["good"]):
+				gift_given.emit(not _gift_missed)
+				return
+			_gift_missed = true
+			b.disabled = true
+			help.visible = true)
+		row.add_child(b)
+	v.add_child(help)
+	return card
 
 
 func _show_children() -> void:

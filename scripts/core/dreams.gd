@@ -3,15 +3,17 @@ extends RefCounted
 ## montre les étapes pour y arriver et le fête quand il est réalisé.
 ## Fonctions statiques qui travaillent sur le dictionnaire du profil :
 ## profile["reve"] = {"id": rêve en cours ("" = pas choisi), "fete": le rêve en cours
-## a déjà été fêté, "changements": nombre de changements, "realises": [rêves réalisés]}.
+## a déjà été fêté, "changements": nombre de changements, "realises": [rêves réalisés],
+## "jalons": étapes du rêve en cours déjà récompensées (-1 = à recompter)}.
 
 const Data = preload("res://scripts/core/data.gd")
 const Shop = preload("res://scripts/core/shop.gd")
 const Family = preload("res://scripts/core/family.gd")
+const Progression = preload("res://scripts/core/progression.gd")
 
 
 static func new_state() -> Dictionary:
-	return {"id": "", "fete": false, "changements": 0, "realises": []}
+	return {"id": "", "fete": false, "changements": 0, "realises": [], "jalons": 0}
 
 
 ## Remet en ordre l'état lu dans une sauvegarde.
@@ -22,6 +24,7 @@ static func clean(state) -> Dictionary:
 	var id := str(state.get("id", ""))
 	result["id"] = id if Data.DREAMS.has(id) else ""
 	result["changements"] = int(state.get("changements", 0))
+	result["jalons"] = maxi(-1, int(state.get("jalons", -1))) # ancienne sauvegarde : recompté sans récompense
 	var done = state.get("realises", [])
 	if done is Array:
 		for d in done:
@@ -64,6 +67,7 @@ static func choose(profile: Dictionary, dream: String) -> bool:
 		state["changements"] = int(state["changements"]) + 1
 	state["id"] = dream
 	state["fete"] = dream in state["realises"]
+	state["jalons"] = steps_done(profile, dream) # les étapes déjà faites ne rapportent rien
 	return changed
 
 
@@ -134,6 +138,8 @@ static func advice(profile: Dictionary) -> String:
 		return "Réussis tes missions et monte les compétences demandées : tout est dans « Travail »."
 	if now == "":
 		return "Clique sur « Travail » et choisis : %s." % Data.career(career, profile)["label"]
+	if Progression.free_change(profile):
+		return "Pendant ta première séance, tu peux encore changer : clique sur « Travail » et choisis : %s." % Data.career(career, profile)["label"]
 	return "Tu pourras changer de travail à partir du palier %d : continue tes missions, puis clique sur « Travail »." % Data.CAREER_CHANGE_MIN_TIER
 
 
@@ -155,6 +161,29 @@ static func claim(profile: Dictionary) -> Dictionary:
 	return {"pieces": Data.DREAM_REWARD_PIECES, "etoiles": Data.DREAM_REWARD_STARS, "label": Data.dream(state["id"], profile)["label"]}
 
 
+## Une nouvelle étape du rêve vient d'être franchie (sans être la dernière, fêtée à
+## part) : renvoie la petite récompense {pieces, etape} et la note ({} sinon).
+## (Les pièces sont à verser par l'appelant.)
+static func milestone(profile: Dictionary) -> Dictionary:
+	if not has_current(profile):
+		return {}
+	var state := _state(profile)
+	var all := steps(profile)
+	var done := steps_done(profile)
+	var before := int(state.get("jalons", -1))
+	if before < 0 or done >= all.size():
+		state["jalons"] = maxi(before, done)
+		return {}
+	if done <= before:
+		return {}
+	state["jalons"] = done
+	var label := ""
+	for s in all:
+		if s["done"]:
+			label = s["label"]
+	return {"pieces": Data.DREAM_STEP_PIECES * (done - before), "etape": label}
+
+
 ## Cet objectif à choix fait-il avancer le rêve en cours ?
 static func helps(profile: Dictionary, offer: Dictionary) -> bool:
 	var dream := current(profile)
@@ -171,6 +200,8 @@ static func helps(profile: Dictionary, offer: Dictionary) -> bool:
 	var now: String = profile["career"]["current"]
 	if now == "":
 		return offer["type"] == "metier"
+	if now != career and Progression.free_change(profile):
+		return false # il suffit de changer de travail dans « Travail »
 	if now != career: # il faut d'abord atteindre le palier qui permet de changer
 		return offer["type"] in ["missions", "palier"] and int(profile["career"]["tiers"].get(now, 1)) < Data.CAREER_CHANGE_MIN_TIER
 	if offer["type"] in ["missions", "palier"]:

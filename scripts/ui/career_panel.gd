@@ -183,6 +183,8 @@ func _show_status(profile: Dictionary) -> void:
 	var change := UiTheme.button("Changer de travail", Color(0.6, 0.62, 0.68))
 	if Progression.can_change_career(profile):
 		change.pressed.connect(func(): _show_choice(profile, true))
+		if Progression.free_change(profile):
+			_box.add_child(UiTheme.label("Pendant ta première séance, tu peux changer une fois de travail sans attendre.", 20, UiTheme.COL_GOOD.darkened(0.2)))
 	else:
 		change.disabled = true
 		change.tooltip_text = "Possible à partir du palier %d" % Data.CAREER_CHANGE_MIN_TIER

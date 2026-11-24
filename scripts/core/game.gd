@@ -466,6 +466,15 @@ func choose_dream(dream: String) -> void:
 	save_profile()
 
 
+## Récompense une étape du rêve qui vient d'être franchie ({} s'il n'y en a pas).
+func claim_dream_step() -> Dictionary:
+	var reward := Dreams.milestone(profile)
+	if not reward.is_empty():
+		add_money(reward["pieces"])
+		save_profile()
+	return reward
+
+
 ## Fête le rêve qui vient d'être réalisé : verse la récompense et la renvoie
 ## ({} s'il n'y a rien à fêter).
 func claim_dream() -> Dictionary:

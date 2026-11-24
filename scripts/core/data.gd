@@ -614,6 +614,7 @@ static func dream(d: String, profile: Dictionary) -> Dictionary:
 const DREAM_ORDER := ["organisateur", "artisan", "sportif", "chanteur", "scientifique", "ingenieur", "nature", "maison", "famille"]
 const DREAM_REWARD_PIECES := 100
 const DREAM_REWARD_STARS := 3
+const DREAM_STEP_PIECES := 20 # chaque étape franchie du rêve rapporte déjà un peu
 
 
 static func dream_icon(dream: String) -> String:
@@ -636,6 +637,11 @@ const CHILD_NAMES := {
 	1: ["Léo", "Gabriel", "Jules", "Arthur", "Louis", "Paul", "Nino", "Timéo", "Eliott", "Rayan"],
 }
 const FAMILY_LIKES := ["la musique", "les animaux", "la cuisine", "le sport", "les livres", "les jeux de société", "la nature", "le dessin", "la danse", "les voyages"]
+## Le cadeau qui fait plaisir à chaque goût (petite consigne à lire dans « Ma famille »).
+const FAMILY_GIFTS := {"la musique": "un disque", "les animaux": "une peluche de chat", "la cuisine": "un livre de recettes",
+	"le sport": "un ballon", "les livres": "un roman", "les jeux de société": "un jeu de cartes", "la nature": "une plante en pot",
+	"le dessin": "des crayons de couleur", "la danse": "des chaussons de danse", "les voyages": "une carte du monde"}
+const FAMILY_GIFT_COMPLICITY := 8 # le bon cadeau fait monter la complicité (un cadeau par jour du jeu)
 const FAMILY_MEET_SKILLS := {"charisme": 1} # pour rencontrer quelqu'un
 const FAMILY_BABY_SKILLS := {"organisation": 2} # pour accueillir un bébé
 const FAMILY_MOVE_IN := 60 # complicité (sur 100) pour vivre ensemble

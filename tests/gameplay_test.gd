@@ -167,6 +167,15 @@ func _run() -> void:
 	check(screen.tutorial.current_id() == "jauges", "se déplacer fait avancer le tutoriel")
 	screen.tutorial.advance()
 	check(screen.tutorial.current_id() == "objet" and screen.studio.get_object("lavabo")._marker.visible, "la flèche montre le lavabo")
+	await process_frame
+	check(not screen.hud.garden_box.visible and not screen.hud.family_button.visible, "tutoriel : jardin et famille cachés au début")
+	screen.tutorial._show(screen.tutorial.STEPS.map(func(st): return st["id"]).find("jardin"))
+	await process_frame
+	check(screen.hud.garden_box.visible and not screen.hud.family_button.visible, "étape du jardin : le coin du jardin apparaît")
+	screen.tutorial.advance()
+	await process_frame
+	check(screen.tutorial.current_id() == "famille" and screen.hud.family_button.visible, "étape de la famille : le bouton « Ma famille » apparaît")
+	check(screen.tutorial.STEPS.map(func(st): return st["id"]).slice(-4) == ["reve", "jardin", "famille", "objectif"], "le tutoriel présente le rêve, le jardin et la famille avant l'objectif")
 	screen.tutorial._finish(true)
 	check(screen.tutorial == null and profile["tuto_fait"], "le tutoriel peut être passé")
 	screen._close_overlay()
@@ -395,6 +404,8 @@ func _run() -> void:
 	check(profile["career"]["missions"]["artisan"] == 1, "mission comptée pour la carrière")
 	check(game.session["missions_reussies"] == 1, "mission réussie comptée pour l'ergo")
 	check(game.session["choix_total"] == mission["questions"].size(), "choix comptés")
+	check(profile["sessions"].size() == 1 and Progression.free_change(profile), "première séance : un changement de travail libre est possible")
+	profile["sessions"] = [{}, game.session] # comme si c'était la deuxième séance
 	screen._on_career_chosen("organisateur")
 	check(profile["career"]["current"] == "artisan", "changement refusé au palier 1")
 
@@ -546,6 +557,22 @@ func _run() -> void:
 	_arrive(screen, "canape", "danser")
 	check(screen.character.anim == "dance" and studio.family[0].anim == "dance", "danser ensemble")
 	screen.typing._close({"status": "cancel"})
+	# Le cadeau du jour : une petite consigne à lire, comme dans les missions.
+	profile["famille"]["complicite"] = 20
+	profile["famille"]["cadeau_jour"] = -1
+	screen._open_family()
+	await process_frame
+	var gift: Dictionary = screen._overlay.gift
+	check(screen._overlay.find_child("Cadeau", true, false) != null and gift["consigne"] == "%s aime %s." % [Family.partner_name(profile), Family.partner(profile)["aime"]], "« Ma famille » propose un cadeau : la consigne dit ce que la personne aime")
+	var wrong := 0 if int(gift["good"]) != 0 else 1
+	var choices_before: int = game.session["choix_total"]
+	screen._overlay.find_child("Cadeau_%d" % wrong, true, false).pressed.emit()
+	check(screen._overlay.find_child("AideCadeau", true, false).visible and Family.complicity(profile) == 20, "mauvais cadeau : on relit la consigne, rien ne change")
+	screen._overlay.find_child("Cadeau_%d" % int(gift["good"]), true, false).pressed.emit()
+	await process_frame
+	check(Family.complicity(profile) == 20 + Data.FAMILY_GIFT_COMPLICITY and game.session["choix_total"] == choices_before + 1, "bon cadeau : la complicité monte, le choix est compté pour l'ergo")
+	check(screen._overlay.find_child("Cadeau", true, false) == null and not Family.gift_ready(profile), "un seul cadeau par jour du jeu")
+	screen._close_overlay()
 	profile["famille"]["complicite"] = Data.FAMILY_MOVE_IN
 	screen._open_family()
 	var move_button = screen._overlay.find_child("VivreEnsemble", true, false)
